@@ -36,6 +36,22 @@ struct Projectile
 	float life;
 };
 
+struct NeutralNpc
+{
+	WorldPoint position;
+	bool dead;
+	float animationOffset;
+};
+
+struct Asteroid
+{
+	WorldPoint position;
+	WorldPoint velocity;
+	float radius;
+	float rotation;
+	float rotationSpeed;
+};
+
 class Game
 {
 public:
@@ -58,6 +74,7 @@ private:
 
 	void UpdateOnFoot(float deltaSeconds);
 	void UpdateShip(float deltaSeconds);
+	void UpdateAsteroids(float deltaSeconds);
 	void UpdateEnemies(float deltaSeconds);
 	void UpdateProjectiles(float deltaSeconds);
 	void HandleInteraction();
@@ -76,6 +93,8 @@ private:
 	void RenderInterface();
 	void DrawWorldBlock(const Obstacle& obstacle);
 	void DrawCharacter(const WorldPoint& point, float r, float g, float b, bool enemy);
+	void DrawNeutralNpc(const NeutralNpc& npc);
+	void DrawAsteroid(const Asteroid& asteroid);
 	void DrawShip(float x, float y, float angle, float scale, float r, float g, float b);
 
 	PrototypeRenderer* m_Renderer;
@@ -105,6 +124,7 @@ private:
 	bool m_PlayerMoving;
 	std::vector<Obstacle> m_Obstacles;
 	std::vector<Enemy> m_Enemies;
+	std::vector<NeutralNpc> m_NeutralNpcs;
 	std::vector<Projectile> m_Projectiles;
 	float m_WeaponEnergy;
 	float m_ReloadTimer;
@@ -113,7 +133,9 @@ private:
 	WorldPoint m_ShipVelocity;
 	float m_ShipAngle;
 	float m_ShipHealth;
+	float m_ShipImpactFlash;
 	float m_TransitionTimer;
+	std::vector<Asteroid> m_Asteroids;
 	int m_CurrentShip;
 	int m_TravelDestinationShip;
 	std::wstring m_Message;

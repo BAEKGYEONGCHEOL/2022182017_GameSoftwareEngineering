@@ -86,6 +86,7 @@ void Game::Reset()
 	m_ShipVelocity = { 0.0f, 0.0f };
 	m_ShipAngle = Pi * 0.5f;
 	m_ShipHealth = 100.0f;
+	m_ShipImpactFlash = 0.0f;
 	m_TransitionTimer = 0.0f;
 	m_CurrentShip = 0;
 	m_TravelDestinationShip = 1;
@@ -111,6 +112,19 @@ void Game::Reset()
 	m_Enemies.push_back({ { 7.3f, 9.4f }, 2, false });
 	m_Enemies.push_back({ { 9.7f, 9.2f }, 2, false });
 	m_Enemies.push_back({ { 6.8f, 7.8f }, 2, false });
+
+	m_NeutralNpcs.clear();
+	m_NeutralNpcs.push_back({ { -6.5f, -3.0f }, true, 0.0f });
+	m_NeutralNpcs.push_back({ { 2.8f, 2.4f }, true, 1.7f });
+	m_NeutralNpcs.push_back({ { -7.2f, 6.1f }, false, 0.8f });
+	m_NeutralNpcs.push_back({ { 4.8f, -5.8f }, false, 2.4f });
+
+	m_Asteroids.clear();
+	m_Asteroids.push_back({ { -135.0f, 125.0f }, { 31.0f, -8.0f }, 25.0f, 0.2f, 0.45f });
+	m_Asteroids.push_back({ { 150.0f, 235.0f }, { -38.0f, -3.0f }, 31.0f, 1.1f, -0.32f });
+	m_Asteroids.push_back({ { -175.0f, 355.0f }, { 43.0f, -11.0f }, 22.0f, 2.2f, 0.60f });
+	m_Asteroids.push_back({ { 145.0f, 455.0f }, { -34.0f, -7.0f }, 28.0f, 0.7f, -0.48f });
+	m_Asteroids.push_back({ { -120.0f, 565.0f }, { 29.0f, -13.0f }, 20.0f, 1.8f, 0.72f });
 }
 
 void Game::Resize(int width, int height)
@@ -168,6 +182,7 @@ void Game::Update(float deltaSeconds)
 		m_DodgeCooldown = std::max(0.0f, m_DodgeCooldown - deltaSeconds);
 		m_DodgeTimer = std::max(0.0f, m_DodgeTimer - deltaSeconds);
 		m_DamageCooldown = std::max(0.0f, m_DamageCooldown - deltaSeconds);
+		m_ShipImpactFlash = std::max(0.0f, m_ShipImpactFlash - deltaSeconds);
 		m_MessageTimer = std::max(0.0f, m_MessageTimer - deltaSeconds);
 		if (m_ReloadTimer > 0.0f)
 		{
@@ -407,6 +422,7 @@ void Game::UpdateShip(float deltaSeconds)
 	m_ShipVelocity.y *= std::pow(0.38f, deltaSeconds);
 	m_ShipPosition.x += m_ShipVelocity.x * deltaSeconds;
 	m_ShipPosition.y += m_ShipVelocity.y * deltaSeconds;
+	UpdateAsteroids(deltaSeconds);
 
 	const WorldPoint debris[] = { { -90.0f, 170.0f }, { 85.0f, 290.0f }, { -70.0f, 410.0f }, { 55.0f, 520.0f } };
 	for (int i = 0; i < 4; ++i)
@@ -421,13 +437,55 @@ void Game::UpdateShip(float deltaSeconds)
 			SetMessage(L"선체가 충돌했습니다. 항로를 수정하십시오.", 1.5f);
 		}
 	}
-
 	float destinationDistance = Length(m_ShipPosition.x - DestinationPosition.x,
 		m_ShipPosition.y - DestinationPosition.y);
 	if ((m_KeyPressed['e'] || m_KeyPressed['E']) && destinationDistance < 85.0f)
 	{
 		m_Mode = Transition;
 		m_TransitionTimer = 0.0f;
+	}
+}
+
+void Game::UpdateAsteroids(float deltaSeconds)
+{
+	for (size_t i = 0; i < m_Asteroids.size(); ++i)
+	{
+		Asteroid& asteroid = m_Asteroids[i];
+		asteroid.position.x += asteroid.velocity.x * deltaSeconds;
+		asteroid.position.y += asteroid.velocity.y * deltaSeconds;
+		asteroid.rotation += asteroid.rotationSpeed * deltaSeconds;
+
+		if (asteroid.position.x < -210.0f || asteroid.position.x > 210.0f)
+			asteroid.velocity.x *= -1.0f;
+		if (asteroid.position.y < 45.0f) asteroid.position.y += 560.0f;
+		if (asteroid.position.y > 625.0f) asteroid.position.y -= 560.0f;
+
+		float dx = m_ShipPosition.x - asteroid.position.x;
+		float dy = m_ShipPosition.y - asteroid.position.y;
+		float distance = Length(dx, dy);
+		if (distance < asteroid.radius + 22.0f && m_DamageCooldown <= 0.0f)
+		{
+			float normalX = distance > 0.01f ? dx / distance : 1.0f;
+			float normalY = distance > 0.01f ? dy / distance : 0.0f;
+			m_ShipPosition.x += normalX * (asteroid.radius + 22.0f - distance);
+			m_ShipPosition.y += normalY * (asteroid.radius + 22.0f - distance);
+			m_ShipVelocity.x += normalX * 75.0f;
+			m_ShipVelocity.y += normalY * 75.0f;
+			asteroid.velocity.x -= normalX * 24.0f;
+			asteroid.velocity.y -= normalY * 24.0f;
+			m_ShipHealth = std::max(0.0f, m_ShipHealth - 12.0f);
+			m_DamageCooldown = 1.0f;
+			m_ShipImpactFlash = 0.45f;
+			SetMessage(L"운석 피격! 선체 손상과 항로 이탈이 발생했습니다.", 2.0f);
+		}
+	}
+
+	if (m_ShipHealth <= 0.0f)
+	{
+		m_ShipHealth = 35.0f;
+		m_ShipPosition = { 0.0f, std::max(0.0f, m_ShipPosition.y - 90.0f) };
+		m_ShipVelocity = { 0.0f, 0.0f };
+		SetMessage(L"비상 자동 항법이 작동했습니다. 선체 내구도 35%로 복구합니다.", 3.0f);
 	}
 }
 
@@ -523,6 +581,16 @@ void Game::RenderInterior()
 	m_Renderer->DrawRect(0.0f, height * 0.38f, static_cast<float>(width), height * 0.24f, 0.02f, 0.04f, 0.075f, 1.0f);
 	m_Renderer->DrawDiamond(width * 0.34f, height * 0.39f, 330.0f, 180.0f, 0.10f, 0.15f, 0.24f, 0.55f);
 	m_Renderer->DrawDiamond(width * 0.34f, height * 0.39f, 270.0f, 145.0f, 0.18f, 0.28f, 0.42f, 0.18f);
+	// Layered hull ribs, conduits and pressure-door silhouettes establish the ship interior.
+	for (int rib = -3; rib <= 3; ++rib)
+	{
+		float ribX = rib * width * 0.145f;
+		m_Renderer->DrawRect(ribX, height * 0.30f, 10.0f, height * 0.25f, 0.11f, 0.17f, 0.22f, 0.92f);
+		m_Renderer->DrawDiamond(ribX, height * 0.18f, 58.0f, 20.0f, 0.16f, 0.23f, 0.28f, 0.72f);
+	}
+	m_Renderer->DrawRect(-width * 0.36f, height * 0.25f, 92.0f, 54.0f, 0.035f, 0.08f, 0.11f, 1.0f);
+	m_Renderer->DrawRect(-width * 0.36f, height * 0.25f, 62.0f, 32.0f, 0.10f, 0.50f, 0.61f, 0.32f);
+	m_Renderer->DrawRect(width * 0.15f, height * 0.29f, width * 0.28f, 7.0f, 0.07f, 0.34f, 0.40f, 0.72f);
 
 	for (int x = -12; x <= 12; ++x)
 	{
@@ -560,12 +628,15 @@ void Game::RenderInterior()
 	entries.push_back({ m_Player.x + m_Player.y, 1, 0 });
 	for (size_t i = 0; i < m_Enemies.size(); ++i)
 		if (m_Enemies[i].health > 0 && m_Enemies[i].active) entries.push_back({ m_Enemies[i].position.x + m_Enemies[i].position.y, 2, static_cast<int>(i) });
+	for (size_t i = 0; i < m_NeutralNpcs.size(); ++i)
+		entries.push_back({ m_NeutralNpcs[i].position.x + m_NeutralNpcs[i].position.y, 3, static_cast<int>(i) });
 	std::sort(entries.begin(), entries.end(), [](const RenderEntry& a, const RenderEntry& b) { return a.depth < b.depth; });
 	for (size_t i = 0; i < entries.size(); ++i)
 	{
 		if (entries[i].type == 0) DrawWorldBlock(m_Obstacles[entries[i].index]);
 		else if (entries[i].type == 1) DrawCharacter(m_Player, 0.20f, 0.72f, 0.86f, false);
-		else DrawCharacter(m_Enemies[entries[i].index].position, 0.62f, 0.08f, 0.72f, true);
+		else if (entries[i].type == 2) DrawCharacter(m_Enemies[entries[i].index].position, 0.62f, 0.08f, 0.72f, true);
+		else DrawNeutralNpc(m_NeutralNpcs[entries[i].index]);
 	}
 	for (size_t i = 0; i < m_Projectiles.size(); ++i)
 	{
@@ -587,6 +658,16 @@ void Game::RenderInterior()
 	ScreenPoint cockpit = WorldToScreen(CockpitPosition.x, CockpitPosition.y, 24.0f);
 	m_Renderer->DrawRect(cockpit.x, cockpit.y, 55.0f, 36.0f,
 		m_CoreRecovered ? 0.10f : 0.22f, m_CoreRecovered ? 0.72f : 0.16f, m_CoreRecovered ? 0.82f : 0.18f, 0.9f);
+	// Pilot station: raised chair, wraparound console, holographic gauges and forward canopy.
+	m_Renderer->DrawSoftShadow(cockpit.x, cockpit.y - 7.0f, 105.0f, 24.0f, 0.85f);
+	m_Renderer->DrawDiamond(cockpit.x, cockpit.y + 7.0f, 118.0f, 38.0f, 0.055f, 0.11f, 0.15f, 1.0f);
+	m_Renderer->DrawRect(cockpit.x, cockpit.y + 34.0f, 35.0f, 48.0f, 0.07f, 0.12f, 0.16f, 1.0f);
+	m_Renderer->DrawDiamond(cockpit.x - 42.0f, cockpit.y + 28.0f, 40.0f, 18.0f, 0.08f, 0.58f, 0.68f, 0.82f);
+	m_Renderer->DrawDiamond(cockpit.x + 42.0f, cockpit.y + 28.0f, 40.0f, 18.0f, 0.08f, 0.58f, 0.68f, 0.82f);
+	m_Renderer->DrawRect(cockpit.x, cockpit.y + 61.0f, 98.0f, 7.0f, 0.20f, 0.68f, 0.78f, 0.60f);
+	for (int gauge = -2; gauge <= 2; ++gauge)
+		m_Renderer->DrawRect(cockpit.x + gauge * 17.0f, cockpit.y + 18.0f, 8.0f, 4.0f,
+			gauge == 0 ? 0.92f : 0.18f, gauge == 0 ? 0.28f : 0.82f, 0.86f, 0.92f);
 	if (m_CurrentShip == 0)
 	{
 		ScreenPoint signal = WorldToScreen(SignalPosition.x, SignalPosition.y, 12.0f);
@@ -672,6 +753,38 @@ void Game::DrawCharacter(const WorldPoint& point, float r, float g, float b, boo
 	}
 }
 
+void Game::DrawNeutralNpc(const NeutralNpc& npc)
+{
+	ScreenPoint foot = WorldToScreen(npc.position.x, npc.position.y);
+	if (npc.dead)
+	{
+		m_Renderer->DrawSoftShadow(foot.x, foot.y, 55.0f, 15.0f, 0.95f);
+		DrawRotatedRect(m_Renderer, foot.x, foot.y + 9.0f, 45.0f, 18.0f, -0.20f,
+			0.22f, 0.28f, 0.30f, 1.0f);
+		m_Renderer->DrawDiamond(foot.x - 24.0f, foot.y + 14.0f, 18.0f, 15.0f,
+			0.48f, 0.52f, 0.50f, 1.0f);
+		DrawRotatedRect(m_Renderer, foot.x + 24.0f, foot.y + 4.0f, 27.0f, 6.0f, 0.28f,
+			0.13f, 0.17f, 0.18f, 1.0f);
+		m_Renderer->DrawRect(foot.x - 5.0f, foot.y + 10.0f, 7.0f, 4.0f, 0.52f, 0.06f, 0.05f, 0.75f);
+		return;
+	}
+
+	float tremble = std::sin(m_TotalTime * 28.0f + npc.animationOffset) * 2.2f;
+	m_Renderer->DrawSoftShadow(foot.x, foot.y, 30.0f, 11.0f, 0.85f);
+	DrawRotatedRect(m_Renderer, foot.x - 6.0f + tremble, foot.y + 9.0f, 7.0f, 20.0f, 0.12f,
+		0.12f, 0.20f, 0.23f, 1.0f);
+	DrawRotatedRect(m_Renderer, foot.x + 6.0f + tremble, foot.y + 9.0f, 7.0f, 20.0f, -0.12f,
+		0.12f, 0.20f, 0.23f, 1.0f);
+	m_Renderer->DrawRect(foot.x + tremble, foot.y + 31.0f, 25.0f, 29.0f, 0.24f, 0.32f, 0.34f, 1.0f);
+	DrawRotatedRect(m_Renderer, foot.x - 12.0f + tremble, foot.y + 35.0f, 6.0f, 23.0f, -0.55f,
+		0.18f, 0.25f, 0.27f, 1.0f);
+	DrawRotatedRect(m_Renderer, foot.x + 12.0f + tremble, foot.y + 35.0f, 6.0f, 23.0f, 0.55f,
+		0.18f, 0.25f, 0.27f, 1.0f);
+	m_Renderer->DrawDiamond(foot.x + tremble, foot.y + 52.0f, 22.0f, 19.0f, 0.42f, 0.47f, 0.45f, 1.0f);
+	m_Renderer->DrawRect(foot.x + tremble, foot.y + 52.0f, 14.0f, 6.0f, 0.04f, 0.09f, 0.10f, 1.0f);
+	m_Renderer->DrawString(foot.x - 28.0f, foot.y + 67.0f, L"생존자", 0.66f, 0.78f, 0.76f, 0.85f);
+}
+
 void Game::RenderSpace()
 {
 	m_Renderer->BeginFrame(0.004f, 0.008f, 0.025f, 1.0f);
@@ -698,6 +811,7 @@ void Game::RenderSpace()
 		m_Renderer->DrawDiamond(x, y, 72.0f + i * 8.0f, 30.0f + i * 5.0f, 0.18f, 0.21f, 0.25f, 1.0f);
 		m_Renderer->DrawRect(x + 12.0f, y + 7.0f, 26.0f, 5.0f, 0.65f, 0.12f, 0.10f, 0.65f);
 	}
+	for (size_t i = 0; i < m_Asteroids.size(); ++i) DrawAsteroid(m_Asteroids[i]);
 
 	float destinationX = (DestinationPosition.x - m_ShipPosition.x) * 0.72f;
 	float destinationY = (DestinationPosition.y - m_ShipPosition.y) * 0.72f;
@@ -706,7 +820,8 @@ void Game::RenderSpace()
 	m_Renderer->DrawRect(destinationX, destinationY + 12.0f, 70.0f, 20.0f, 0.10f, 0.18f, 0.23f, 1.0f);
 	DrawShip(destinationX, destinationY + 14.0f, -Pi * 0.5f, m_TravelDestinationShip == 1 ? 2.3f : 1.6f,
 		m_TravelDestinationShip == 1 ? 0.32f : 0.20f, 0.48f, 0.58f);
-	DrawShip(0.0f, -35.0f, m_ShipAngle, 1.0f, 0.20f, 0.67f, 0.82f);
+	float impactShake = m_ShipImpactFlash > 0.0f ? std::sin(m_TotalTime * 95.0f) * 6.0f : 0.0f;
+	DrawShip(impactShake, -35.0f + impactShake * 0.35f, m_ShipAngle, 1.0f, 0.20f, 0.67f, 0.82f);
 
 	if (Length(m_ShipVelocity.x, m_ShipVelocity.y) > 80.0f)
 		m_Renderer->DrawDiamond(-std::cos(m_ShipAngle) * 35.0f,
@@ -717,16 +832,58 @@ void Game::RenderSpace()
 		float alpha = Clamp(m_TransitionTimer / 1.4f, 0.0f, 1.0f);
 		m_Renderer->DrawRect(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, 0.0f, 0.0f, alpha);
 	}
+	if (m_ShipImpactFlash > 0.0f)
+	{
+		float flashAlpha = Clamp(m_ShipImpactFlash / 0.45f, 0.0f, 1.0f) * 0.34f;
+		m_Renderer->DrawRect(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height),
+			0.78f, 0.08f, 0.035f, flashAlpha);
+	}
+}
+
+void Game::DrawAsteroid(const Asteroid& asteroid)
+{
+	float x = (asteroid.position.x - m_ShipPosition.x) * 0.72f;
+	float y = (asteroid.position.y - m_ShipPosition.y) * 0.72f;
+	float radius = asteroid.radius * 1.45f;
+	ScreenPoint p0 = Rotate(radius, 0.0f, asteroid.rotation, x, y);
+	ScreenPoint p1 = Rotate(radius * 0.25f, radius * 0.78f, asteroid.rotation, x, y);
+	ScreenPoint p2 = Rotate(-radius * 0.82f, radius * 0.38f, asteroid.rotation, x, y);
+	ScreenPoint p3 = Rotate(-radius * 0.62f, -radius * 0.66f, asteroid.rotation, x, y);
+	m_Renderer->DrawSoftShadow(x + 12.0f, y - 12.0f, radius * 1.9f, radius * 0.65f, 0.92f);
+	m_Renderer->DrawQuad(p0, p1, p2, p3, 0.23f, 0.20f, 0.18f, 1.0f);
+	m_Renderer->DrawDiamond(x - radius * 0.18f, y + radius * 0.16f,
+		radius * 0.55f, radius * 0.34f, 0.10f, 0.09f, 0.085f, 0.82f);
+	m_Renderer->DrawDiamond(x + radius * 0.24f, y - radius * 0.14f,
+		radius * 0.31f, radius * 0.22f, 0.36f, 0.30f, 0.25f, 0.78f);
 }
 
 void Game::DrawShip(float x, float y, float angle, float scale, float r, float g, float b)
 {
-	ScreenPoint nose = Rotate(34.0f * scale, 0.0f, angle, x, y);
-	ScreenPoint upper = Rotate(-18.0f * scale, 20.0f * scale, angle, x, y);
-	ScreenPoint rear = Rotate(-10.0f * scale, 0.0f, angle, x, y);
-	ScreenPoint lower = Rotate(-18.0f * scale, -20.0f * scale, angle, x, y);
-	m_Renderer->DrawQuad(nose, upper, rear, lower, r, g, b, 1.0f);
-	m_Renderer->DrawDiamond(x, y, 17.0f * scale, 10.0f * scale, 0.70f, 0.86f, 0.92f, 1.0f);
+	ScreenPoint nose = Rotate(42.0f * scale, 0.0f, angle, x, y);
+	ScreenPoint shoulderTop = Rotate(4.0f * scale, 15.0f * scale, angle, x, y);
+	ScreenPoint rearTop = Rotate(-30.0f * scale, 12.0f * scale, angle, x, y);
+	ScreenPoint rearBottom = Rotate(-30.0f * scale, -12.0f * scale, angle, x, y);
+	ScreenPoint shoulderBottom = Rotate(4.0f * scale, -15.0f * scale, angle, x, y);
+	ScreenPoint centerRear = Rotate(-13.0f * scale, 0.0f, angle, x, y);
+	m_Renderer->DrawQuad(nose, shoulderTop, centerRear, shoulderBottom, r, g, b, 1.0f);
+	m_Renderer->DrawQuad(shoulderTop, rearTop, centerRear, centerRear, r * 0.62f, g * 0.64f, b * 0.68f, 1.0f);
+	m_Renderer->DrawQuad(centerRear, rearBottom, shoulderBottom, centerRear, r * 0.52f, g * 0.58f, b * 0.63f, 1.0f);
+	// Swept wings and paired engine pods make the silhouette readable while turning.
+	DrawRotatedRect(m_Renderer, x, y, 48.0f * scale, 9.0f * scale, angle, r * 0.58f, g * 0.62f, b * 0.68f, 1.0f);
+	ScreenPoint engineA = Rotate(-24.0f * scale, 17.0f * scale, angle, x, y);
+	ScreenPoint engineB = Rotate(-24.0f * scale, -17.0f * scale, angle, x, y);
+	DrawRotatedRect(m_Renderer, engineA.x, engineA.y, 25.0f * scale, 8.0f * scale, angle,
+		0.08f, 0.18f, 0.23f, 1.0f);
+	DrawRotatedRect(m_Renderer, engineB.x, engineB.y, 25.0f * scale, 8.0f * scale, angle,
+		0.08f, 0.18f, 0.23f, 1.0f);
+	ScreenPoint canopy = Rotate(12.0f * scale, 0.0f, angle, x, y);
+	m_Renderer->DrawDiamond(canopy.x, canopy.y, 20.0f * scale, 11.0f * scale, 0.55f, 0.84f, 0.92f, 0.95f);
+	ScreenPoint armor = Rotate(-7.0f * scale, 0.0f, angle, x, y);
+	m_Renderer->DrawDiamond(armor.x, armor.y, 17.0f * scale, 8.0f * scale, r * 1.15f, g * 1.05f, b, 0.95f);
+	ScreenPoint exhaustA = Rotate(-38.0f * scale, 17.0f * scale, angle, x, y);
+	ScreenPoint exhaustB = Rotate(-38.0f * scale, -17.0f * scale, angle, x, y);
+	m_Renderer->DrawDiamond(exhaustA.x, exhaustA.y, 8.0f * scale, 6.0f * scale, 0.20f, 0.78f, 1.0f, 0.82f);
+	m_Renderer->DrawDiamond(exhaustB.x, exhaustB.y, 8.0f * scale, 6.0f * scale, 0.20f, 0.78f, 1.0f, 0.82f);
 }
 
 void Game::RenderDestination()
@@ -770,7 +927,13 @@ void Game::RenderInterface()
 	{
 		std::wostringstream ship;
 		ship << (m_CurrentShip == 0 ? L"노크티스 선체 " : L"에레보스 선체 ") << static_cast<int>(m_ShipHealth) << L"%";
+		m_Renderer->DrawRect(-width * 0.5f + 105.0f, -height * 0.5f + 27.0f, 194.0f, 35.0f, 0.025f, 0.04f, 0.06f, 0.90f);
+		m_Renderer->DrawRect(-width * 0.5f + 18.0f + m_ShipHealth * 0.82f, -height * 0.5f + 18.0f,
+			m_ShipHealth * 1.64f, 6.0f, m_ShipHealth < 40.0f ? 0.86f : 0.16f,
+			m_ShipHealth < 40.0f ? 0.12f : 0.68f, 0.72f, 1.0f);
 		m_Renderer->DrawString(-width * 0.5f + 22.0f, -height * 0.5f + 25.0f, ship.str(), 0.58f, 0.82f, 0.92f, 1.0f);
+		if (m_ShipImpactFlash > 0.0f)
+			m_Renderer->DrawString(-90.0f, height * 0.5f - 67.0f, L"경고: 선체 충격 감지", 1.0f, 0.28f, 0.16f, 1.0f);
 	}
 
 	std::wstring interaction = InteractionText();
