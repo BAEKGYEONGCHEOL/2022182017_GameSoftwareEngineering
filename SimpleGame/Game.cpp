@@ -94,18 +94,18 @@ void Game::Reset()
 	m_MessageTimer = 6.0f;
 
 	m_Obstacles.clear();
-	m_Obstacles.push_back({ -7.1f, -7.2f, 0.65f, 0.55f, 42.0f, 0.16f, 0.25f, 0.30f });
-	m_Obstacles.push_back({ -4.6f, -6.4f, 0.75f, 0.50f, 48.0f, 0.20f, 0.25f, 0.28f });
-	m_Obstacles.push_back({ -1.8f, -3.6f, 0.55f, 0.85f, 52.0f, 0.19f, 0.23f, 0.28f });
-	m_Obstacles.push_back({ 1.4f, -1.6f, 0.80f, 0.55f, 38.0f, 0.24f, 0.20f, 0.25f });
-	m_Obstacles.push_back({ 4.1f, 0.2f, 0.65f, 0.85f, 54.0f, 0.13f, 0.23f, 0.29f });
-	m_Obstacles.push_back({ 6.1f, 3.1f, 0.80f, 0.60f, 44.0f, 0.19f, 0.25f, 0.29f });
-	m_Obstacles.push_back({ 7.0f, 6.8f, 0.60f, 0.55f, 38.0f, 0.25f, 0.18f, 0.27f });
-	m_Obstacles.push_back({ 3.2f, 7.1f, 0.60f, 0.80f, 50.0f, 0.14f, 0.21f, 0.27f });
-	m_Obstacles.push_back({ -0.7f, 6.2f, 0.75f, 0.50f, 44.0f, 0.18f, 0.24f, 0.29f });
-	m_Obstacles.push_back({ -4.2f, 5.8f, 0.55f, 0.85f, 49.0f, 0.14f, 0.23f, 0.30f });
-	m_Obstacles.push_back({ -7.1f, 4.0f, 0.80f, 0.55f, 45.0f, 0.17f, 0.25f, 0.31f });
-	m_Obstacles.push_back({ -2.6f, 1.0f, 0.65f, 0.65f, 40.0f, 0.21f, 0.22f, 0.27f });
+	m_Obstacles.push_back({ -7.1f, -7.2f, 0.65f, 0.55f, 42.0f, 0.16f, 0.25f, 0.30f, MedicalPod });
+	m_Obstacles.push_back({ -4.6f, -6.4f, 0.75f, 0.50f, 48.0f, 0.20f, 0.25f, 0.28f, ControlConsole });
+	m_Obstacles.push_back({ -1.8f, -3.6f, 0.55f, 0.85f, 52.0f, 0.19f, 0.23f, 0.28f, CoolantPipe });
+	m_Obstacles.push_back({ 1.4f, -1.6f, 0.80f, 0.55f, 38.0f, 0.24f, 0.20f, 0.25f, CargoCrate });
+	m_Obstacles.push_back({ 4.1f, 0.2f, 0.65f, 0.85f, 54.0f, 0.13f, 0.23f, 0.29f, PowerRelay });
+	m_Obstacles.push_back({ 6.1f, 3.1f, 0.80f, 0.60f, 44.0f, 0.19f, 0.25f, 0.29f, CargoCrate });
+	m_Obstacles.push_back({ 7.0f, 6.8f, 0.60f, 0.55f, 38.0f, 0.25f, 0.18f, 0.27f, PowerRelay });
+	m_Obstacles.push_back({ 3.2f, 7.1f, 0.60f, 0.80f, 50.0f, 0.14f, 0.21f, 0.27f, EngineModule });
+	m_Obstacles.push_back({ -0.7f, 6.2f, 0.75f, 0.50f, 44.0f, 0.18f, 0.24f, 0.29f, ControlConsole });
+	m_Obstacles.push_back({ -4.2f, 5.8f, 0.55f, 0.85f, 49.0f, 0.14f, 0.23f, 0.30f, CoolantPipe });
+	m_Obstacles.push_back({ -7.1f, 4.0f, 0.80f, 0.55f, 45.0f, 0.17f, 0.25f, 0.31f, CargoCrate });
+	m_Obstacles.push_back({ -2.6f, 1.0f, 0.65f, 0.65f, 40.0f, 0.21f, 0.22f, 0.27f, MedicalPod });
 
 	m_Enemies.clear();
 	m_Enemies.push_back({ { 9.2f, 7.2f }, 2, false });
@@ -114,10 +114,10 @@ void Game::Reset()
 	m_Enemies.push_back({ { 6.8f, 7.8f }, 2, false });
 
 	m_NeutralNpcs.clear();
-	m_NeutralNpcs.push_back({ { -6.5f, -3.0f }, true, 0.0f });
-	m_NeutralNpcs.push_back({ { 2.8f, 2.4f }, true, 1.7f });
-	m_NeutralNpcs.push_back({ { -7.2f, 6.1f }, false, 0.8f });
-	m_NeutralNpcs.push_back({ { 4.8f, -5.8f }, false, 2.4f });
+	m_NeutralNpcs.push_back({ { -6.5f, -3.0f }, true, 0.0f, -1, false });
+	m_NeutralNpcs.push_back({ { 2.8f, 2.4f }, true, 1.7f, -1, false });
+	m_NeutralNpcs.push_back({ { -7.2f, 6.1f }, false, 0.8f, 0, false });
+	m_NeutralNpcs.push_back({ { 4.8f, -5.8f }, false, 2.4f, 1, false });
 
 	m_Asteroids.clear();
 	m_Asteroids.push_back({ { -135.0f, 125.0f }, { 31.0f, -8.0f }, 25.0f, 0.2f, 0.45f });
@@ -361,6 +361,25 @@ void Game::UpdateProjectiles(float deltaSeconds)
 
 void Game::HandleInteraction()
 {
+	for (size_t i = 0; i < m_NeutralNpcs.size(); ++i)
+	{
+		NeutralNpc& npc = m_NeutralNpcs[i];
+		if (npc.dead || !IsNear(npc.position, 1.25f)) continue;
+		if (npc.dialogueId == 0)
+		{
+			SetMessage(npc.talked
+				? L"통신장교 서윤: 공허종의 신호에도 구조 요청이 섞여 있었어요. 지휘부는 그 부분을 지웠습니다."
+				: L"통신장교 서윤: 우리가 먼저 그 문을 열었어요... 그런데 모두 적이 먼저 공격했다고 믿고 있어요.", 5.0f);
+		}
+		else
+		{
+			SetMessage(npc.talked
+				? L"정비사 라울: 살아남으면 진실을 전해 주세요. 복수만으로는 이 함선을 다시 움직일 수 없습니다."
+				: L"정비사 라울: 냉각관이 터질 때 동료들을 두고 도망쳤습니다... 아직도 그 소리가 들립니다.", 5.0f);
+		}
+		npc.talked = true;
+		return;
+	}
 	if (m_Quest == InspectTerminal && IsNear(TerminalPosition, 1.15f))
 	{
 		m_Quest = FindCore;
@@ -555,6 +574,12 @@ std::wstring Game::InteractionText() const
 		return m_TravelDestinationShip == 0 ? L"[E] 노크티스에 도킹" : L"[E] 에레보스에 도킹";
 	}
 	if (m_Mode != OnFoot) return L"";
+	for (size_t i = 0; i < m_NeutralNpcs.size(); ++i)
+	{
+		const NeutralNpc& npc = m_NeutralNpcs[i];
+		if (!npc.dead && IsNear(npc.position, 1.25f))
+			return npc.dialogueId == 0 ? L"[E] 통신장교 서윤과 대화" : L"[E] 정비사 라울과 대화";
+	}
 	if (m_Quest == InspectTerminal && IsNear(TerminalPosition, 1.15f)) return L"[E] 단말기 조사";
 	if (m_CurrentShip == 0 && !m_RecordRead && IsNear(RecordPosition, 1.05f)) return L"[E] 손상된 기록 읽기";
 	if (m_CurrentShip == 0 && m_CoreRecovered && !m_SignalChecked && IsNear(SignalPosition, 1.05f)) return L"[E] 구조 신호 조사";
@@ -607,10 +632,10 @@ void Game::RenderInterior()
 
 	for (int i = -12; i <= 12; ++i)
 	{
-		Obstacle north = { static_cast<float>(i), -12.2f, 0.48f, 0.25f, 58.0f, 0.12f, 0.18f, 0.22f };
-		Obstacle south = { static_cast<float>(i), 12.2f, 0.48f, 0.25f, 58.0f, 0.10f, 0.16f, 0.21f };
-		Obstacle west = { -12.2f, static_cast<float>(i), 0.25f, 0.48f, 58.0f, 0.11f, 0.17f, 0.22f };
-		Obstacle east = { 12.2f, static_cast<float>(i), 0.25f, 0.48f, 58.0f, 0.11f, 0.16f, 0.21f };
+		Obstacle north = { static_cast<float>(i), -12.2f, 0.48f, 0.25f, 58.0f, 0.12f, 0.18f, 0.22f, HullWall };
+		Obstacle south = { static_cast<float>(i), 12.2f, 0.48f, 0.25f, 58.0f, 0.10f, 0.16f, 0.21f, HullWall };
+		Obstacle west = { -12.2f, static_cast<float>(i), 0.25f, 0.48f, 58.0f, 0.11f, 0.17f, 0.22f, HullWall };
+		Obstacle east = { 12.2f, static_cast<float>(i), 0.25f, 0.48f, 58.0f, 0.11f, 0.16f, 0.21f, HullWall };
 		DrawWorldBlock(north);
 		DrawWorldBlock(south);
 		DrawWorldBlock(west);
@@ -689,10 +714,86 @@ void Game::DrawWorldBlock(const Obstacle& obstacle)
 	float width = (obstacle.halfWidth + obstacle.halfHeight) * TileWidth;
 	float topY = foot.y + obstacle.visualHeight;
 	m_Renderer->DrawSoftShadow(foot.x + 10.0f, foot.y - 5.0f, width * 0.90f, 18.0f, 0.85f);
-	m_Renderer->DrawRect(foot.x, foot.y + obstacle.visualHeight * 0.5f, width * 0.72f, obstacle.visualHeight,
-		obstacle.r * 0.70f, obstacle.g * 0.70f, obstacle.b * 0.76f, 1.0f);
-	m_Renderer->DrawDiamond(foot.x, topY, width, (obstacle.halfWidth + obstacle.halfHeight) * TileHeight,
-		obstacle.r, obstacle.g, obstacle.b, 1.0f);
+	if (obstacle.type == HullWall)
+	{
+		m_Renderer->DrawRect(foot.x, foot.y + obstacle.visualHeight * 0.5f, width * 0.72f, obstacle.visualHeight,
+			obstacle.r * 0.70f, obstacle.g * 0.70f, obstacle.b * 0.76f, 1.0f);
+		m_Renderer->DrawDiamond(foot.x, topY, width, (obstacle.halfWidth + obstacle.halfHeight) * TileHeight,
+			obstacle.r, obstacle.g, obstacle.b, 1.0f);
+		m_Renderer->DrawRect(foot.x, foot.y + obstacle.visualHeight * 0.52f, width * 0.62f, 4.0f,
+			0.20f, 0.42f, 0.48f, 0.45f);
+		return;
+	}
+
+	if (obstacle.type == CargoCrate)
+	{
+		m_Renderer->DrawRect(foot.x, foot.y + obstacle.visualHeight * 0.44f, width * 0.76f, obstacle.visualHeight * 0.88f,
+			0.16f, 0.19f, 0.20f, 1.0f);
+		m_Renderer->DrawDiamond(foot.x, topY, width, 27.0f, 0.29f, 0.25f, 0.20f, 1.0f);
+		m_Renderer->DrawRect(foot.x, foot.y + obstacle.visualHeight * 0.48f, 6.0f, obstacle.visualHeight * 0.78f,
+			0.62f, 0.39f, 0.12f, 0.92f);
+		m_Renderer->DrawRect(foot.x, topY, width * 0.62f, 3.0f, 0.72f, 0.45f, 0.14f, 0.86f);
+		return;
+	}
+
+	if (obstacle.type == ControlConsole)
+	{
+		m_Renderer->DrawRect(foot.x, foot.y + obstacle.visualHeight * 0.34f, width * 0.54f, obstacle.visualHeight * 0.67f,
+			0.07f, 0.12f, 0.15f, 1.0f);
+		m_Renderer->DrawDiamond(foot.x, topY - 3.0f, width * 0.88f, 26.0f, 0.08f, 0.42f, 0.50f, 1.0f);
+		m_Renderer->DrawRect(foot.x, topY + 1.0f, width * 0.53f, 9.0f, 0.12f, 0.72f, 0.82f, 0.82f);
+		for (int light = -2; light <= 2; ++light)
+			m_Renderer->DrawRect(foot.x + light * 9.0f, topY + 2.0f, 4.0f, 3.0f,
+				light == 1 ? 0.92f : 0.16f, light == 1 ? 0.25f : 0.78f, 0.68f, 1.0f);
+		return;
+	}
+
+	if (obstacle.type == MedicalPod)
+	{
+		m_Renderer->DrawRect(foot.x, foot.y + obstacle.visualHeight * 0.46f, width * 0.68f, obstacle.visualHeight * 0.86f,
+			0.12f, 0.18f, 0.20f, 1.0f);
+		m_Renderer->DrawDiamond(foot.x, topY - 2.0f, width * 0.82f, 30.0f, 0.25f, 0.48f, 0.50f, 0.90f);
+		m_Renderer->DrawRect(foot.x, topY - 1.0f, 17.0f, 17.0f, 0.78f, 0.82f, 0.77f, 0.95f);
+		m_Renderer->DrawRect(foot.x, topY - 1.0f, 5.0f, 15.0f, 0.15f, 0.62f, 0.58f, 1.0f);
+		m_Renderer->DrawRect(foot.x, topY - 1.0f, 15.0f, 5.0f, 0.15f, 0.62f, 0.58f, 1.0f);
+		return;
+	}
+
+	if (obstacle.type == CoolantPipe)
+	{
+		for (int pipe = -1; pipe <= 1; pipe += 2)
+		{
+			m_Renderer->DrawRect(foot.x + pipe * width * 0.18f, foot.y + obstacle.visualHeight * 0.48f,
+				11.0f, obstacle.visualHeight * 0.94f, 0.11f, 0.26f, 0.31f, 1.0f);
+			m_Renderer->DrawRect(foot.x + pipe * width * 0.18f, topY - 8.0f, 17.0f, 6.0f,
+				0.26f, 0.55f, 0.61f, 0.95f);
+		}
+		m_Renderer->DrawRect(foot.x, foot.y + 14.0f, width * 0.68f, 8.0f, 0.08f, 0.18f, 0.21f, 1.0f);
+		return;
+	}
+
+	if (obstacle.type == PowerRelay)
+	{
+		float pulse = 0.68f + std::sin(m_TotalTime * 6.0f + obstacle.x) * 0.20f;
+		m_Renderer->DrawRect(foot.x, foot.y + obstacle.visualHeight * 0.48f, width * 0.58f, obstacle.visualHeight * 0.96f,
+			0.08f, 0.12f, 0.17f, 1.0f);
+		m_Renderer->DrawDiamond(foot.x, topY, width * 0.76f, 24.0f, 0.16f, 0.28f, 0.34f, 1.0f);
+		m_Renderer->DrawRect(foot.x, foot.y + obstacle.visualHeight * 0.53f, 8.0f, obstacle.visualHeight * 0.62f,
+			0.20f, 0.78f, 0.92f, pulse);
+		m_Renderer->DrawDiamond(foot.x, topY + 4.0f, 14.0f, 10.0f, 0.32f, 0.88f, 1.0f, pulse);
+		return;
+	}
+
+	// Engine modules use a broad armored housing and a pulsing central coolant core.
+	float enginePulse = 0.55f + std::sin(m_TotalTime * 4.0f) * 0.18f;
+	m_Renderer->DrawRect(foot.x, foot.y + obstacle.visualHeight * 0.43f, width * 0.82f, obstacle.visualHeight * 0.86f,
+		0.07f, 0.12f, 0.15f, 1.0f);
+	m_Renderer->DrawDiamond(foot.x, topY, width, 31.0f, 0.13f, 0.20f, 0.24f, 1.0f);
+	m_Renderer->DrawDiamond(foot.x, topY + 2.0f, width * 0.48f, 18.0f, 0.18f, 0.68f, 0.78f, enginePulse);
+	m_Renderer->DrawRect(foot.x - width * 0.31f, foot.y + obstacle.visualHeight * 0.46f, 7.0f, obstacle.visualHeight * 0.64f,
+		0.30f, 0.35f, 0.36f, 1.0f);
+	m_Renderer->DrawRect(foot.x + width * 0.31f, foot.y + obstacle.visualHeight * 0.46f, 7.0f, obstacle.visualHeight * 0.64f,
+		0.30f, 0.35f, 0.36f, 1.0f);
 }
 
 void Game::DrawCharacter(const WorldPoint& point, float r, float g, float b, bool enemy)
@@ -782,7 +883,8 @@ void Game::DrawNeutralNpc(const NeutralNpc& npc)
 		0.18f, 0.25f, 0.27f, 1.0f);
 	m_Renderer->DrawDiamond(foot.x + tremble, foot.y + 52.0f, 22.0f, 19.0f, 0.42f, 0.47f, 0.45f, 1.0f);
 	m_Renderer->DrawRect(foot.x + tremble, foot.y + 52.0f, 14.0f, 6.0f, 0.04f, 0.09f, 0.10f, 1.0f);
-	m_Renderer->DrawString(foot.x - 28.0f, foot.y + 67.0f, L"생존자", 0.66f, 0.78f, 0.76f, 0.85f);
+	m_Renderer->DrawString(foot.x - 42.0f, foot.y + 67.0f,
+		npc.dialogueId == 0 ? L"통신장교 서윤" : L"정비사 라울", 0.66f, 0.78f, 0.76f, 0.85f);
 }
 
 void Game::RenderSpace()

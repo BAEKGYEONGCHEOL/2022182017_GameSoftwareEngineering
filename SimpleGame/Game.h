@@ -10,6 +10,17 @@ struct WorldPoint
 	float y;
 };
 
+enum InteriorObjectType
+{
+	CargoCrate,
+	ControlConsole,
+	MedicalPod,
+	PowerRelay,
+	CoolantPipe,
+	EngineModule,
+	HullWall
+};
+
 struct Obstacle
 {
 	float x;
@@ -20,6 +31,7 @@ struct Obstacle
 	float r;
 	float g;
 	float b;
+	InteriorObjectType type;
 };
 
 struct Enemy
@@ -41,6 +53,8 @@ struct NeutralNpc
 	WorldPoint position;
 	bool dead;
 	float animationOffset;
+	int dialogueId;
+	bool talked;
 };
 
 struct Asteroid
