@@ -52,12 +52,20 @@ struct Projectile
 	float distanceTravelled;
 	float maximumDistance;
 	int damage;
+	bool charged;
 };
 
 struct ExperienceOrb
 {
 	WorldPoint position;
 	float life;
+};
+
+struct StoryDocument
+{
+	WorldPoint position;
+	int documentId;
+	bool read;
 };
 
 struct NeutralNpc
@@ -183,6 +191,7 @@ class Game
 	bool m_LevelWeaponCollected;
 	int m_AmmoInMagazine;
 	int m_ReserveAmmo;
+	int m_ShotsFired;
 	int m_PlayerLevel;
 	int m_Experience;
 	int m_ExperienceToNextLevel;
@@ -191,7 +200,10 @@ class Game
 	int m_Agility;
 	int m_Vitality;
 	float m_PlayerMaxHealth;
+	float m_LevelUpFlash;
 	std::vector<int> m_FirstLevelTiles;
+	std::vector<WorldPoint> m_LevelCorpses;
+	std::vector<StoryDocument> m_StoryDocuments;
 	int m_FirstLevelSize;
 	unsigned int m_LevelSeed;
 	ModelLibrary m_ModelLibrary;

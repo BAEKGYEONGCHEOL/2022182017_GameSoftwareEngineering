@@ -11,6 +11,11 @@ ellipse 0 0 20 7 0.20 0.92 1.00 1.0
 ellipse -8 0 22 5 0.12 0.58 0.95 0.45
 rect 4 0 7 2 0.88 1.00 1.00 1.0
 
+model charged_bullet
+ellipse 0 0 28 12 1.00 0.52 0.12 1.0
+ellipse -11 0 34 8 0.95 0.18 0.08 0.52
+diamond 3 0 12 8 1.00 0.94 0.54 1.0
+
 model void_scout
 ellipse 0 14 34 42 0.35 0.06 0.46 1.0
 ellipse 0 39 24 20 0.48 0.08 0.62 1.0
@@ -29,3 +34,18 @@ model xp_orb
 ellipse 0 0 18 18 0.24 0.92 0.72 0.95
 ellipse 0 0 34 20 0.12 0.65 0.48 0.25
 
+model fallen_soldier
+ellipse -20 8 19 17 0.42 0.46 0.45 1.0
+rect 4 5 43 17 0.17 0.24 0.27 1.0
+rect 27 0 28 7 0.08 0.14 0.16 1.0
+rect 1 5 7 4 0.58 0.06 0.05 0.75
+ellipse -23 9 11 5 0.03 0.08 0.09 1.0
+
+model field_document
+rect 0 2 21 15 0.66 0.63 0.50 1.0
+rect 0 2 15 2 0.20 0.30 0.31 0.9
+diamond 0 2 31 18 0.72 0.55 0.16 0.20
+
+model field_document_read
+rect 0 2 21 15 0.28 0.34 0.32 1.0
+rect 0 2 15 2 0.16 0.64 0.58 0.9

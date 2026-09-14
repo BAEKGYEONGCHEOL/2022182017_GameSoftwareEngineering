@@ -98,6 +98,7 @@ void Game::Reset()
 	m_LevelWeaponCollected = false;
 	m_AmmoInMagazine = 12;
 	m_ReserveAmmo = 48;
+	m_ShotsFired = 0;
 	m_PlayerLevel = 1;
 	m_Experience = 0;
 	m_ExperienceToNextLevel = 100;
@@ -106,6 +107,7 @@ void Game::Reset()
 	m_Agility = 1;
 	m_Vitality = 1;
 	m_PlayerMaxHealth = 100.0f;
+	m_LevelUpFlash = 0.0f;
 	m_FirstLevelSize = 21;
 	m_LevelSeed = static_cast<unsigned int>(std::time(NULL));
 	m_FirstLevelTiles.clear();
@@ -217,6 +219,7 @@ void Game::Update(float deltaSeconds)
 		m_DodgeTimer = std::max(0.0f, m_DodgeTimer - deltaSeconds);
 		m_DamageCooldown = std::max(0.0f, m_DamageCooldown - deltaSeconds);
 		m_ShipImpactFlash = std::max(0.0f, m_ShipImpactFlash - deltaSeconds);
+		m_LevelUpFlash = std::max(0.0f, m_LevelUpFlash - deltaSeconds);
 		m_MessageTimer = std::max(0.0f, m_MessageTimer - deltaSeconds);
 		if (m_ReloadTimer > 0.0f)
 		{
@@ -386,6 +389,34 @@ void Game::UpdateFirstLevel(float deltaSeconds)
 		m_Quest = EarnExperience;
 		SetMessage(L"훈련용 펄스 소총 획득: 12발 탄창, 예비 탄약 48발. 마우스로 사격합니다.", 4.0f);
 	}
+	else if (m_KeyPressed['e'] || m_KeyPressed['E'])
+	{
+		for (size_t index = 0; index < m_StoryDocuments.size(); ++index)
+		{
+			StoryDocument& document = m_StoryDocuments[index];
+			if (!IsNear(document.position, 1.1f))
+				continue;
+
+			document.read = true;
+			if (document.documentId == 0)
+			{
+				SetMessage(
+					L"작전 기록: 지휘부는 민간인 대피가 끝나기 전에 이 구역을 봉쇄했다.", 4.5f);
+			}
+			else if (document.documentId == 1)
+			{
+				SetMessage(
+					L"의무관 기록: 공허종 정찰체 하나가 무기를 버린 부상자를 지나쳤다.", 4.5f);
+			}
+			else
+			{
+				SetMessage(
+					L"찢어진 명령서: '모든 외계 신호는 기만이다.' 발령 시각은 첫 공격보다 이르다.",
+					4.5f);
+			}
+			break;
+		}
+	}
 
 	if (m_MousePressed)
 		HandleAttack();
@@ -426,7 +457,7 @@ void Game::GenerateFirstLevel()
 
 	std::mt19937 random(m_LevelSeed);
 	std::uniform_int_distribution<int> tileDistribution(1, m_FirstLevelSize - 2);
-	for (int attempt = 0; attempt < 90; ++attempt)
+	for (int attempt = 0; attempt < 28; ++attempt)
 	{
 		int x = tileDistribution(random);
 		int y = tileDistribution(random);
@@ -440,6 +471,15 @@ void Game::GenerateFirstLevel()
 	}
 
 	m_Player = {0.0f, 0.0f};
+	m_LevelCorpses.clear();
+	m_LevelCorpses.push_back({2.0f, 1.0f});
+	m_LevelCorpses.push_back({-2.0f, -1.0f});
+	m_LevelCorpses.push_back({0.0f, 2.0f});
+	m_LevelCorpses.push_back({-1.0f, 2.0f});
+	m_StoryDocuments.clear();
+	m_StoryDocuments.push_back({{1.4f, 1.0f}, 0, false});
+	m_StoryDocuments.push_back({{-1.5f, -1.0f}, 1, false});
+	m_StoryDocuments.push_back({{0.4f, 2.2f}, 2, false});
 	m_Enemies.clear();
 	std::uniform_int_distribution<int> enemyDistribution(1, m_FirstLevelSize - 2);
 	while (m_Enemies.size() < 6)
@@ -532,6 +572,7 @@ void Game::AwardExperience(int amount, const WorldPoint& position)
 		++m_PlayerLevel;
 		m_ExperienceToNextLevel = 100 + (m_PlayerLevel - 1) * 50;
 		m_StatPoints += 3;
+		m_LevelUpFlash = 3.2f;
 		m_Quest = AllocateStats;
 		SetMessage(L"레벨 상승! 1: 화력, 2: 기동, 3: 생존에 스탯 포인트를 배분하십시오.", 5.0f);
 	}
@@ -670,13 +711,18 @@ void Game::HandleAttack()
 	}
 	float bulletSpeed = 11.0f + static_cast<float>(m_Agility - 1) * 0.8f;
 	int bulletDamage = 1 + (m_Firepower - 1) / 2;
+	++m_ShotsFired;
+	bool chargedBullet = m_Mode == FirstLevel && m_ShotsFired % 4 == 0;
+	if (chargedBullet)
+		++bulletDamage;
 	m_Projectiles.push_back({m_Player,
 		m_Player,
 		{worldDirection.x * bulletSpeed, worldDirection.y * bulletSpeed},
 		1.4f,
 		0.0f,
 		14.0f,
-		bulletDamage});
+		bulletDamage,
+		chargedBullet});
 }
 
 void Game::UpdateProjectiles(float deltaSeconds)
@@ -977,6 +1023,14 @@ std::wstring Game::InteractionText() const
 	}
 	if (m_Mode == FirstLevel && !m_LevelWeaponCollected && IsNear(FirstLevelWeaponPosition, 1.2f))
 		return L"[E] 훈련용 펄스 소총 회수";
+	if (m_Mode == FirstLevel)
+	{
+		for (size_t index = 0; index < m_StoryDocuments.size(); ++index)
+		{
+			if (IsNear(m_StoryDocuments[index].position, 1.1f))
+				return m_StoryDocuments[index].read ? L"[E] 문서 다시 읽기" : L"[E] 현장 문서 조사";
+		}
+	}
 	if (m_Mode != OnFoot)
 		return L"";
 	for (size_t i = 0; i < m_NeutralNpcs.size(); ++i)
@@ -1776,6 +1830,25 @@ void Game::RenderFirstLevel()
 		m_ModelLibrary.Draw(m_Renderer, "pulse_rifle_pickup", weapon.x, weapon.y, pulse);
 	}
 
+	for (size_t index = 0; index < m_LevelCorpses.size(); ++index)
+	{
+		ScreenPoint corpse = WorldToScreen(m_LevelCorpses[index].x, m_LevelCorpses[index].y, 3.0f);
+		m_Renderer->DrawSoftShadow(corpse.x, corpse.y - 3.0f, 58.0f, 13.0f, 0.82f);
+		m_ModelLibrary.Draw(m_Renderer, "fallen_soldier", corpse.x, corpse.y, 1.0f);
+	}
+
+	for (size_t index = 0; index < m_StoryDocuments.size(); ++index)
+	{
+		const StoryDocument& document = m_StoryDocuments[index];
+		float pulse = document.read ? 1.0f : 1.0f + std::sin(m_TotalTime * 5.0f + index) * 0.12f;
+		ScreenPoint paper = WorldToScreen(document.position.x, document.position.y, 7.0f);
+		m_ModelLibrary.Draw(m_Renderer,
+			document.read ? "field_document_read" : "field_document",
+			paper.x,
+			paper.y,
+			pulse);
+	}
+
 	for (size_t index = 0; index < m_Enemies.size(); ++index)
 	{
 		if (!m_Enemies[index].active || m_Enemies[index].health <= 0)
@@ -1797,15 +1870,20 @@ void Game::RenderFirstLevel()
 			28.0f);
 		float tracerWidth =
 			std::max(10.0f, Length(bullet.x - previous.x, bullet.y - previous.y) * 1.7f);
+		bool charged = m_Projectiles[index].charged;
 		m_Renderer->DrawDiamond((bullet.x + previous.x) * 0.5f,
 			(bullet.y + previous.y) * 0.5f,
 			tracerWidth,
 			5.0f,
-			0.10f,
-			0.62f,
-			0.94f,
-			0.42f);
-		m_ModelLibrary.Draw(m_Renderer, "pulse_bullet", bullet.x, bullet.y, 1.0f);
+			charged ? 1.0f : 0.10f,
+			charged ? 0.34f : 0.62f,
+			charged ? 0.08f : 0.94f,
+			charged ? 0.70f : 0.42f);
+		m_ModelLibrary.Draw(m_Renderer,
+			m_Projectiles[index].charged ? "charged_bullet" : "pulse_bullet",
+			bullet.x,
+			bullet.y,
+			1.0f);
 	}
 
 	for (size_t index = 0; index < m_ExperienceOrbs.size(); ++index)
@@ -1814,6 +1892,7 @@ void Game::RenderFirstLevel()
 		ScreenPoint orb = WorldToScreen(
 			m_ExperienceOrbs[index].position.x, m_ExperienceOrbs[index].position.y, 28.0f + bob);
 		m_ModelLibrary.Draw(m_Renderer, "xp_orb", orb.x, orb.y, 1.0f);
+		m_Renderer->DrawString(orb.x - 19.0f, orb.y + 18.0f, L"+25 XP", 0.32f, 1.0f, 0.72f, 0.94f);
 	}
 }
 
@@ -1886,7 +1965,9 @@ void Game::RenderInterface()
 				0.90f);
 			m_Renderer->DrawString(-width * 0.5f + 20.0f,
 				-height * 0.5f + 54.0f,
-				m_ReloadTimer > 0.0f ? L"펄스 카빈 충전 중..." : weapon.str(),
+				m_ReloadTimer > 0.0f
+					? (m_Mode == FirstLevel ? L"펄스 소총 재장전 중..." : L"펄스 카빈 충전 중...")
+					: weapon.str(),
 				0.34f,
 				0.86f,
 				0.92f,
@@ -1901,28 +1982,56 @@ void Game::RenderInterface()
 			std::wostringstream stats;
 			stats << L"화력 " << m_Firepower << L"  기동 " << m_Agility << L"  생존 " << m_Vitality
 				  << L"  포인트 " << m_StatPoints;
+			float experienceRatio = Clamp(
+				static_cast<float>(m_Experience) / static_cast<float>(m_ExperienceToNextLevel),
+				0.0f,
+				1.0f);
 			m_Renderer->DrawRect(width * 0.5f - 174.0f,
-				-height * 0.5f + 44.0f,
+				-height * 0.5f + 52.0f,
 				326.0f,
-				66.0f,
+				82.0f,
 				0.025f,
 				0.04f,
 				0.06f,
 				0.90f);
 			m_Renderer->DrawString(width * 0.5f - 325.0f,
-				-height * 0.5f + 56.0f,
+				-height * 0.5f + 70.0f,
 				level.str(),
 				0.38f,
 				0.90f,
 				0.76f,
 				1.0f);
 			m_Renderer->DrawString(width * 0.5f - 325.0f,
-				-height * 0.5f + 28.0f,
+				-height * 0.5f + 42.0f,
 				stats.str(),
 				0.68f,
 				0.78f,
 				0.86f,
 				1.0f);
+			m_Renderer->DrawRect(width * 0.5f - 174.0f,
+				-height * 0.5f + 20.0f,
+				302.0f,
+				8.0f,
+				0.035f,
+				0.08f,
+				0.09f,
+				1.0f);
+			m_Renderer->DrawRect(width * 0.5f - 325.0f + experienceRatio * 151.0f,
+				-height * 0.5f + 20.0f,
+				experienceRatio * 302.0f,
+				6.0f,
+				0.18f,
+				0.88f,
+				0.62f,
+				1.0f);
+			if ((m_ShotsFired + 1) % 4 == 0 && m_LevelWeaponCollected)
+				m_Renderer->DrawString(-width * 0.5f + 20.0f,
+					-height * 0.5f + 82.0f,
+					L"다음 탄환: 주황색 강화 펄스탄 (+1 피해)",
+					1.0f,
+					0.55f,
+					0.20f,
+					1.0f);
 		}
 	}
 	else if (m_Mode == ShipControl || m_Mode == Transition)
@@ -1951,6 +2060,27 @@ void Game::RenderInterface()
 		if (m_ShipImpactFlash > 0.0f)
 			m_Renderer->DrawString(
 				-90.0f, height * 0.5f - 67.0f, L"경고: 선체 충격 감지", 1.0f, 0.28f, 0.16f, 1.0f);
+	}
+
+	if (m_Mode == FirstLevel && m_LevelUpFlash > 0.0f)
+	{
+		float pulse = 0.78f + std::sin(m_TotalTime * 8.0f) * 0.18f;
+		m_Renderer->DrawRect(0.0f, 75.0f, 460.0f, 118.0f, 0.025f, 0.08f, 0.075f, 0.94f);
+		m_Renderer->DrawString(-84.0f, 103.0f, L"레벨 상승", 0.30f, 1.0f, 0.72f, pulse);
+		m_Renderer->DrawString(-178.0f,
+			70.0f,
+			L"스탯 포인트 +3    [1] 화력  [2] 기동  [3] 생존",
+			0.78f,
+			0.92f,
+			0.86f,
+			1.0f);
+		m_Renderer->DrawString(-133.0f,
+			42.0f,
+			L"포인트를 모두 사용하면 첫 레벨이 완료됩니다.",
+			0.52f,
+			0.72f,
+			0.70f,
+			1.0f);
 	}
 
 	std::wstring interaction = InteractionText();

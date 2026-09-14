@@ -8,6 +8,7 @@ SimpleGame/x64/
 x64/Debug/*.exe
 x64/Debug/*.pdb
 x64/Debug/Shaders/
+x64/Debug/Data/
 
 # Common compiler and linker artifacts
 *.obj
@@ -17,4 +18,3 @@ x64/Debug/Shaders/
 *.tlog
 *.lastbuildstate
 *.recipe
-
