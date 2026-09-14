@@ -16,10 +16,12 @@ void main()
 	color += texture(u_Image, v_UV - stepUV * 1.384615).rgb * 0.316216;
 	color += texture(u_Image, v_UV + stepUV * 3.230769).rgb * 0.070270;
 	color += texture(u_Image, v_UV - stepUV * 3.230769).rgb * 0.070270;
+	color += texture(u_Image, v_UV + stepUV * 5.5).rgb * 0.035;
+	color += texture(u_Image, v_UV - stepUV * 5.5).rgb * 0.035;
 	if (u_ExtractBright == 1)
 	{
 		float brightness = max(color.r, max(color.g, color.b));
-		color *= smoothstep(0.28, 0.72, brightness);
+		color *= smoothstep(0.22, 0.58, brightness);
 	}
 	FragColor = vec4(color, 1.0);
 }

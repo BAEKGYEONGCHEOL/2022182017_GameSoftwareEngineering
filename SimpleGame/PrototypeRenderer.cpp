@@ -95,6 +95,13 @@ void PrototypeRenderer::Present(float timeSeconds)
 	glUniform2f(glGetUniformLocation(m_BloomProgram, "u_Direction"), 0.0f, 1.0f);
 	glUniform1i(glGetUniformLocation(m_BloomProgram, "u_ExtractBright"), 0);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
+
+	// A third, wider horizontal pass removes the cross-shaped two-pass bloom around small console lights.
+	glBindFramebuffer(GL_FRAMEBUFFER, m_BloomFramebuffers[0]);
+	glBindTexture(GL_TEXTURE_2D, m_BloomTextures[1]);
+	glUniform2f(glGetUniformLocation(m_BloomProgram, "u_Direction"), 1.65f, 0.0f);
+	glUniform1i(glGetUniformLocation(m_BloomProgram, "u_ExtractBright"), 0);
+	glDrawArrays(GL_TRIANGLES, 0, 6);
 	glDisableVertexAttribArray(bloomPosition);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -104,7 +111,7 @@ void PrototypeRenderer::Present(float timeSeconds)
 	glBindTexture(GL_TEXTURE_2D, m_SceneTexture);
 	glUniform1i(glGetUniformLocation(m_PostProgram, "u_Scene"), 0);
 	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, m_BloomTextures[1]);
+	glBindTexture(GL_TEXTURE_2D, m_BloomTextures[0]);
 	glUniform1i(glGetUniformLocation(m_PostProgram, "u_Bloom"), 1);
 	glUniform2f(glGetUniformLocation(m_PostProgram, "u_Resolution"), static_cast<float>(m_Width), static_cast<float>(m_Height));
 	glUniform1f(glGetUniformLocation(m_PostProgram, "u_Time"), timeSeconds);
@@ -148,14 +155,19 @@ void PrototypeRenderer::DrawDiamond(float x, float y, float width, float height,
 
 void PrototypeRenderer::DrawSoftShadow(float x, float y, float width, float height, float strength)
 {
-	for (int layer = 8; layer >= 1; --layer)
+	// More closely spaced layers create a smoother penumbra; the offset implies a shared overhead light.
+	for (int layer = 12; layer >= 1; --layer)
 	{
-		float spread = static_cast<float>(layer) * 2.6f;
-		float alpha = strength * (9.0f - static_cast<float>(layer)) / 68.0f;
-		DrawDiamond(x - 10.0f - layer * 0.8f, y - 6.0f, width + spread * 2.4f, height + spread,
-			0.0f, 0.0f, 0.012f, alpha);
+		float normalized = (13.0f - static_cast<float>(layer)) / 12.0f;
+		float spread = static_cast<float>(layer) * 1.65f;
+		float alpha = strength * normalized * normalized * 0.075f;
+		DrawDiamond(x - 8.0f - layer * 0.55f, y - 5.0f - layer * 0.12f,
+			width + spread * 2.5f, height + spread, 0.0f, 0.0f, 0.010f, alpha);
 	}
-	DrawDiamond(x - 5.0f, y - 2.0f, width * 0.72f, height * 0.62f, 0.0f, 0.0f, 0.008f, strength * 0.22f);
+	DrawDiamond(x - 5.0f, y - 2.0f, width * 0.78f, height * 0.68f,
+		0.0f, 0.0f, 0.006f, strength * 0.27f);
+	DrawDiamond(x - 2.0f, y - 1.0f, width * 0.54f, height * 0.46f,
+		0.0f, 0.0f, 0.004f, strength * 0.20f);
 }
 
 void PrototypeRenderer::DrawVertices(const float* vertices, int count, float r, float g, float b, float a)

@@ -603,19 +603,6 @@ void Game::RenderInterior()
 	m_Renderer->BeginFrame(m_CurrentShip == 0 ? 0.012f : 0.018f, 0.020f, m_CurrentShip == 0 ? 0.035f : 0.045f, 1.0f);
 	int width = m_Renderer->Width();
 	int height = m_Renderer->Height();
-	m_Renderer->DrawRect(0.0f, height * 0.38f, static_cast<float>(width), height * 0.24f, 0.02f, 0.04f, 0.075f, 1.0f);
-	m_Renderer->DrawDiamond(width * 0.34f, height * 0.39f, 330.0f, 180.0f, 0.10f, 0.15f, 0.24f, 0.55f);
-	m_Renderer->DrawDiamond(width * 0.34f, height * 0.39f, 270.0f, 145.0f, 0.18f, 0.28f, 0.42f, 0.18f);
-	// Layered hull ribs, conduits and pressure-door silhouettes establish the ship interior.
-	for (int rib = -3; rib <= 3; ++rib)
-	{
-		float ribX = rib * width * 0.145f;
-		m_Renderer->DrawRect(ribX, height * 0.30f, 10.0f, height * 0.25f, 0.11f, 0.17f, 0.22f, 0.92f);
-		m_Renderer->DrawDiamond(ribX, height * 0.18f, 58.0f, 20.0f, 0.16f, 0.23f, 0.28f, 0.72f);
-	}
-	m_Renderer->DrawRect(-width * 0.36f, height * 0.25f, 92.0f, 54.0f, 0.035f, 0.08f, 0.11f, 1.0f);
-	m_Renderer->DrawRect(-width * 0.36f, height * 0.25f, 62.0f, 32.0f, 0.10f, 0.50f, 0.61f, 0.32f);
-	m_Renderer->DrawRect(width * 0.15f, height * 0.29f, width * 0.28f, 7.0f, 0.07f, 0.34f, 0.40f, 0.72f);
 
 	for (int x = -12; x <= 12; ++x)
 	{
