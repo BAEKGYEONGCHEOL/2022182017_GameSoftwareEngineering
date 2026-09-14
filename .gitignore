@@ -1,0 +1,20 @@
+# Visual Studio user data and caches
+.vs/
+
+# Intermediate build output
+SimpleGame/x64/
+
+# Generated executable output (runtime DLLs remain versioned)
+x64/Debug/*.exe
+x64/Debug/*.pdb
+x64/Debug/Shaders/
+
+# Common compiler and linker artifacts
+*.obj
+*.pch
+*.ilk
+*.idb
+*.tlog
+*.lastbuildstate
+*.recipe
+

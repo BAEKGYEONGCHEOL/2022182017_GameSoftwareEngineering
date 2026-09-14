@@ -1,89 +1,138 @@
-/*
-Copyright 2022 Lee Taek Hee (Tech University of Korea)
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the What The Hell License. Do it plz.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY.
-*/
-
 #include "stdafx.h"
+
 #include <iostream>
-#include "Dependencies\glew.h"
-#include "Dependencies\freeglut.h"
+#include <Windows.h>
+#include "Dependencies\\glew.h"
+#include "Dependencies\\freeglut.h"
+#include "Game.h"
+#include "PrototypeRenderer.h"
 
-#include "Renderer.h"
-
-Renderer *g_Renderer = NULL;
-
-void RenderScene(void)
+namespace
 {
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glClearColor(0.0f, 0.3f, 0.3f, 1.0f);
+	PrototypeRenderer* g_Renderer = NULL;
+	Game* g_Game = NULL;
+	int g_PreviousTime = 0;
+	float g_Accumulator = 0.0f;
+	const float FixedStep = 1.0f / 60.0f;
+}
 
-	// Renderer Test
-	g_Renderer->DrawSolidRect(0, 0, 0, 4, 1, 0, 1, 1);
-
+void RenderScene()
+{
+	if (g_Game != NULL) g_Game->Render();
 	glutSwapBuffers();
 }
 
-void Idle(void)
+void Idle()
 {
-	RenderScene();
+	int currentTime = glutGet(GLUT_ELAPSED_TIME);
+	float elapsedSeconds = static_cast<float>(currentTime - g_PreviousTime) / 1000.0f;
+	g_PreviousTime = currentTime;
+	if (elapsedSeconds > 0.25f) elapsedSeconds = 0.25f;
+	g_Accumulator += elapsedSeconds;
+
+	while (g_Accumulator >= FixedStep)
+	{
+		if (g_Game != NULL) g_Game->Update(FixedStep);
+		g_Accumulator -= FixedStep;
+	}
+	glutPostRedisplay();
 }
 
-void MouseInput(int button, int state, int x, int y)
+void Reshape(int width, int height)
 {
-	RenderScene();
+	if (g_Game != NULL) g_Game->Resize(width, height);
 }
 
-void KeyInput(unsigned char key, int x, int y)
+void KeyDown(unsigned char key, int, int)
 {
-	RenderScene();
+	if (g_Game != NULL) g_Game->KeyDown(key);
 }
 
-void SpecialKeyInput(int key, int x, int y)
+void KeyUp(unsigned char key, int, int)
 {
-	RenderScene();
+	if (g_Game != NULL) g_Game->KeyUp(key);
 }
 
-int main(int argc, char **argv)
+void SpecialDown(int key, int, int)
 {
-	// Initialize GL things
+	if (g_Game != NULL) g_Game->SpecialDown(key);
+}
+
+void SpecialUp(int key, int, int)
+{
+	if (g_Game != NULL) g_Game->SpecialUp(key);
+}
+
+void MouseMove(int x, int y)
+{
+	if (g_Game != NULL) g_Game->MouseMove(x, y);
+}
+
+void MouseButton(int button, int state, int x, int y)
+{
+	if (g_Game != NULL)
+	{
+		g_Game->MouseMove(x, y);
+		g_Game->MouseButton(button, state);
+	}
+}
+
+void CloseGame()
+{
+	delete g_Game;
+	g_Game = NULL;
+	delete g_Renderer;
+	g_Renderer = NULL;
+}
+
+int main(int argc, char** argv)
+{
 	glutInit(&argc, argv);
-	glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGBA);
-	glutInitWindowPosition(0, 0);
-	glutInitWindowSize(500, 500);
-	glutCreateWindow("Game Software Engineering KPU");
+	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA);
+	glutInitWindowPosition(80, 50);
+	glutInitWindowSize(1100, 700);
+	glutCreateWindow("NOCTIS - Tutorial Prototype");
+	HWND gameWindow = GetForegroundWindow();
+	if (gameWindow != NULL) SetWindowTextW(gameWindow, L"노크티스 - 튜토리얼 프로토타입");
 
-	glewInit();
-	if (glewIsSupported("GL_VERSION_3_0"))
+	GLenum glewResult = glewInit();
+	if (glewResult != GLEW_OK)
 	{
-		std::cout << " GLEW Version is 3.0\n ";
+		std::cerr << "GLEW initialization failed: " << glewGetErrorString(glewResult) << "\n";
+		return 1;
 	}
-	else
+	if (!GLEW_VERSION_3_3)
 	{
-		std::cout << "GLEW 3.0 not supported\n ";
+		std::cerr << "OpenGL 3.3 is required.\n";
+		return 1;
 	}
 
-	// Initialize Renderer
-	g_Renderer = new Renderer(500, 500);
+	g_Renderer = new PrototypeRenderer(1100, 700);
 	if (!g_Renderer->IsInitialized())
 	{
-		std::cout << "Renderer could not be initialized.. \n";
+		std::cerr << "Renderer could not be initialized.\n";
+		delete g_Renderer;
+		g_Renderer = NULL;
+		return 1;
 	}
+	g_Game = new Game(g_Renderer);
+	g_PreviousTime = glutGet(GLUT_ELAPSED_TIME);
 
+	glutIgnoreKeyRepeat(1);
 	glutDisplayFunc(RenderScene);
 	glutIdleFunc(Idle);
-	glutKeyboardFunc(KeyInput);
-	glutMouseFunc(MouseInput);
-	glutSpecialFunc(SpecialKeyInput);
+	glutReshapeFunc(Reshape);
+	glutKeyboardFunc(KeyDown);
+	glutKeyboardUpFunc(KeyUp);
+	glutSpecialFunc(SpecialDown);
+	glutSpecialUpFunc(SpecialUp);
+	glutPassiveMotionFunc(MouseMove);
+	glutMotionFunc(MouseMove);
+	glutMouseFunc(MouseButton);
+	glutCloseFunc(CloseGame);
+	glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_GLUTMAINLOOP_RETURNS);
 
 	glutMainLoop();
-
-	delete g_Renderer;
-
-    return 0;
+	CloseGame();
+	return 0;
 }
-

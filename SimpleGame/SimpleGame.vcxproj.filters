@@ -30,6 +30,12 @@
     <ClInclude Include="Renderer.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+	<ClInclude Include="Game.h">
+	  <Filter>헤더 파일</Filter>
+	</ClInclude>
+	<ClInclude Include="PrototypeRenderer.h">
+	  <Filter>헤더 파일</Filter>
+	</ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -41,6 +47,12 @@
     <ClCompile Include="Renderer.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+	<ClCompile Include="Game.cpp">
+	  <Filter>소스 파일</Filter>
+	</ClCompile>
+	<ClCompile Include="PrototypeRenderer.cpp">
+	  <Filter>소스 파일</Filter>
+	</ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="Shaders\SolidRect.fs">
@@ -49,5 +61,20 @@
     <None Include="Shaders\SolidRect.vs">
       <Filter>소스 파일\Shaders</Filter>
     </None>
+	<None Include="Shaders\Prototype.fs">
+	  <Filter>소스 파일\Shaders</Filter>
+	</None>
+	<None Include="Shaders\Prototype.vs">
+	  <Filter>소스 파일\Shaders</Filter>
+	</None>
+	<None Include="Shaders\PrototypePost.fs">
+	  <Filter>소스 파일\Shaders</Filter>
+	</None>
+	<None Include="Shaders\PrototypePost.vs">
+	  <Filter>소스 파일\Shaders</Filter>
+	</None>
+	<None Include="Shaders\PrototypeBloom.fs">
+	  <Filter>소스 파일\Shaders</Filter>
+	</None>
   </ItemGroup>
 </Project>
