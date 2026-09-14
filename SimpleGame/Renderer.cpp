@@ -6,21 +6,20 @@ Renderer::Renderer(int windowSizeX, int windowSizeY)
 	Initialize(windowSizeX, windowSizeY);
 }
 
-
 Renderer::~Renderer()
 {
 }
 
 void Renderer::Initialize(int windowSizeX, int windowSizeY)
 {
-	//Set window size
+	// Set window size
 	m_WindowSizeX = windowSizeX;
 	m_WindowSizeY = windowSizeY;
 
-	//Load shaders
+	// Load shaders
 	m_SolidRectShader = CompileShaders("./Shaders/SolidRect.vs", "./Shaders/SolidRect.fs");
-	
-	//Create VBOs
+
+	// Create VBOs
 	CreateVertexBufferObjects();
 
 	if (m_SolidRectShader > 0 && m_VBORect > 0)
@@ -36,11 +35,25 @@ bool Renderer::IsInitialized()
 
 void Renderer::CreateVertexBufferObjects()
 {
-	float rect[]
-		=
-	{
-		-1.f / m_WindowSizeX, -1.f / m_WindowSizeY, 0.f, -1.f / m_WindowSizeX, 1.f / m_WindowSizeY, 0.f, 1.f / m_WindowSizeX, 1.f / m_WindowSizeY, 0.f, //Triangle1
-		-1.f / m_WindowSizeX, -1.f / m_WindowSizeY, 0.f,  1.f / m_WindowSizeX, 1.f / m_WindowSizeY, 0.f, 1.f / m_WindowSizeX, -1.f / m_WindowSizeY, 0.f, //Triangle2
+	float rect[] = {
+		-1.f / m_WindowSizeX,
+		-1.f / m_WindowSizeY,
+		0.f,
+		-1.f / m_WindowSizeX,
+		1.f / m_WindowSizeY,
+		0.f,
+		1.f / m_WindowSizeX,
+		1.f / m_WindowSizeY,
+		0.f, // Triangle1
+		-1.f / m_WindowSizeX,
+		-1.f / m_WindowSizeY,
+		0.f,
+		1.f / m_WindowSizeX,
+		1.f / m_WindowSizeY,
+		0.f,
+		1.f / m_WindowSizeX,
+		-1.f / m_WindowSizeY,
+		0.f, // Triangle2
 	};
 
 	glGenBuffers(1, &m_VBORect);
@@ -50,10 +63,11 @@ void Renderer::CreateVertexBufferObjects()
 
 void Renderer::AddShader(GLuint ShaderProgram, const char* pShaderText, GLenum ShaderType)
 {
-	//쉐이더 오브젝트 생성
+	// 쉐이더 오브젝트 생성
 	GLuint ShaderObj = glCreateShader(ShaderType);
 
-	if (ShaderObj == 0) {
+	if (ShaderObj == 0)
+	{
 		fprintf(stderr, "Error creating shader type %d\n", ShaderType);
 	}
 
@@ -62,25 +76,27 @@ void Renderer::AddShader(GLuint ShaderProgram, const char* pShaderText, GLenum S
 	GLint Lengths[1];
 
 	size_t slen = strlen(pShaderText);
-	if (slen > INT_MAX) {
+	if (slen > INT_MAX)
+	{
 		// Handle error
 	}
 	GLint len = (GLint)slen;
 
 	Lengths[0] = len;
-	//쉐이더 코드를 쉐이더 오브젝트에 할당
+	// 쉐이더 코드를 쉐이더 오브젝트에 할당
 	glShaderSource(ShaderObj, 1, p, Lengths);
 
-	//할당된 쉐이더 코드를 컴파일
+	// 할당된 쉐이더 코드를 컴파일
 	glCompileShader(ShaderObj);
 
 	GLint success;
 	// ShaderObj 가 성공적으로 컴파일 되었는지 확인
 	glGetShaderiv(ShaderObj, GL_COMPILE_STATUS, &success);
-	if (!success) {
+	if (!success)
+	{
 		GLchar InfoLog[1024];
 
-		//OpenGL 의 shader log 데이터를 가져옴
+		// OpenGL 의 shader log 데이터를 가져옴
 		glGetShaderInfoLog(ShaderObj, 1024, NULL, InfoLog);
 		fprintf(stderr, "Error compiling shader type %d: '%s'\n", ShaderType, InfoLog);
 		printf("%s \n", pShaderText);
@@ -90,7 +106,7 @@ void Renderer::AddShader(GLuint ShaderProgram, const char* pShaderText, GLenum S
 	glAttachShader(ShaderProgram, ShaderObj);
 }
 
-bool Renderer::ReadFile(char* filename, std::string *target)
+bool Renderer::ReadFile(char* filename, std::string* target)
 {
 	std::ifstream file(filename);
 	if (file.fail())
@@ -100,7 +116,8 @@ bool Renderer::ReadFile(char* filename, std::string *target)
 		return false;
 	}
 	std::string line;
-	while (getline(file, line)) {
+	while (getline(file, line))
+	{
 		target->append(line.c_str());
 		target->append("\n");
 	}
@@ -109,22 +126,25 @@ bool Renderer::ReadFile(char* filename, std::string *target)
 
 GLuint Renderer::CompileShaders(char* filenameVS, char* filenameFS)
 {
-	GLuint ShaderProgram = glCreateProgram(); //빈 쉐이더 프로그램 생성
+	GLuint ShaderProgram = glCreateProgram(); // 빈 쉐이더 프로그램 생성
 
-	if (ShaderProgram == 0) { //쉐이더 프로그램이 만들어졌는지 확인
+	if (ShaderProgram == 0)
+	{ // 쉐이더 프로그램이 만들어졌는지 확인
 		fprintf(stderr, "Error creating shader program\n");
 	}
 
 	std::string vs, fs;
 
-	//shader.vs 가 vs 안으로 로딩됨
-	if (!ReadFile(filenameVS, &vs)) {
+	// shader.vs 가 vs 안으로 로딩됨
+	if (!ReadFile(filenameVS, &vs))
+	{
 		printf("Error compiling vertex shader\n");
 		return -1;
 	};
 
-	//shader.fs 가 fs 안으로 로딩됨
-	if (!ReadFile(filenameFS, &fs)) {
+	// shader.fs 가 fs 안으로 로딩됨
+	if (!ReadFile(filenameFS, &fs))
+	{
 		printf("Error compiling fragment shader\n");
 		return -1;
 	};
@@ -136,26 +156,30 @@ GLuint Renderer::CompileShaders(char* filenameVS, char* filenameFS)
 	AddShader(ShaderProgram, fs.c_str(), GL_FRAGMENT_SHADER);
 
 	GLint Success = 0;
-	GLchar ErrorLog[1024] = { 0 };
+	GLchar ErrorLog[1024] = {0};
 
-	//Attach 완료된 shaderProgram 을 링킹함
+	// Attach 완료된 shaderProgram 을 링킹함
 	glLinkProgram(ShaderProgram);
 
-	//링크가 성공했는지 확인
+	// 링크가 성공했는지 확인
 	glGetProgramiv(ShaderProgram, GL_LINK_STATUS, &Success);
 
-	if (Success == 0) {
+	if (Success == 0)
+	{
 		// shader program 로그를 받아옴
 		glGetProgramInfoLog(ShaderProgram, sizeof(ErrorLog), NULL, ErrorLog);
-		std::cout << filenameVS << ", " << filenameFS << " Error linking shader program\n" << ErrorLog;
+		std::cout << filenameVS << ", " << filenameFS << " Error linking shader program\n"
+				  << ErrorLog;
 		return -1;
 	}
 
 	glValidateProgram(ShaderProgram);
 	glGetProgramiv(ShaderProgram, GL_VALIDATE_STATUS, &Success);
-	if (!Success) {
+	if (!Success)
+	{
 		glGetProgramInfoLog(ShaderProgram, sizeof(ErrorLog), NULL, ErrorLog);
-		std::cout << filenameVS << ", " << filenameFS << " Error validating shader program\n" << ErrorLog;
+		std::cout << filenameVS << ", " << filenameFS << " Error validating shader program\n"
+				  << ErrorLog;
 		return -1;
 	}
 
@@ -165,13 +189,14 @@ GLuint Renderer::CompileShaders(char* filenameVS, char* filenameFS)
 	return ShaderProgram;
 }
 
-void Renderer::DrawSolidRect(float x, float y, float z, float size, float r, float g, float b, float a)
+void Renderer::DrawSolidRect(
+	float x, float y, float z, float size, float r, float g, float b, float a)
 {
 	float newX, newY;
 
 	GetGLPosition(x, y, &newX, &newY);
 
-	//Program select
+	// Program select
 	glUseProgram(m_SolidRectShader);
 
 	glUniform4f(glGetUniformLocation(m_SolidRectShader, "u_Trans"), newX, newY, 0, size);
@@ -189,7 +214,7 @@ void Renderer::DrawSolidRect(float x, float y, float z, float size, float r, flo
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void Renderer::GetGLPosition(float x, float y, float *newX, float *newY)
+void Renderer::GetGLPosition(float x, float y, float* newX, float* newY)
 {
 	*newX = x * 2.f / m_WindowSizeX;
 	*newY = y * 2.f / m_WindowSizeY;

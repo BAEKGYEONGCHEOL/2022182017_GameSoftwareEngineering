@@ -1,0 +1,26 @@
+BasedOnStyle: Microsoft
+
+Language: Cpp
+Standard: c++14
+
+UseTab: Always
+TabWidth: 4
+IndentWidth: 4
+ContinuationIndentWidth: 4
+ColumnLimit: 100
+
+BreakBeforeBraces: Allman
+AllowShortBlocksOnASingleLine: Never
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+
+BinPackArguments: false
+BinPackParameters: false
+AlignAfterOpenBracket: DontAlign
+BreakConstructorInitializers: BeforeComma
+
+PointerAlignment: Left
+ReferenceAlignment: Left
+SortIncludes: Never

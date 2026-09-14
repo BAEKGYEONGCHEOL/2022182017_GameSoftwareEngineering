@@ -9,16 +9,17 @@
 
 namespace
 {
-	PrototypeRenderer* g_Renderer = NULL;
-	Game* g_Game = NULL;
-	int g_PreviousTime = 0;
-	float g_Accumulator = 0.0f;
-	const float FixedStep = 1.0f / 60.0f;
-}
+PrototypeRenderer* g_Renderer = NULL;
+Game* g_Game = NULL;
+int g_PreviousTime = 0;
+float g_Accumulator = 0.0f;
+const float FixedStep = 1.0f / 60.0f;
+} // namespace
 
 void RenderScene()
 {
-	if (g_Game != NULL) g_Game->Render();
+	if (g_Game != NULL)
+		g_Game->Render();
 	glutSwapBuffers();
 }
 
@@ -27,12 +28,14 @@ void Idle()
 	int currentTime = glutGet(GLUT_ELAPSED_TIME);
 	float elapsedSeconds = static_cast<float>(currentTime - g_PreviousTime) / 1000.0f;
 	g_PreviousTime = currentTime;
-	if (elapsedSeconds > 0.25f) elapsedSeconds = 0.25f;
+	if (elapsedSeconds > 0.25f)
+		elapsedSeconds = 0.25f;
 	g_Accumulator += elapsedSeconds;
 
 	while (g_Accumulator >= FixedStep)
 	{
-		if (g_Game != NULL) g_Game->Update(FixedStep);
+		if (g_Game != NULL)
+			g_Game->Update(FixedStep);
 		g_Accumulator -= FixedStep;
 	}
 	glutPostRedisplay();
@@ -40,32 +43,38 @@ void Idle()
 
 void Reshape(int width, int height)
 {
-	if (g_Game != NULL) g_Game->Resize(width, height);
+	if (g_Game != NULL)
+		g_Game->Resize(width, height);
 }
 
 void KeyDown(unsigned char key, int, int)
 {
-	if (g_Game != NULL) g_Game->KeyDown(key);
+	if (g_Game != NULL)
+		g_Game->KeyDown(key);
 }
 
 void KeyUp(unsigned char key, int, int)
 {
-	if (g_Game != NULL) g_Game->KeyUp(key);
+	if (g_Game != NULL)
+		g_Game->KeyUp(key);
 }
 
 void SpecialDown(int key, int, int)
 {
-	if (g_Game != NULL) g_Game->SpecialDown(key);
+	if (g_Game != NULL)
+		g_Game->SpecialDown(key);
 }
 
 void SpecialUp(int key, int, int)
 {
-	if (g_Game != NULL) g_Game->SpecialUp(key);
+	if (g_Game != NULL)
+		g_Game->SpecialUp(key);
 }
 
 void MouseMove(int x, int y)
 {
-	if (g_Game != NULL) g_Game->MouseMove(x, y);
+	if (g_Game != NULL)
+		g_Game->MouseMove(x, y);
 }
 
 void MouseButton(int button, int state, int x, int y)
@@ -93,7 +102,8 @@ int main(int argc, char** argv)
 	glutInitWindowSize(1100, 700);
 	glutCreateWindow("NOCTIS - Tutorial Prototype");
 	HWND gameWindow = GetForegroundWindow();
-	if (gameWindow != NULL) SetWindowTextW(gameWindow, L"노크티스 - 튜토리얼 프로토타입");
+	if (gameWindow != NULL)
+		SetWindowTextW(gameWindow, L"노크티스 - 튜토리얼 프로토타입");
 
 	GLenum glewResult = glewInit();
 	if (glewResult != GLEW_OK)

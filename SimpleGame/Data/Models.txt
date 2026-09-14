@@ -1,0 +1,31 @@
+# model primitive offsetX offsetY width height red green blue alpha
+
+model pulse_rifle_pickup
+rect 0 8 42 9 0.08 0.16 0.20 1.0
+rect 16 8 20 4 0.16 0.72 0.82 1.0
+rect -10 -1 8 18 0.10 0.20 0.23 1.0
+diamond 0 9 58 20 0.12 0.56 0.65 0.28
+
+model pulse_bullet
+ellipse 0 0 20 7 0.20 0.92 1.00 1.0
+ellipse -8 0 22 5 0.12 0.58 0.95 0.45
+rect 4 0 7 2 0.88 1.00 1.00 1.0
+
+model void_scout
+ellipse 0 14 34 42 0.35 0.06 0.46 1.0
+ellipse 0 39 24 20 0.48 0.08 0.62 1.0
+ellipse -12 11 9 29 0.22 0.05 0.31 1.0
+ellipse 12 11 9 29 0.22 0.05 0.31 1.0
+ellipse -5 41 4 4 0.20 0.96 0.84 1.0
+ellipse 5 41 4 4 0.20 0.96 0.84 1.0
+
+model training_pylon
+rect 0 18 34 36 0.08 0.13 0.16 1.0
+diamond 0 40 48 20 0.12 0.28 0.34 1.0
+rect 0 22 8 25 0.18 0.68 0.78 0.85
+ellipse 0 42 13 8 0.30 0.86 0.94 1.0
+
+model xp_orb
+ellipse 0 0 18 18 0.24 0.92 0.72 0.95
+ellipse 0 0 34 20 0.12 0.65 0.48 0.25
+

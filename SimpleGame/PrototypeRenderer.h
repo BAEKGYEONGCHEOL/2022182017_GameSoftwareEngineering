@@ -12,7 +12,7 @@ struct ScreenPoint
 
 class PrototypeRenderer
 {
-public:
+  public:
 	PrototypeRenderer(int width, int height);
 	~PrototypeRenderer();
 
@@ -22,20 +22,31 @@ public:
 	int Height() const;
 	void BeginFrame(float r, float g, float b, float a);
 	void Present(float timeSeconds);
-	void DrawQuad(const ScreenPoint& a, const ScreenPoint& b, const ScreenPoint& c, const ScreenPoint& d,
-		float r, float g, float bColor, float alpha);
+	void DrawQuad(const ScreenPoint& a,
+		const ScreenPoint& b,
+		const ScreenPoint& c,
+		const ScreenPoint& d,
+		float r,
+		float g,
+		float bColor,
+		float alpha);
 	void DrawRect(float x, float y, float width, float height, float r, float g, float b, float a);
-	void DrawDiamond(float x, float y, float width, float height, float r, float g, float b, float a);
+	void DrawDiamond(
+		float x, float y, float width, float height, float r, float g, float b, float a);
+	void DrawEllipse(
+		float x, float y, float width, float height, float r, float g, float b, float a);
+	void DrawSpaceBackground(float timeSeconds, float travelX, float travelY);
 	void DrawString(float x, float y, const std::string& text, float r, float g, float b, float a);
 	void DrawString(float x, float y, const std::wstring& text, float r, float g, float b, float a);
 	void DrawSoftShadow(float x, float y, float width, float height, float strength);
 
-private:
+  private:
 	bool ReadFile(const char* filename, std::string& result) const;
 	GLuint CompileShader(GLenum type, const char* source);
 	GLuint CreateProgram();
 	GLuint CreatePostProgram();
 	GLuint CreateBloomProgram();
+	GLuint CreateSpaceProgram();
 	bool CreateSceneTarget();
 	void DestroySceneTarget();
 	bool InitializeFont();
@@ -48,6 +59,7 @@ private:
 	GLuint m_Program;
 	GLuint m_PostProgram;
 	GLuint m_BloomProgram;
+	GLuint m_SpaceProgram;
 	GLuint m_VertexBuffer;
 	GLuint m_SceneFramebuffer;
 	GLuint m_SceneTexture;

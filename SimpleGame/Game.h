@@ -2,6 +2,8 @@
 
 #include <string>
 #include <vector>
+
+#include "ModelLibrary.h"
 #include "PrototypeRenderer.h"
 
 struct WorldPoint
@@ -44,7 +46,17 @@ struct Enemy
 struct Projectile
 {
 	WorldPoint position;
+	WorldPoint previousPosition;
 	WorldPoint velocity;
+	float life;
+	float distanceTravelled;
+	float maximumDistance;
+	int damage;
+};
+
+struct ExperienceOrb
+{
+	WorldPoint position;
 	float life;
 };
 
@@ -68,7 +80,7 @@ struct Asteroid
 
 class Game
 {
-public:
+  public:
 	explicit Game(PrototypeRenderer* renderer);
 	void Reset();
 	void Update(float deltaSeconds);
@@ -82,15 +94,39 @@ public:
 	void MouseMove(int x, int y);
 	void MouseButton(int button, int state);
 
-private:
-	enum GameMode { OnFoot, ShipControl, Transition, Complete };
-	enum QuestStage { InspectTerminal, FindCore, ReturnToCockpit, FlyToSignal, QuestComplete };
+  private:
+	enum GameMode
+	{
+		OnFoot,
+		ShipControl,
+		Transition,
+		FirstLevel,
+		Complete
+	};
+	enum QuestStage
+	{
+		InspectTerminal,
+		FindCore,
+		ReturnToCockpit,
+		FlyToSignal,
+		QuestComplete,
+		CollectLevelWeapon,
+		EarnExperience,
+		AllocateStats,
+		FirstLevelComplete
+	};
 
 	void UpdateOnFoot(float deltaSeconds);
 	void UpdateShip(float deltaSeconds);
 	void UpdateAsteroids(float deltaSeconds);
 	void UpdateEnemies(float deltaSeconds);
 	void UpdateProjectiles(float deltaSeconds);
+	void UpdateFirstLevel(float deltaSeconds);
+	void GenerateFirstLevel();
+	bool IsFirstLevelConnected(const std::vector<int>& tiles) const;
+	bool IsFirstLevelWalkable(float x, float y) const;
+	void AwardExperience(int amount, const WorldPoint& position);
+	void ApplyStatInput();
 	void HandleInteraction();
 	void HandleAttack();
 	void SetMessage(const std::wstring& message, float seconds);
@@ -104,6 +140,7 @@ private:
 	void RenderInterior();
 	void RenderSpace();
 	void RenderDestination();
+	void RenderFirstLevel();
 	void RenderInterface();
 	void DrawWorldBlock(const Obstacle& obstacle);
 	void DrawCharacter(const WorldPoint& point, float r, float g, float b, bool enemy);
@@ -140,8 +177,24 @@ private:
 	std::vector<Enemy> m_Enemies;
 	std::vector<NeutralNpc> m_NeutralNpcs;
 	std::vector<Projectile> m_Projectiles;
+	std::vector<ExperienceOrb> m_ExperienceOrbs;
 	float m_WeaponEnergy;
 	float m_ReloadTimer;
+	bool m_LevelWeaponCollected;
+	int m_AmmoInMagazine;
+	int m_ReserveAmmo;
+	int m_PlayerLevel;
+	int m_Experience;
+	int m_ExperienceToNextLevel;
+	int m_StatPoints;
+	int m_Firepower;
+	int m_Agility;
+	int m_Vitality;
+	float m_PlayerMaxHealth;
+	std::vector<int> m_FirstLevelTiles;
+	int m_FirstLevelSize;
+	unsigned int m_LevelSeed;
+	ModelLibrary m_ModelLibrary;
 
 	WorldPoint m_ShipPosition;
 	WorldPoint m_ShipVelocity;
