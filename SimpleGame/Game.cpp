@@ -33,6 +33,24 @@ float Length(float x, float y)
 	return std::sqrt(x * x + y * y);
 }
 
+float DistanceToSegment(
+	const WorldPoint& point, const WorldPoint& segmentStart, const WorldPoint& segmentEnd)
+{
+	float segmentX = segmentEnd.x - segmentStart.x;
+	float segmentY = segmentEnd.y - segmentStart.y;
+	float lengthSquared = segmentX * segmentX + segmentY * segmentY;
+	if (lengthSquared <= 0.0001f)
+		return Length(point.x - segmentStart.x, point.y - segmentStart.y);
+
+	float projection =
+		((point.x - segmentStart.x) * segmentX + (point.y - segmentStart.y) * segmentY) /
+		lengthSquared;
+	projection = Clamp(projection, 0.0f, 1.0f);
+	float closestX = segmentStart.x + segmentX * projection;
+	float closestY = segmentStart.y + segmentY * projection;
+	return Length(point.x - closestX, point.y - closestY);
+}
+
 ScreenPoint Rotate(float x, float y, float angle, float centerX, float centerY)
 {
 	const float cosine = std::cos(angle);
@@ -97,7 +115,7 @@ void Game::Reset()
 	m_ExperienceOrbs.clear();
 	m_LevelWeaponCollected = false;
 	m_AmmoInMagazine = 12;
-	m_ReserveAmmo = 48;
+	m_SpareMagazines = 3;
 	m_ShotsFired = 0;
 	m_PlayerLevel = 1;
 	m_Experience = 0;
@@ -114,6 +132,7 @@ void Game::Reset()
 	if (!m_ModelLibrary.IsLoaded())
 		m_ModelLibrary.Load();
 	m_ShipPosition = {0.0f, 0.0f};
+	m_PreviousShipPosition = m_ShipPosition;
 	m_ShipVelocity = {0.0f, 0.0f};
 	m_ShipAngle = Pi * 0.5f;
 	m_ShipHealth = 100.0f;
@@ -228,11 +247,12 @@ void Game::Update(float deltaSeconds)
 			{
 				if (m_Mode == FirstLevel)
 				{
-					int requiredAmmo = 12 - m_AmmoInMagazine;
-					int loadedAmmo = std::min(requiredAmmo, m_ReserveAmmo);
-					m_AmmoInMagazine += loadedAmmo;
-					m_ReserveAmmo -= loadedAmmo;
-					SetMessage(L"탄창 교체 완료.", 1.2f);
+					if (m_SpareMagazines > 0 && m_AmmoInMagazine < 12)
+					{
+						m_AmmoInMagazine = 12;
+						--m_SpareMagazines;
+						SetMessage(L"탄창 교체 완료.", 1.2f);
+					}
 				}
 				else
 				{
@@ -253,6 +273,7 @@ void Game::Update(float deltaSeconds)
 			{
 				m_CurrentShip = m_TravelDestinationShip;
 				m_ShipPosition = {0.0f, 0.0f};
+				m_PreviousShipPosition = m_ShipPosition;
 				m_ShipVelocity = {0.0f, 0.0f};
 
 				if (m_CurrentShip == 1 && m_Quest == FlyToSignal)
@@ -387,13 +408,27 @@ void Game::UpdateFirstLevel(float deltaSeconds)
 	{
 		m_LevelWeaponCollected = true;
 		m_Quest = EarnExperience;
-		SetMessage(L"훈련용 펄스 소총 획득: 12발 탄창, 예비 탄약 48발. 마우스로 사격합니다.", 4.0f);
+		SetMessage(L"훈련용 펄스 소총 획득: 12발 탄창, 예비 탄창 3개. 마우스로 사격합니다.", 4.0f);
 	}
 	else if (m_KeyPressed['e'] || m_KeyPressed['E'])
 	{
 		bool interactionHandled = false;
+		for (size_t index = 0; index < m_MagazinePickups.size(); ++index)
+		{
+			MagazinePickup& magazine = m_MagazinePickups[index];
+			if (magazine.collected || !IsNear(magazine.position, 1.1f))
+				continue;
+
+			magazine.collected = true;
+			++m_SpareMagazines;
+			interactionHandled = true;
+			SetMessage(L"예비 탄창을 획득했습니다. 탄창 보유 수 +1", 2.0f);
+			break;
+		}
 		for (size_t index = 0; index < m_StoryDocuments.size(); ++index)
 		{
+			if (interactionHandled)
+				break;
 			StoryDocument& document = m_StoryDocuments[index];
 			if (!IsNear(document.position, 1.1f))
 				continue;
@@ -468,11 +503,17 @@ void Game::UpdateFirstLevel(float deltaSeconds)
 	UpdateProjectiles(deltaSeconds);
 	ApplyStatInput();
 
-	if ((m_KeyPressed['r'] || m_KeyPressed['R']) && m_LevelWeaponCollected &&
-		m_AmmoInMagazine < 12 && m_ReserveAmmo > 0 && m_ReloadTimer <= 0.0f)
+	if ((m_KeyPressed['r'] || m_KeyPressed['R']) && m_LevelWeaponCollected && m_ReloadTimer <= 0.0f)
 	{
-		m_ReloadTimer = std::max(0.45f, 1.05f - static_cast<float>(m_Agility - 1) * 0.08f);
-		SetMessage(L"새 탄창을 장전하고 있습니다...", m_ReloadTimer);
+		if (m_AmmoInMagazine >= 12)
+			SetMessage(L"현재 탄창이 이미 가득 차 있습니다.", 1.4f);
+		else if (m_SpareMagazines <= 0)
+			SetMessage(L"예비 탄창이 없습니다. 구역을 탐색해 탄창을 확보하십시오.", 2.0f);
+		else
+		{
+			m_ReloadTimer = std::max(0.45f, 1.05f - static_cast<float>(m_Agility - 1) * 0.08f);
+			SetMessage(L"새 탄창을 장전하고 있습니다...", m_ReloadTimer);
+		}
 	}
 
 	for (size_t index = 0; index < m_ExperienceOrbs.size();)
@@ -634,6 +675,12 @@ void Game::GenerateFirstLevel()
 	m_LevelSurvivors.push_back({toWorld(rooms[4], 1.5f, 0.0f), 1, false});
 	m_LevelSurvivors.push_back({toWorld(rooms[5], -1.5f, 0.0f), 2, false});
 	m_LevelSurvivors.push_back({toWorld(rooms[6], 0.0f, -1.5f), 3, false});
+	m_MagazinePickups.clear();
+	m_MagazinePickups.push_back({toWorld(rooms[1], -2.0f, 1.5f), false});
+	m_MagazinePickups.push_back({toWorld(rooms[2], 2.0f, -1.5f), false});
+	m_MagazinePickups.push_back({toWorld(rooms[3], 2.0f, -1.5f), false});
+	m_MagazinePickups.push_back({toWorld(rooms[5], 1.5f, 1.5f), false});
+	m_MagazinePickups.push_back({toWorld(rooms[6], -2.0f, -1.5f), false});
 
 	m_Enemies.clear();
 	const WorldPoint enemyOffsets[] = {{-2.0f, -1.5f}, {2.0f, 1.0f}, {0.0f, 2.0f}};
@@ -722,7 +769,7 @@ void Game::AwardExperience(int amount, const WorldPoint& position)
 	message << L"공허종 정찰체 제거: 경험치 +" << amount;
 	SetMessage(message.str(), 1.6f);
 
-	while (m_PlayerLevel == 1 && m_Experience >= m_ExperienceToNextLevel)
+	while (m_Experience >= m_ExperienceToNextLevel)
 	{
 		m_Experience -= m_ExperienceToNextLevel;
 		++m_PlayerLevel;
@@ -832,7 +879,10 @@ void Game::HandleAttack()
 
 	if (m_Mode == FirstLevel && m_AmmoInMagazine <= 0)
 	{
-		SetMessage(L"탄창이 비었습니다. R 키로 재장전하십시오.", 1.5f);
+		SetMessage(m_SpareMagazines > 0
+					   ? L"탄창이 비었습니다. R 키로 재장전하십시오."
+					   : L"탄창과 예비 탄창이 모두 비었습니다. 탄창을 탐색하십시오.",
+			1.8f);
 		return;
 	}
 
@@ -999,6 +1049,7 @@ void Game::HandleInteraction()
 
 void Game::UpdateShip(float deltaSeconds)
 {
+	m_PreviousShipPosition = m_ShipPosition;
 	if (m_SpecialKeys[GLUT_KEY_LEFT])
 		m_ShipAngle += 2.1f * deltaSeconds;
 	if (m_SpecialKeys[GLUT_KEY_RIGHT])
@@ -1028,13 +1079,14 @@ void Game::UpdateShip(float deltaSeconds)
 		{-90.0f, 170.0f}, {85.0f, 290.0f}, {-70.0f, 410.0f}, {55.0f, 520.0f}};
 	for (int i = 0; i < 4; ++i)
 	{
-		float distance = Length(m_ShipPosition.x - debris[i].x, m_ShipPosition.y - debris[i].y);
+		float distance = DistanceToSegment(debris[i], m_PreviousShipPosition, m_ShipPosition);
 		if (distance < 34.0f && m_DamageCooldown <= 0.0f)
 		{
 			m_ShipVelocity.x *= -0.4f;
 			m_ShipVelocity.y *= -0.4f;
 			m_ShipHealth = std::max(20.0f, m_ShipHealth - 15.0f);
 			m_DamageCooldown = 0.8f;
+			m_ShipImpactFlash = 0.35f;
 			SetMessage(L"선체가 충돌했습니다. 항로를 수정하십시오.", 1.5f);
 		}
 	}
@@ -1052,26 +1104,42 @@ void Game::UpdateAsteroids(float deltaSeconds)
 	for (size_t i = 0; i < m_Asteroids.size(); ++i)
 	{
 		Asteroid& asteroid = m_Asteroids[i];
+		WorldPoint previousAsteroidPosition = asteroid.position;
 		asteroid.position.x += asteroid.velocity.x * deltaSeconds;
 		asteroid.position.y += asteroid.velocity.y * deltaSeconds;
 		asteroid.rotation += asteroid.rotationSpeed * deltaSeconds;
 
 		if (asteroid.position.x < -210.0f || asteroid.position.x > 210.0f)
 			asteroid.velocity.x *= -1.0f;
+		bool wrapped = false;
 		if (asteroid.position.y < 45.0f)
+		{
 			asteroid.position.y += 560.0f;
+			wrapped = true;
+		}
 		if (asteroid.position.y > 625.0f)
+		{
 			asteroid.position.y -= 560.0f;
+			wrapped = true;
+		}
+		if (wrapped)
+			previousAsteroidPosition = asteroid.position;
 
 		float dx = m_ShipPosition.x - asteroid.position.x;
 		float dy = m_ShipPosition.y - asteroid.position.y;
-		float distance = Length(dx, dy);
-		if (distance < asteroid.radius + 22.0f && m_DamageCooldown <= 0.0f)
+		float finalDistance = Length(dx, dy);
+		WorldPoint relativeStart = {m_PreviousShipPosition.x - previousAsteroidPosition.x,
+			m_PreviousShipPosition.y - previousAsteroidPosition.y};
+		WorldPoint relativeEnd = {dx, dy};
+		const WorldPoint relativeOrigin = {0.0f, 0.0f};
+		float sweptDistance = DistanceToSegment(relativeOrigin, relativeStart, relativeEnd);
+		if (sweptDistance < asteroid.radius + 22.0f && m_DamageCooldown <= 0.0f)
 		{
-			float normalX = distance > 0.01f ? dx / distance : 1.0f;
-			float normalY = distance > 0.01f ? dy / distance : 0.0f;
-			m_ShipPosition.x += normalX * (asteroid.radius + 22.0f - distance);
-			m_ShipPosition.y += normalY * (asteroid.radius + 22.0f - distance);
+			float normalX = finalDistance > 0.01f ? dx / finalDistance : 1.0f;
+			float normalY = finalDistance > 0.01f ? dy / finalDistance : 0.0f;
+			float separation = std::max(3.0f, asteroid.radius + 22.0f - finalDistance);
+			m_ShipPosition.x += normalX * separation;
+			m_ShipPosition.y += normalY * separation;
 			m_ShipVelocity.x += normalX * 75.0f;
 			m_ShipVelocity.y += normalY * 75.0f;
 			asteroid.velocity.x -= normalX * 24.0f;
@@ -1087,6 +1155,7 @@ void Game::UpdateAsteroids(float deltaSeconds)
 	{
 		m_ShipHealth = 35.0f;
 		m_ShipPosition = {0.0f, std::max(0.0f, m_ShipPosition.y - 90.0f)};
+		m_PreviousShipPosition = m_ShipPosition;
 		m_ShipVelocity = {0.0f, 0.0f};
 		SetMessage(L"비상 자동 항법이 작동했습니다. 선체 내구도 35%로 복구합니다.", 3.0f);
 	}
@@ -1183,6 +1252,12 @@ std::wstring Game::InteractionText() const
 		return L"[E] 훈련용 펄스 소총 회수";
 	if (m_Mode == FirstLevel)
 	{
+		for (size_t index = 0; index < m_MagazinePickups.size(); ++index)
+		{
+			if (!m_MagazinePickups[index].collected &&
+				IsNear(m_MagazinePickups[index].position, 1.1f))
+				return L"[E] 예비 탄창 획득";
+		}
 		for (size_t index = 0; index < m_StoryDocuments.size(); ++index)
 		{
 			if (IsNear(m_StoryDocuments[index].position, 1.1f))
@@ -1821,17 +1896,37 @@ void Game::RenderSpace()
 		0.48f,
 		0.58f);
 	float impactShake = m_ShipImpactFlash > 0.0f ? std::sin(m_TotalTime * 95.0f) * 6.0f : 0.0f;
-	DrawShip(impactShake, -35.0f + impactShake * 0.35f, m_ShipAngle, 1.0f, 0.20f, 0.67f, 0.82f);
-
-	if (Length(m_ShipVelocity.x, m_ShipVelocity.y) > 80.0f)
-		m_Renderer->DrawDiamond(-std::cos(m_ShipAngle) * 35.0f,
-			-35.0f - std::sin(m_ShipAngle) * 35.0f,
-			48.0f,
-			16.0f,
-			0.18f,
-			0.70f,
+	float shipX = impactShake;
+	float shipY = -35.0f + impactShake * 0.35f;
+	float shipSpeed = Length(m_ShipVelocity.x, m_ShipVelocity.y);
+	if (shipSpeed > 35.0f)
+	{
+		float flameLength = 34.0f + Clamp(shipSpeed / 180.0f, 0.0f, 1.0f) * 28.0f;
+		float flameCenterX = shipX - std::cos(m_ShipAngle) * (38.0f + flameLength * 0.5f);
+		float flameCenterY = shipY - std::sin(m_ShipAngle) * (38.0f + flameLength * 0.5f);
+		float flicker = std::sin(m_TotalTime * 38.0f) * 4.0f;
+		DrawRotatedRect(m_Renderer,
+			flameCenterX,
+			flameCenterY,
+			flameLength + flicker,
+			17.0f,
+			m_ShipAngle,
+			0.08f,
+			0.45f,
 			1.0f,
-			0.55f);
+			0.42f);
+		DrawRotatedRect(m_Renderer,
+			flameCenterX + std::cos(m_ShipAngle) * 7.0f,
+			flameCenterY + std::sin(m_ShipAngle) * 7.0f,
+			flameLength * 0.62f,
+			7.0f,
+			m_ShipAngle,
+			0.72f,
+			0.94f,
+			1.0f,
+			0.82f);
+	}
+	DrawShip(shipX, shipY, m_ShipAngle, 1.0f, 0.20f, 0.67f, 0.82f);
 
 	if (m_Mode == Transition)
 	{
@@ -2029,6 +2124,18 @@ void Game::RenderFirstLevel()
 			pulse);
 	}
 
+	for (size_t index = 0; index < m_MagazinePickups.size(); ++index)
+	{
+		const MagazinePickup& magazine = m_MagazinePickups[index];
+		if (magazine.collected)
+			continue;
+
+		float pulse = 1.0f + std::sin(m_TotalTime * 4.5f + static_cast<float>(index)) * 0.08f;
+		ScreenPoint screen = WorldToScreen(magazine.position.x, magazine.position.y, 8.0f);
+		m_Renderer->DrawSoftShadow(screen.x, screen.y - 7.0f, 32.0f, 10.0f, 0.70f);
+		m_ModelLibrary.Draw(m_Renderer, "ammo_magazine", screen.x, screen.y, pulse);
+	}
+
 	for (size_t index = 0; index < m_LevelSurvivors.size(); ++index)
 	{
 		const LevelSurvivor& survivor = m_LevelSurvivors[index];
@@ -2143,12 +2250,13 @@ void Game::RenderInterface()
 		{
 			std::wostringstream weapon;
 			if (m_Mode == FirstLevel)
-				weapon << L"펄스 소총  " << m_AmmoInMagazine << L" / " << m_ReserveAmmo;
+				weapon << L"펄스 소총  " << m_AmmoInMagazine << L" / 12   예비 탄창 "
+					   << m_SpareMagazines << L"개";
 			else
 				weapon << L"펄스 카빈 " << static_cast<int>(m_WeaponEnergy) << L"%";
-			m_Renderer->DrawRect(-width * 0.5f + 105.0f,
+			m_Renderer->DrawRect(-width * 0.5f + 150.0f,
 				-height * 0.5f + 58.0f,
-				194.0f,
+				284.0f,
 				25.0f,
 				0.025f,
 				0.04f,

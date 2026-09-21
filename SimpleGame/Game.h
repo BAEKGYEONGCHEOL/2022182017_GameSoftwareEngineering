@@ -75,6 +75,12 @@ struct LevelSurvivor
 	bool talked;
 };
 
+struct MagazinePickup
+{
+	WorldPoint position;
+	bool collected;
+};
+
 struct NeutralNpc
 {
 	WorldPoint position;
@@ -197,7 +203,7 @@ class Game
 	float m_ReloadTimer;
 	bool m_LevelWeaponCollected;
 	int m_AmmoInMagazine;
-	int m_ReserveAmmo;
+	int m_SpareMagazines;
 	int m_ShotsFired;
 	int m_PlayerLevel;
 	int m_Experience;
@@ -212,11 +218,13 @@ class Game
 	std::vector<WorldPoint> m_LevelCorpses;
 	std::vector<StoryDocument> m_StoryDocuments;
 	std::vector<LevelSurvivor> m_LevelSurvivors;
+	std::vector<MagazinePickup> m_MagazinePickups;
 	int m_FirstLevelSize;
 	unsigned int m_LevelSeed;
 	ModelLibrary m_ModelLibrary;
 
 	WorldPoint m_ShipPosition;
+	WorldPoint m_PreviousShipPosition;
 	WorldPoint m_ShipVelocity;
 	float m_ShipAngle;
 	float m_ShipHealth;
