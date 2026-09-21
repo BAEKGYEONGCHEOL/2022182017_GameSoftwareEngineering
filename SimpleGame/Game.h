@@ -68,6 +68,13 @@ struct StoryDocument
 	bool read;
 };
 
+struct LevelSurvivor
+{
+	WorldPoint position;
+	int survivorId;
+	bool talked;
+};
+
 struct NeutralNpc
 {
 	WorldPoint position;
@@ -204,6 +211,7 @@ class Game
 	std::vector<int> m_FirstLevelTiles;
 	std::vector<WorldPoint> m_LevelCorpses;
 	std::vector<StoryDocument> m_StoryDocuments;
+	std::vector<LevelSurvivor> m_LevelSurvivors;
 	int m_FirstLevelSize;
 	unsigned int m_LevelSeed;
 	ModelLibrary m_ModelLibrary;

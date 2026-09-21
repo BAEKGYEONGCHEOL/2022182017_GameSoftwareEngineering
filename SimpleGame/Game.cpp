@@ -108,7 +108,7 @@ void Game::Reset()
 	m_Vitality = 1;
 	m_PlayerMaxHealth = 100.0f;
 	m_LevelUpFlash = 0.0f;
-	m_FirstLevelSize = 21;
+	m_FirstLevelSize = 45;
 	m_LevelSeed = static_cast<unsigned int>(std::time(NULL));
 	m_FirstLevelTiles.clear();
 	if (!m_ModelLibrary.IsLoaded())
@@ -391,6 +391,7 @@ void Game::UpdateFirstLevel(float deltaSeconds)
 	}
 	else if (m_KeyPressed['e'] || m_KeyPressed['E'])
 	{
+		bool interactionHandled = false;
 		for (size_t index = 0; index < m_StoryDocuments.size(); ++index)
 		{
 			StoryDocument& document = m_StoryDocuments[index];
@@ -414,7 +415,49 @@ void Game::UpdateFirstLevel(float deltaSeconds)
 					L"찢어진 명령서: '모든 외계 신호는 기만이다.' 발령 시각은 첫 공격보다 이르다.",
 					4.5f);
 			}
+			interactionHandled = true;
 			break;
+		}
+
+		for (size_t index = 0; index < m_LevelSurvivors.size() && !interactionHandled; ++index)
+		{
+			LevelSurvivor& survivor = m_LevelSurvivors[index];
+			if (!IsNear(survivor.position, 1.3f))
+				continue;
+
+			if (survivor.survivorId == 0)
+			{
+				SetMessage(survivor.talked ? L"경비대원 미라: 뒤에서도 인간의 총성이 들렸어요. "
+											 L"누가 누구를 쐈는지 모르겠습니다."
+										   : L"경비대원 미라: 격벽을 닫으라는 명령을 따랐어요. "
+											 L"아직 통로에 사람들이 있었는데...",
+					5.0f);
+			}
+			else if (survivor.survivorId == 1)
+			{
+				SetMessage(survivor.talked ? L"정비기사 준: 동력실 우회 통로는 살아 있습니다. "
+											 L"공허종도 그 길을 쓰는 것 같아요."
+										   : L"정비기사 준: 놈이 문을 부쉈지만 비무장 작업자들은 "
+											 L"지나쳤습니다. 이유는 모르겠어요.",
+					5.0f);
+			}
+			else if (survivor.survivorId == 2)
+			{
+				SetMessage(survivor.talked ? L"난민 한: 구조선이 오면 군인보다 먼저 아이들을 태워 "
+											 L"주세요. 약속해 주세요."
+										   : L"난민 한: 방송은 이 방이 안전하다고 했습니다. 문이 "
+											 L"잠긴 뒤에야 거짓말인 걸 알았어요.",
+					5.0f);
+			}
+			else
+			{
+				SetMessage(survivor.talked ? L"의무관 일리안: 인간도 공허종도 같은 통로에서 "
+											 L"죽었습니다. 전쟁은 구분하지 않더군요."
+										   : L"의무관 일리안: 탄환보다 감염 공포가 더 많은 사람을 "
+											 L"죽였어요. 서로를 먼저 의심했죠.",
+					5.0f);
+			}
+			survivor.talked = true;
 		}
 	}
 
@@ -444,55 +487,168 @@ void Game::UpdateFirstLevel(float deltaSeconds)
 
 void Game::GenerateFirstLevel()
 {
-	m_FirstLevelTiles.assign(m_FirstLevelSize * m_FirstLevelSize, 1);
+	struct Room
+	{
+		int centerX;
+		int centerY;
+		int halfWidth;
+		int halfHeight;
+	};
+
+	m_FirstLevelTiles.assign(m_FirstLevelSize * m_FirstLevelSize, 0);
 	int halfSize = m_FirstLevelSize / 2;
-
-	for (int coordinate = 0; coordinate < m_FirstLevelSize; ++coordinate)
-	{
-		m_FirstLevelTiles[coordinate] = 0;
-		m_FirstLevelTiles[(m_FirstLevelSize - 1) * m_FirstLevelSize + coordinate] = 0;
-		m_FirstLevelTiles[coordinate * m_FirstLevelSize] = 0;
-		m_FirstLevelTiles[coordinate * m_FirstLevelSize + m_FirstLevelSize - 1] = 0;
-	}
-
 	std::mt19937 random(m_LevelSeed);
-	std::uniform_int_distribution<int> tileDistribution(1, m_FirstLevelSize - 2);
-	for (int attempt = 0; attempt < 28; ++attempt)
-	{
-		int x = tileDistribution(random);
-		int y = tileDistribution(random);
-		if (std::abs(x - halfSize) <= 2 && std::abs(y - halfSize) <= 2)
-			continue;
+	std::uniform_int_distribution<int> roomJitter(-2, 2);
+	std::uniform_int_distribution<int> roomRadius(3, 5);
 
-		int index = y * m_FirstLevelSize + x;
-		m_FirstLevelTiles[index] = 0;
-		if (!IsFirstLevelConnected(m_FirstLevelTiles))
-			m_FirstLevelTiles[index] = 1;
+	const WorldPoint roomAnchors[] = {
+		{0.0f, 0.0f},
+		{-12.0f, 0.0f},
+		{12.0f, 0.0f},
+		{-12.0f, -13.0f},
+		{12.0f, -13.0f},
+		{-12.0f, 13.0f},
+		{12.0f, 13.0f},
+	};
+
+	std::vector<Room> rooms;
+	for (int roomIndex = 0; roomIndex < 7; ++roomIndex)
+	{
+		int jitterX = roomIndex == 0 ? 0 : roomJitter(random);
+		int jitterY = roomIndex == 0 ? 0 : roomJitter(random);
+		Room room = {
+			halfSize + static_cast<int>(roomAnchors[roomIndex].x) + jitterX,
+			halfSize + static_cast<int>(roomAnchors[roomIndex].y) + jitterY,
+			roomRadius(random),
+			roomRadius(random),
+		};
+		rooms.push_back(room);
+
+		for (int y = room.centerY - room.halfHeight; y <= room.centerY + room.halfHeight; ++y)
+		{
+			for (int x = room.centerX - room.halfWidth; x <= room.centerX + room.halfWidth; ++x)
+			{
+				if (x > 0 && x < m_FirstLevelSize - 1 && y > 0 && y < m_FirstLevelSize - 1)
+					m_FirstLevelTiles[y * m_FirstLevelSize + x] = 2;
+			}
+		}
 	}
 
-	m_Player = {0.0f, 0.0f};
+	auto carveTile = [this](int x, int y)
+	{
+		for (int offsetY = -1; offsetY <= 1; ++offsetY)
+		{
+			for (int offsetX = -1; offsetX <= 1; ++offsetX)
+			{
+				int tileX = x + offsetX;
+				int tileY = y + offsetY;
+				if (tileX > 0 && tileX < m_FirstLevelSize - 1 && tileY > 0 &&
+					tileY < m_FirstLevelSize - 1 &&
+					m_FirstLevelTiles[tileY * m_FirstLevelSize + tileX] == 0)
+				{
+					m_FirstLevelTiles[tileY * m_FirstLevelSize + tileX] = 1;
+				}
+			}
+		}
+	};
+
+	std::vector<WorldPoint> corridorPatrols;
+	auto connectRooms = [&random, &rooms, &carveTile, &corridorPatrols, halfSize](
+							int firstRoom, int secondRoom)
+	{
+		int x = rooms[firstRoom].centerX;
+		int y = rooms[firstRoom].centerY;
+		int targetX = rooms[secondRoom].centerX;
+		int targetY = rooms[secondRoom].centerY;
+		bool horizontalFirst = (random() & 1u) == 0u;
+		std::vector<WorldPoint> corridorPath;
+
+		auto carveHorizontal = [&]()
+		{
+			while (x != targetX)
+			{
+				carveTile(x, y);
+				corridorPath.push_back(
+					{static_cast<float>(x - halfSize), static_cast<float>(y - halfSize)});
+				x += x < targetX ? 1 : -1;
+			}
+		};
+
+		auto carveVertical = [&]()
+		{
+			while (y != targetY)
+			{
+				carveTile(x, y);
+				corridorPath.push_back(
+					{static_cast<float>(x - halfSize), static_cast<float>(y - halfSize)});
+				y += y < targetY ? 1 : -1;
+			}
+		};
+
+		if (horizontalFirst)
+		{
+			carveHorizontal();
+			carveVertical();
+		}
+		else
+		{
+			carveVertical();
+			carveHorizontal();
+		}
+		carveTile(targetX, targetY);
+		if (!corridorPath.empty())
+			corridorPatrols.push_back(corridorPath[corridorPath.size() / 2]);
+	};
+
+	const int connections[][2] = {
+		{0, 1},
+		{0, 2},
+		{1, 3},
+		{1, 5},
+		{2, 4},
+		{2, 6},
+		{5, 6},
+	};
+	for (int connectionIndex = 0; connectionIndex < 7; ++connectionIndex)
+		connectRooms(connections[connectionIndex][0], connections[connectionIndex][1]);
+
+	auto toWorld = [halfSize](const Room& room, float offsetX, float offsetY)
+	{
+		return WorldPoint{static_cast<float>(room.centerX - halfSize) + offsetX,
+			static_cast<float>(room.centerY - halfSize) + offsetY};
+	};
+
+	m_Player = toWorld(rooms[0], 0.0f, 0.0f);
 	m_LevelCorpses.clear();
-	m_LevelCorpses.push_back({2.0f, 1.0f});
-	m_LevelCorpses.push_back({-2.0f, -1.0f});
-	m_LevelCorpses.push_back({0.0f, 2.0f});
-	m_LevelCorpses.push_back({-1.0f, 2.0f});
+	m_LevelCorpses.push_back(toWorld(rooms[1], 1.5f, -1.0f));
+	m_LevelCorpses.push_back(toWorld(rooms[2], -1.5f, 1.0f));
+	m_LevelCorpses.push_back(toWorld(rooms[3], 1.0f, 1.5f));
+	m_LevelCorpses.push_back(toWorld(rooms[4], -1.0f, -1.5f));
+	m_LevelCorpses.push_back(toWorld(rooms[6], 1.5f, 1.0f));
 	m_StoryDocuments.clear();
-	m_StoryDocuments.push_back({{1.4f, 1.0f}, 0, false});
-	m_StoryDocuments.push_back({{-1.5f, -1.0f}, 1, false});
-	m_StoryDocuments.push_back({{0.4f, 2.2f}, 2, false});
-	m_Enemies.clear();
-	std::uniform_int_distribution<int> enemyDistribution(1, m_FirstLevelSize - 2);
-	while (m_Enemies.size() < 6)
-	{
-		int tileX = enemyDistribution(random);
-		int tileY = enemyDistribution(random);
-		float worldX = static_cast<float>(tileX - halfSize);
-		float worldY = static_cast<float>(tileY - halfSize);
+	m_StoryDocuments.push_back({toWorld(rooms[1], 2.0f, -0.5f), 0, false});
+	m_StoryDocuments.push_back({toWorld(rooms[3], -1.5f, 1.0f), 1, false});
+	m_StoryDocuments.push_back({toWorld(rooms[6], -1.5f, 1.5f), 2, false});
+	m_LevelSurvivors.clear();
+	m_LevelSurvivors.push_back({toWorld(rooms[3], 0.0f, -1.5f), 0, false});
+	m_LevelSurvivors.push_back({toWorld(rooms[4], 1.5f, 0.0f), 1, false});
+	m_LevelSurvivors.push_back({toWorld(rooms[5], -1.5f, 0.0f), 2, false});
+	m_LevelSurvivors.push_back({toWorld(rooms[6], 0.0f, -1.5f), 3, false});
 
-		if (m_FirstLevelTiles[tileY * m_FirstLevelSize + tileX] == 1 &&
-			Length(worldX, worldY) > 5.0f)
-			m_Enemies.push_back({{worldX, worldY}, 3, true});
+	m_Enemies.clear();
+	const WorldPoint enemyOffsets[] = {{-2.0f, -1.5f}, {2.0f, 1.0f}, {0.0f, 2.0f}};
+	for (int roomIndex = 1; roomIndex < 7; ++roomIndex)
+	{
+		int enemyCount = roomIndex == 5 ? 2 : 3;
+		for (int enemyIndex = 0; enemyIndex < enemyCount; ++enemyIndex)
+		{
+			WorldPoint position =
+				toWorld(rooms[roomIndex], enemyOffsets[enemyIndex].x, enemyOffsets[enemyIndex].y);
+			m_Enemies.push_back({position, 3, true});
+		}
 	}
+	for (size_t patrolIndex = 0; patrolIndex < corridorPatrols.size(); patrolIndex += 2)
+		m_Enemies.push_back({corridorPatrols[patrolIndex], 3, true});
 }
 
 bool Game::IsFirstLevelConnected(const std::vector<int>& tiles) const
@@ -501,7 +657,7 @@ bool Game::IsFirstLevelConnected(const std::vector<int>& tiles) const
 	int walkableCount = 0;
 	for (int index = 0; index < static_cast<int>(tiles.size()); ++index)
 	{
-		if (tiles[index] == 1)
+		if (tiles[index] > 0)
 		{
 			++walkableCount;
 			if (startIndex < 0)
@@ -534,7 +690,7 @@ bool Game::IsFirstLevelConnected(const std::vector<int>& tiles) const
 			if ((directionIndex == 0 && currentX == 0) ||
 				(directionIndex == 1 && currentX == m_FirstLevelSize - 1))
 				continue;
-			if (tiles[next] == 1 && !visited[next])
+			if (tiles[next] > 0 && !visited[next])
 			{
 				visited[next] = true;
 				openTiles.push(next);
@@ -554,7 +710,7 @@ bool Game::IsFirstLevelWalkable(float x, float y) const
 	if (tileX < 0 || tileX >= m_FirstLevelSize || tileY < 0 || tileY >= m_FirstLevelSize)
 		return false;
 
-	return m_FirstLevelTiles[tileY * m_FirstLevelSize + tileX] == 1;
+	return m_FirstLevelTiles[tileY * m_FirstLevelSize + tileX] > 0;
 }
 
 void Game::AwardExperience(int amount, const WorldPoint& position)
@@ -621,6 +777,8 @@ void Game::UpdateEnemies(float deltaSeconds)
 		float dx = m_Player.x - enemy.position.x;
 		float dy = m_Player.y - enemy.position.y;
 		float distance = Length(dx, dy);
+		if (m_Mode == FirstLevel && distance > 7.0f)
+			continue;
 		if (distance > 0.65f)
 		{
 			float nextX = enemy.position.x + dx / distance * 1.15f * deltaSeconds;
@@ -1029,6 +1187,11 @@ std::wstring Game::InteractionText() const
 		{
 			if (IsNear(m_StoryDocuments[index].position, 1.1f))
 				return m_StoryDocuments[index].read ? L"[E] 문서 다시 읽기" : L"[E] 현장 문서 조사";
+		}
+		for (size_t index = 0; index < m_LevelSurvivors.size(); ++index)
+		{
+			if (IsNear(m_LevelSurvivors[index].position, 1.3f))
+				return L"[E] 생존자와 대화";
 		}
 	}
 	if (m_Mode != OnFoot)
@@ -1789,6 +1952,8 @@ void Game::RenderFirstLevel()
 {
 	m_Renderer->BeginFrame(0.008f, 0.014f, 0.025f, 1.0f);
 	int halfSize = m_FirstLevelSize / 2;
+	int screenWidth = m_Renderer->Width();
+	int screenHeight = m_Renderer->Height();
 
 	for (int tileY = 0; tileY < m_FirstLevelSize; ++tileY)
 	{
@@ -1797,26 +1962,41 @@ void Game::RenderFirstLevel()
 			float worldX = static_cast<float>(tileX - halfSize);
 			float worldY = static_cast<float>(tileY - halfSize);
 			ScreenPoint screen = WorldToScreen(worldX, worldY);
+			if (std::fabs(screen.x) > screenWidth * 0.5f + 110.0f ||
+				std::fabs(screen.y) > screenHeight * 0.5f + 110.0f)
+				continue;
+
 			int tile = m_FirstLevelTiles[tileY * m_FirstLevelSize + tileX];
 
-			if (tile == 1)
+			if (tile > 0)
 			{
 				float variation =
 					static_cast<float>((tileX * 13 + tileY * 7 + m_LevelSeed) % 5) * 0.006f;
+				float roomLight = tile == 2 ? 0.018f : 0.0f;
 				m_Renderer->DrawDiamond(screen.x,
 					screen.y,
 					TileWidth - 2.0f,
 					TileHeight - 1.0f,
-					0.055f + variation,
-					0.085f + variation,
-					0.105f + variation,
+					0.050f + variation + roomLight,
+					0.078f + variation + roomLight,
+					0.098f + variation + roomLight,
 					1.0f);
+				if (tile == 1 && ((tileX + tileY) % 4 == 0))
+					m_Renderer->DrawDiamond(
+						screen.x, screen.y + 1.0f, 21.0f, 7.0f, 0.10f, 0.42f, 0.46f, 0.42f);
 			}
 			else if (tileX > 0 && tileY > 0 && tileX < m_FirstLevelSize - 1 &&
 					 tileY < m_FirstLevelSize - 1)
 			{
-				m_Renderer->DrawSoftShadow(screen.x, screen.y, 42.0f, 15.0f, 0.72f);
-				m_ModelLibrary.Draw(m_Renderer, "training_pylon", screen.x, screen.y, 0.82f);
+				bool besideFloor = m_FirstLevelTiles[tileY * m_FirstLevelSize + tileX - 1] > 0 ||
+								   m_FirstLevelTiles[tileY * m_FirstLevelSize + tileX + 1] > 0 ||
+								   m_FirstLevelTiles[(tileY - 1) * m_FirstLevelSize + tileX] > 0 ||
+								   m_FirstLevelTiles[(tileY + 1) * m_FirstLevelSize + tileX] > 0;
+				if (besideFloor)
+				{
+					m_Renderer->DrawSoftShadow(screen.x, screen.y, 52.0f, 16.0f, 0.76f);
+					m_ModelLibrary.Draw(m_Renderer, "corridor_wall", screen.x, screen.y, 0.92f);
+				}
 			}
 		}
 	}
@@ -1847,6 +2027,17 @@ void Game::RenderFirstLevel()
 			paper.x,
 			paper.y,
 			pulse);
+	}
+
+	for (size_t index = 0; index < m_LevelSurvivors.size(); ++index)
+	{
+		const LevelSurvivor& survivor = m_LevelSurvivors[index];
+		ScreenPoint screen = WorldToScreen(survivor.position.x, survivor.position.y);
+		float tremble = std::sin(m_TotalTime * 24.0f + static_cast<float>(index)) * 1.7f;
+		m_Renderer->DrawSoftShadow(screen.x, screen.y, 34.0f, 12.0f, 0.82f);
+		m_ModelLibrary.Draw(m_Renderer, "wounded_survivor", screen.x + tremble, screen.y, 1.0f);
+		m_Renderer->DrawString(
+			screen.x - 27.0f, screen.y + 61.0f, L"생존자", 0.62f, 0.82f, 0.76f, 0.90f);
 	}
 
 	for (size_t index = 0; index < m_Enemies.size(); ++index)
