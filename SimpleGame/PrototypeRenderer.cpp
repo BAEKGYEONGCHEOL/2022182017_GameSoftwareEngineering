@@ -22,6 +22,8 @@ PrototypeRenderer::PrototypeRenderer(int width, int height)
 	, m_ScreenSizeUniform(-1)
 	, m_ColorUniform(-1)
 	, m_FontHandle(NULL)
+	, m_DrawCallCount(0)
+	, m_FrameNumber(0)
 {
 	m_BloomFramebuffers[0] = m_BloomFramebuffers[1] = 0;
 	m_BloomTextures[0] = m_BloomTextures[1] = 0;
@@ -84,6 +86,11 @@ int PrototypeRenderer::Height() const
 	return m_Height;
 }
 
+unsigned int PrototypeRenderer::DrawCallCount() const
+{
+	return m_DrawCallCount;
+}
+
 void PrototypeRenderer::Resize(int width, int height)
 {
 	m_Width = width > 1 ? width : 1;
@@ -95,6 +102,8 @@ void PrototypeRenderer::Resize(int width, int height)
 
 void PrototypeRenderer::BeginFrame(float r, float g, float b, float a)
 {
+	m_DrawCallCount = 0;
+	++m_FrameNumber;
 	glBindFramebuffer(GL_FRAMEBUFFER, m_SceneFramebuffer);
 	glViewport(0, 0, m_Width, m_Height);
 	glClearColor(r, g, b, a);
@@ -126,12 +135,14 @@ void PrototypeRenderer::Present(float timeSeconds)
 	glUniform2f(glGetUniformLocation(m_BloomProgram, "u_Direction"), 1.0f, 0.0f);
 	glUniform1i(glGetUniformLocation(m_BloomProgram, "u_ExtractBright"), 1);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
+	++m_DrawCallCount;
 
 	glBindFramebuffer(GL_FRAMEBUFFER, m_BloomFramebuffers[1]);
 	glBindTexture(GL_TEXTURE_2D, m_BloomTextures[0]);
 	glUniform2f(glGetUniformLocation(m_BloomProgram, "u_Direction"), 0.0f, 1.0f);
 	glUniform1i(glGetUniformLocation(m_BloomProgram, "u_ExtractBright"), 0);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
+	++m_DrawCallCount;
 
 	// A third, wider horizontal pass removes the cross-shaped two-pass bloom around small console
 	// lights.
@@ -140,6 +151,7 @@ void PrototypeRenderer::Present(float timeSeconds)
 	glUniform2f(glGetUniformLocation(m_BloomProgram, "u_Direction"), 1.65f, 0.0f);
 	glUniform1i(glGetUniformLocation(m_BloomProgram, "u_ExtractBright"), 0);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
+	++m_DrawCallCount;
 	glDisableVertexAttribArray(bloomPosition);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -160,12 +172,16 @@ void PrototypeRenderer::Present(float timeSeconds)
 	glEnableVertexAttribArray(position);
 	glVertexAttribPointer(position, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
+	++m_DrawCallCount;
 	glDisableVertexAttribArray(position);
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glEnable(GL_BLEND);
+
+	std::cout << "\r[Frame " << m_FrameNumber << "] OpenGL draw calls: " << m_DrawCallCount
+			  << "        " << std::flush;
 }
 
 void PrototypeRenderer::DrawQuad(const ScreenPoint& a,
@@ -246,6 +262,7 @@ void PrototypeRenderer::DrawSpaceBackground(float timeSeconds, float travelX, fl
 	glUniform1f(glGetUniformLocation(m_SpaceProgram, "u_Time"), timeSeconds);
 	glUniform2f(glGetUniformLocation(m_SpaceProgram, "u_Travel"), travelX, travelY);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
+	++m_DrawCallCount;
 	glDisableVertexAttribArray(position);
 	glEnable(GL_BLEND);
 }
@@ -287,6 +304,7 @@ void PrototypeRenderer::DrawVertices(
 	glEnableVertexAttribArray(m_PositionAttribute);
 	glVertexAttribPointer(m_PositionAttribute, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
 	glDrawArrays(GL_TRIANGLES, 0, count);
+	++m_DrawCallCount;
 	glDisableVertexAttribArray(m_PositionAttribute);
 }
 
@@ -317,7 +335,10 @@ void PrototypeRenderer::DrawString(
 	{
 		GLuint glyph = GetGlyph(*character);
 		if (glyph != 0)
+		{
 			glCallList(glyph);
+			++m_DrawCallCount;
+		}
 	}
 	glPopMatrix();
 	glMatrixMode(GL_PROJECTION);

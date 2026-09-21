@@ -20,6 +20,7 @@ class PrototypeRenderer
 	void Resize(int width, int height);
 	int Width() const;
 	int Height() const;
+	unsigned int DrawCallCount() const;
 	void BeginFrame(float r, float g, float b, float a);
 	void Present(float timeSeconds);
 	void DrawQuad(const ScreenPoint& a,
@@ -70,4 +71,6 @@ class PrototypeRenderer
 	GLint m_ColorUniform;
 	void* m_FontHandle;
 	std::unordered_map<wchar_t, GLuint> m_Glyphs;
+	unsigned int m_DrawCallCount;
+	unsigned long long m_FrameNumber;
 };

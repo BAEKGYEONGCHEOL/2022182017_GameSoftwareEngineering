@@ -1306,8 +1306,29 @@ void Game::Render()
 	m_Renderer->Present(m_TotalTime);
 }
 
+Actor* Game::CreateSceneActor(const std::string& name,
+	float x,
+	float y,
+	float height,
+	int layer,
+	float sortOrder,
+	const Actor::RenderFunction& renderFunction,
+	Actor* parent)
+{
+	Actor* actor = m_SceneGraph.CreateActor(name, parent);
+	ActorTransform& transform = actor->LocalTransform();
+	transform.x = x;
+	transform.y = y;
+	transform.height = height;
+	actor->SetLayer(layer);
+	actor->SetSortOrder(sortOrder);
+	actor->SetRenderFunction(renderFunction);
+	return actor;
+}
+
 void Game::RenderInterior()
 {
+	m_SceneGraph.Clear();
 	m_Renderer->BeginFrame(
 		m_CurrentShip == 0 ? 0.012f : 0.018f, 0.020f, m_CurrentShip == 0 ? 0.035f : 0.045f, 1.0f);
 	int width = m_Renderer->Width();
@@ -1341,10 +1362,24 @@ void Game::RenderInterior()
 			-12.2f, static_cast<float>(i), 0.25f, 0.48f, 58.0f, 0.11f, 0.17f, 0.22f, HullWall};
 		Obstacle east = {
 			12.2f, static_cast<float>(i), 0.25f, 0.48f, 58.0f, 0.11f, 0.16f, 0.21f, HullWall};
-		DrawWorldBlock(north);
-		DrawWorldBlock(south);
-		DrawWorldBlock(west);
-		DrawWorldBlock(east);
+		const Obstacle walls[] = {north, south, west, east};
+		for (int wallIndex = 0; wallIndex < 4; ++wallIndex)
+		{
+			const Obstacle wall = walls[wallIndex];
+			CreateSceneActor("HullWall",
+				wall.x,
+				wall.y,
+				0.0f,
+				1,
+				wall.x + wall.y,
+				[this, wall](const ActorTransform& transform)
+				{
+					Obstacle placedWall = wall;
+					placedWall.x = transform.x;
+					placedWall.y = transform.y;
+					DrawWorldBlock(placedWall);
+				});
+		}
 	}
 
 	ScreenPoint infestationA = WorldToScreen(9.0f, 9.3f, 2.0f);
@@ -1354,44 +1389,85 @@ void Game::RenderInterior()
 	m_Renderer->DrawDiamond(
 		infestationB.x, infestationB.y, 125.0f, 42.0f, 0.10f, 0.28f, 0.33f, 0.62f);
 
-	struct RenderEntry
-	{
-		float depth;
-		int type;
-		int index;
-	};
-	std::vector<RenderEntry> entries;
 	for (size_t i = 0; i < m_Obstacles.size(); ++i)
-		entries.push_back({m_Obstacles[i].x + m_Obstacles[i].y, 0, static_cast<int>(i)});
-	entries.push_back({m_Player.x + m_Player.y, 1, 0});
-	for (size_t i = 0; i < m_Enemies.size(); ++i)
-		if (m_Enemies[i].health > 0 && m_Enemies[i].active)
-			entries.push_back(
-				{m_Enemies[i].position.x + m_Enemies[i].position.y, 2, static_cast<int>(i)});
-	for (size_t i = 0; i < m_NeutralNpcs.size(); ++i)
-		entries.push_back(
-			{m_NeutralNpcs[i].position.x + m_NeutralNpcs[i].position.y, 3, static_cast<int>(i)});
-	std::sort(entries.begin(),
-		entries.end(),
-		[](const RenderEntry& a, const RenderEntry& b) { return a.depth < b.depth; });
-	for (size_t i = 0; i < entries.size(); ++i)
 	{
-		if (entries[i].type == 0)
-			DrawWorldBlock(m_Obstacles[entries[i].index]);
-		else if (entries[i].type == 1)
-			DrawCharacter(m_Player, 0.20f, 0.72f, 0.86f, false);
-		else if (entries[i].type == 2)
-			DrawCharacter(m_Enemies[entries[i].index].position, 0.62f, 0.08f, 0.72f, true);
-		else
-			DrawNeutralNpc(m_NeutralNpcs[entries[i].index]);
+		const Obstacle obstacle = m_Obstacles[i];
+		CreateSceneActor("InteriorFixture",
+			obstacle.x,
+			obstacle.y,
+			0.0f,
+			1,
+			obstacle.x + obstacle.y,
+			[this, obstacle](const ActorTransform& transform)
+			{
+				Obstacle placedObstacle = obstacle;
+				placedObstacle.x = transform.x;
+				placedObstacle.y = transform.y;
+				DrawWorldBlock(placedObstacle);
+			});
+	}
+	CreateSceneActor("Player",
+		m_Player.x,
+		m_Player.y,
+		0.0f,
+		1,
+		m_Player.x + m_Player.y,
+		[this](const ActorTransform& transform)
+		{
+			WorldPoint position = {transform.x, transform.y};
+			DrawCharacter(position, 0.20f, 0.72f, 0.86f, false);
+		});
+	for (size_t i = 0; i < m_Enemies.size(); ++i)
+	{
+		if (m_Enemies[i].health > 0 && m_Enemies[i].active)
+		{
+			const WorldPoint position = m_Enemies[i].position;
+			CreateSceneActor("Enemy",
+				position.x,
+				position.y,
+				0.0f,
+				1,
+				position.x + position.y,
+				[this](const ActorTransform& transform)
+				{
+					WorldPoint placedPosition = {transform.x, transform.y};
+					DrawCharacter(placedPosition, 0.62f, 0.08f, 0.72f, true);
+				});
+		}
+	}
+	for (size_t i = 0; i < m_NeutralNpcs.size(); ++i)
+	{
+		const NeutralNpc npc = m_NeutralNpcs[i];
+		CreateSceneActor("NeutralNpc",
+			npc.position.x,
+			npc.position.y,
+			0.0f,
+			1,
+			npc.position.x + npc.position.y,
+			[this, npc](const ActorTransform& transform)
+			{
+				NeutralNpc placedNpc = npc;
+				placedNpc.position = {transform.x, transform.y};
+				DrawNeutralNpc(placedNpc);
+			});
 	}
 	for (size_t i = 0; i < m_Projectiles.size(); ++i)
 	{
-		ScreenPoint shot =
-			WorldToScreen(m_Projectiles[i].position.x, m_Projectiles[i].position.y, 29.0f);
-		m_Renderer->DrawSoftShadow(shot.x, shot.y - 25.0f, 24.0f, 7.0f, 0.18f);
-		m_Renderer->DrawDiamond(shot.x, shot.y, 25.0f, 8.0f, 0.18f, 0.92f, 1.0f, 1.0f);
+		const WorldPoint position = m_Projectiles[i].position;
+		CreateSceneActor("Projectile",
+			position.x,
+			position.y,
+			29.0f,
+			2,
+			position.x + position.y,
+			[this](const ActorTransform& transform)
+			{
+				ScreenPoint shot = WorldToScreen(transform.x, transform.y, transform.height);
+				m_Renderer->DrawSoftShadow(shot.x, shot.y - 25.0f, 24.0f, 7.0f, 0.18f);
+				m_Renderer->DrawDiamond(shot.x, shot.y, 25.0f, 8.0f, 0.18f, 0.92f, 1.0f, 1.0f);
+			});
 	}
+	m_SceneGraph.Render();
 
 	if (m_CurrentShip == 0)
 	{
@@ -1859,6 +1935,7 @@ void Game::DrawNeutralNpc(const NeutralNpc& npc)
 
 void Game::RenderSpace()
 {
+	m_SceneGraph.Clear();
 	m_Renderer->BeginFrame(0.004f, 0.008f, 0.025f, 1.0f);
 	int width = m_Renderer->Width();
 	int height = m_Renderer->Height();
@@ -1872,14 +1949,46 @@ void Game::RenderSpace()
 		{-90.0f, 170.0f}, {85.0f, 290.0f}, {-70.0f, 410.0f}, {55.0f, 520.0f}};
 	for (int i = 0; i < 4; ++i)
 	{
-		float x = (debris[i].x - m_ShipPosition.x) * 0.72f;
-		float y = (debris[i].y - m_ShipPosition.y) * 0.72f;
-		m_Renderer->DrawDiamond(
-			x, y, 72.0f + i * 8.0f, 30.0f + i * 5.0f, 0.18f, 0.21f, 0.25f, 1.0f);
-		m_Renderer->DrawRect(x + 12.0f, y + 7.0f, 26.0f, 5.0f, 0.65f, 0.12f, 0.10f, 0.65f);
+		const int debrisIndex = i;
+		CreateSceneActor("SpaceDebris",
+			debris[i].x,
+			debris[i].y,
+			0.0f,
+			1,
+			debris[i].y,
+			[this, debrisIndex](const ActorTransform& transform)
+			{
+				float x = (transform.x - m_ShipPosition.x) * 0.72f;
+				float y = (transform.y - m_ShipPosition.y) * 0.72f;
+				m_Renderer->DrawDiamond(x,
+					y,
+					72.0f + debrisIndex * 8.0f,
+					30.0f + debrisIndex * 5.0f,
+					0.18f,
+					0.21f,
+					0.25f,
+					1.0f);
+				m_Renderer->DrawRect(x + 12.0f, y + 7.0f, 26.0f, 5.0f, 0.65f, 0.12f, 0.10f, 0.65f);
+			});
 	}
 	for (size_t i = 0; i < m_Asteroids.size(); ++i)
-		DrawAsteroid(m_Asteroids[i]);
+	{
+		const Asteroid asteroid = m_Asteroids[i];
+		Actor* actor = CreateSceneActor("Asteroid",
+			asteroid.position.x,
+			asteroid.position.y,
+			0.0f,
+			2,
+			asteroid.position.y,
+			[this, asteroid](const ActorTransform& transform)
+			{
+				Asteroid placedAsteroid = asteroid;
+				placedAsteroid.position = {transform.x, transform.y};
+				placedAsteroid.rotation = transform.rotation;
+				DrawAsteroid(placedAsteroid);
+			});
+		actor->LocalTransform().rotation = asteroid.rotation;
+	}
 
 	float destinationX = (DestinationPosition.x - m_ShipPosition.x) * 0.72f;
 	float destinationY = (DestinationPosition.y - m_ShipPosition.y) * 0.72f;
@@ -1888,45 +1997,84 @@ void Game::RenderSpace()
 		destinationX, destinationY, 125.0f, 58.0f, 0.08f, 0.34f, 0.46f, beaconPulse);
 	m_Renderer->DrawRect(
 		destinationX, destinationY + 12.0f, 70.0f, 20.0f, 0.10f, 0.18f, 0.23f, 1.0f);
-	DrawShip(destinationX,
+	const float destinationScale = m_TravelDestinationShip == 1 ? 2.3f : 1.6f;
+	const float destinationRed = m_TravelDestinationShip == 1 ? 0.32f : 0.20f;
+	Actor* destinationShip = CreateSceneActor("DestinationShip",
+		destinationX,
 		destinationY + 14.0f,
-		-Pi * 0.5f,
-		m_TravelDestinationShip == 1 ? 2.3f : 1.6f,
-		m_TravelDestinationShip == 1 ? 0.32f : 0.20f,
-		0.48f,
-		0.58f);
+		0.0f,
+		3,
+		destinationY,
+		[this, destinationScale, destinationRed](const ActorTransform& transform)
+		{
+			DrawShip(transform.x,
+				transform.y,
+				transform.rotation,
+				destinationScale * transform.scaleX,
+				destinationRed,
+				0.48f,
+				0.58f);
+		});
+	destinationShip->LocalTransform().rotation = -Pi * 0.5f;
 	float impactShake = m_ShipImpactFlash > 0.0f ? std::sin(m_TotalTime * 95.0f) * 6.0f : 0.0f;
 	float shipX = impactShake;
 	float shipY = -35.0f + impactShake * 0.35f;
 	float shipSpeed = Length(m_ShipVelocity.x, m_ShipVelocity.y);
+	Actor* playerShip = CreateSceneActor("PlayerShip",
+		shipX,
+		shipY,
+		0.0f,
+		4,
+		shipY,
+		[this](const ActorTransform& transform)
+		{
+			DrawShip(transform.x,
+				transform.y,
+				transform.rotation,
+				transform.scaleX,
+				0.20f,
+				0.67f,
+				0.82f);
+		});
+	playerShip->LocalTransform().rotation = m_ShipAngle;
 	if (shipSpeed > 35.0f)
 	{
 		float flameLength = 34.0f + Clamp(shipSpeed / 180.0f, 0.0f, 1.0f) * 28.0f;
-		float flameCenterX = shipX - std::cos(m_ShipAngle) * (38.0f + flameLength * 0.5f);
-		float flameCenterY = shipY - std::sin(m_ShipAngle) * (38.0f + flameLength * 0.5f);
 		float flicker = std::sin(m_TotalTime * 38.0f) * 4.0f;
-		DrawRotatedRect(m_Renderer,
-			flameCenterX,
-			flameCenterY,
-			flameLength + flicker,
-			17.0f,
-			m_ShipAngle,
-			0.08f,
-			0.45f,
-			1.0f,
-			0.42f);
-		DrawRotatedRect(m_Renderer,
-			flameCenterX + std::cos(m_ShipAngle) * 7.0f,
-			flameCenterY + std::sin(m_ShipAngle) * 7.0f,
-			flameLength * 0.62f,
-			7.0f,
-			m_ShipAngle,
-			0.72f,
-			0.94f,
-			1.0f,
-			0.82f);
+		Actor* exhaust = CreateSceneActor(
+			"EngineExhaust",
+			-(38.0f + flameLength * 0.5f),
+			0.0f,
+			0.0f,
+			3,
+			shipY - 0.1f,
+			[this, flameLength, flicker](const ActorTransform& transform)
+			{
+				DrawRotatedRect(m_Renderer,
+					transform.x,
+					transform.y,
+					flameLength + flicker,
+					17.0f,
+					transform.rotation,
+					0.08f,
+					0.45f,
+					1.0f,
+					0.42f);
+				DrawRotatedRect(m_Renderer,
+					transform.x + std::cos(transform.rotation) * 7.0f,
+					transform.y + std::sin(transform.rotation) * 7.0f,
+					flameLength * 0.62f,
+					7.0f,
+					transform.rotation,
+					0.72f,
+					0.94f,
+					1.0f,
+					0.82f);
+			},
+			playerShip);
+		exhaust->SetSortOrder(shipY - 0.1f);
 	}
-	DrawShip(shipX, shipY, m_ShipAngle, 1.0f, 0.20f, 0.67f, 0.82f);
+	m_SceneGraph.Render();
 
 	if (m_Mode == Transition)
 	{
@@ -2045,6 +2193,7 @@ void Game::DrawShip(float x, float y, float angle, float scale, float r, float g
 
 void Game::RenderFirstLevel()
 {
+	m_SceneGraph.Clear();
 	m_Renderer->BeginFrame(0.008f, 0.014f, 0.025f, 1.0f);
 	int halfSize = m_FirstLevelSize / 2;
 	int screenWidth = m_Renderer->Width();
@@ -2089,8 +2238,19 @@ void Game::RenderFirstLevel()
 								   m_FirstLevelTiles[(tileY + 1) * m_FirstLevelSize + tileX] > 0;
 				if (besideFloor)
 				{
-					m_Renderer->DrawSoftShadow(screen.x, screen.y, 52.0f, 16.0f, 0.76f);
-					m_ModelLibrary.Draw(m_Renderer, "corridor_wall", screen.x, screen.y, 0.92f);
+					CreateSceneActor("CorridorWall",
+						worldX,
+						worldY,
+						0.0f,
+						1,
+						worldX + worldY,
+						[this](const ActorTransform& transform)
+						{
+							ScreenPoint wall =
+								WorldToScreen(transform.x, transform.y, transform.height);
+							m_Renderer->DrawSoftShadow(wall.x, wall.y, 52.0f, 16.0f, 0.76f);
+							m_ModelLibrary.Draw(m_Renderer, "corridor_wall", wall.x, wall.y, 0.92f);
+						});
 				}
 			}
 		}
@@ -2098,30 +2258,60 @@ void Game::RenderFirstLevel()
 
 	if (!m_LevelWeaponCollected)
 	{
-		ScreenPoint weapon =
-			WorldToScreen(FirstLevelWeaponPosition.x, FirstLevelWeaponPosition.y, 11.0f);
-		float pulse = 1.0f + std::sin(m_TotalTime * 4.0f) * 0.08f;
-		m_Renderer->DrawSoftShadow(weapon.x, weapon.y - 10.0f, 60.0f, 16.0f, 0.65f);
-		m_ModelLibrary.Draw(m_Renderer, "pulse_rifle_pickup", weapon.x, weapon.y, pulse);
+		CreateSceneActor("PulseRiflePickup",
+			FirstLevelWeaponPosition.x,
+			FirstLevelWeaponPosition.y,
+			11.0f,
+			2,
+			FirstLevelWeaponPosition.x + FirstLevelWeaponPosition.y,
+			[this](const ActorTransform& transform)
+			{
+				ScreenPoint weapon = WorldToScreen(transform.x, transform.y, transform.height);
+				float pulse = 1.0f + std::sin(m_TotalTime * 4.0f) * 0.08f;
+				m_Renderer->DrawSoftShadow(weapon.x, weapon.y - 10.0f, 60.0f, 16.0f, 0.65f);
+				m_ModelLibrary.Draw(m_Renderer, "pulse_rifle_pickup", weapon.x, weapon.y, pulse);
+			});
 	}
 
 	for (size_t index = 0; index < m_LevelCorpses.size(); ++index)
 	{
-		ScreenPoint corpse = WorldToScreen(m_LevelCorpses[index].x, m_LevelCorpses[index].y, 3.0f);
-		m_Renderer->DrawSoftShadow(corpse.x, corpse.y - 3.0f, 58.0f, 13.0f, 0.82f);
-		m_ModelLibrary.Draw(m_Renderer, "fallen_soldier", corpse.x, corpse.y, 1.0f);
+		const WorldPoint position = m_LevelCorpses[index];
+		CreateSceneActor("FallenSoldier",
+			position.x,
+			position.y,
+			3.0f,
+			1,
+			position.x + position.y,
+			[this](const ActorTransform& transform)
+			{
+				ScreenPoint corpse = WorldToScreen(transform.x, transform.y, transform.height);
+				m_Renderer->DrawSoftShadow(corpse.x, corpse.y - 3.0f, 58.0f, 13.0f, 0.82f);
+				m_ModelLibrary.Draw(m_Renderer, "fallen_soldier", corpse.x, corpse.y, 1.0f);
+			});
 	}
 
 	for (size_t index = 0; index < m_StoryDocuments.size(); ++index)
 	{
 		const StoryDocument& document = m_StoryDocuments[index];
-		float pulse = document.read ? 1.0f : 1.0f + std::sin(m_TotalTime * 5.0f + index) * 0.12f;
-		ScreenPoint paper = WorldToScreen(document.position.x, document.position.y, 7.0f);
-		m_ModelLibrary.Draw(m_Renderer,
-			document.read ? "field_document_read" : "field_document",
-			paper.x,
-			paper.y,
-			pulse);
+		const float animationOffset = static_cast<float>(index);
+		CreateSceneActor("StoryDocument",
+			document.position.x,
+			document.position.y,
+			7.0f,
+			2,
+			document.position.x + document.position.y,
+			[this, document, animationOffset](const ActorTransform& transform)
+			{
+				float pulse = document.read
+								  ? 1.0f
+								  : 1.0f + std::sin(m_TotalTime * 5.0f + animationOffset) * 0.12f;
+				ScreenPoint paper = WorldToScreen(transform.x, transform.y, transform.height);
+				m_ModelLibrary.Draw(m_Renderer,
+					document.read ? "field_document_read" : "field_document",
+					paper.x,
+					paper.y,
+					pulse);
+			});
 	}
 
 	for (size_t index = 0; index < m_MagazinePickups.size(); ++index)
@@ -2130,21 +2320,42 @@ void Game::RenderFirstLevel()
 		if (magazine.collected)
 			continue;
 
-		float pulse = 1.0f + std::sin(m_TotalTime * 4.5f + static_cast<float>(index)) * 0.08f;
-		ScreenPoint screen = WorldToScreen(magazine.position.x, magazine.position.y, 8.0f);
-		m_Renderer->DrawSoftShadow(screen.x, screen.y - 7.0f, 32.0f, 10.0f, 0.70f);
-		m_ModelLibrary.Draw(m_Renderer, "ammo_magazine", screen.x, screen.y, pulse);
+		const float animationOffset = static_cast<float>(index);
+		CreateSceneActor("AmmoMagazine",
+			magazine.position.x,
+			magazine.position.y,
+			8.0f,
+			2,
+			magazine.position.x + magazine.position.y,
+			[this, animationOffset](const ActorTransform& transform)
+			{
+				float pulse = 1.0f + std::sin(m_TotalTime * 4.5f + animationOffset) * 0.08f;
+				ScreenPoint screen = WorldToScreen(transform.x, transform.y, transform.height);
+				m_Renderer->DrawSoftShadow(screen.x, screen.y - 7.0f, 32.0f, 10.0f, 0.70f);
+				m_ModelLibrary.Draw(m_Renderer, "ammo_magazine", screen.x, screen.y, pulse);
+			});
 	}
 
 	for (size_t index = 0; index < m_LevelSurvivors.size(); ++index)
 	{
 		const LevelSurvivor& survivor = m_LevelSurvivors[index];
-		ScreenPoint screen = WorldToScreen(survivor.position.x, survivor.position.y);
-		float tremble = std::sin(m_TotalTime * 24.0f + static_cast<float>(index)) * 1.7f;
-		m_Renderer->DrawSoftShadow(screen.x, screen.y, 34.0f, 12.0f, 0.82f);
-		m_ModelLibrary.Draw(m_Renderer, "wounded_survivor", screen.x + tremble, screen.y, 1.0f);
-		m_Renderer->DrawString(
-			screen.x - 27.0f, screen.y + 61.0f, L"생존자", 0.62f, 0.82f, 0.76f, 0.90f);
+		const float animationOffset = static_cast<float>(index);
+		CreateSceneActor("LevelSurvivor",
+			survivor.position.x,
+			survivor.position.y,
+			0.0f,
+			3,
+			survivor.position.x + survivor.position.y,
+			[this, animationOffset](const ActorTransform& transform)
+			{
+				ScreenPoint screen = WorldToScreen(transform.x, transform.y, transform.height);
+				float tremble = std::sin(m_TotalTime * 24.0f + animationOffset) * 1.7f;
+				m_Renderer->DrawSoftShadow(screen.x, screen.y, 34.0f, 12.0f, 0.82f);
+				m_ModelLibrary.Draw(
+					m_Renderer, "wounded_survivor", screen.x + tremble, screen.y, 1.0f);
+				m_Renderer->DrawString(
+					screen.x - 27.0f, screen.y + 61.0f, L"생존자", 0.62f, 0.82f, 0.76f, 0.90f);
+			});
 	}
 
 	for (size_t index = 0; index < m_Enemies.size(); ++index)
@@ -2152,50 +2363,92 @@ void Game::RenderFirstLevel()
 		if (!m_Enemies[index].active || m_Enemies[index].health <= 0)
 			continue;
 
-		ScreenPoint enemy = WorldToScreen(m_Enemies[index].position.x, m_Enemies[index].position.y);
-		m_Renderer->DrawSoftShadow(enemy.x, enemy.y, 39.0f, 14.0f, 0.88f);
-		m_ModelLibrary.Draw(m_Renderer, "void_scout", enemy.x, enemy.y, 1.0f);
+		const WorldPoint position = m_Enemies[index].position;
+		CreateSceneActor("VoidScout",
+			position.x,
+			position.y,
+			0.0f,
+			3,
+			position.x + position.y,
+			[this](const ActorTransform& transform)
+			{
+				ScreenPoint enemy = WorldToScreen(transform.x, transform.y, transform.height);
+				m_Renderer->DrawSoftShadow(enemy.x, enemy.y, 39.0f, 14.0f, 0.88f);
+				m_ModelLibrary.Draw(m_Renderer, "void_scout", enemy.x, enemy.y, 1.0f);
+			});
 	}
 
-	DrawCharacter(m_Player, 0.20f, 0.72f, 0.86f, false);
+	CreateSceneActor("Player",
+		m_Player.x,
+		m_Player.y,
+		0.0f,
+		3,
+		m_Player.x + m_Player.y,
+		[this](const ActorTransform& transform)
+		{
+			WorldPoint position = {transform.x, transform.y};
+			DrawCharacter(position, 0.20f, 0.72f, 0.86f, false);
+		});
 
 	for (size_t index = 0; index < m_Projectiles.size(); ++index)
 	{
-		ScreenPoint bullet =
-			WorldToScreen(m_Projectiles[index].position.x, m_Projectiles[index].position.y, 28.0f);
-		ScreenPoint previous = WorldToScreen(m_Projectiles[index].previousPosition.x,
-			m_Projectiles[index].previousPosition.y,
-			28.0f);
-		float tracerWidth =
-			std::max(10.0f, Length(bullet.x - previous.x, bullet.y - previous.y) * 1.7f);
-		bool charged = m_Projectiles[index].charged;
-		m_Renderer->DrawDiamond((bullet.x + previous.x) * 0.5f,
-			(bullet.y + previous.y) * 0.5f,
-			tracerWidth,
-			5.0f,
-			charged ? 1.0f : 0.10f,
-			charged ? 0.34f : 0.62f,
-			charged ? 0.08f : 0.94f,
-			charged ? 0.70f : 0.42f);
-		m_ModelLibrary.Draw(m_Renderer,
-			m_Projectiles[index].charged ? "charged_bullet" : "pulse_bullet",
-			bullet.x,
-			bullet.y,
-			1.0f);
+		const Projectile projectile = m_Projectiles[index];
+		CreateSceneActor("Projectile",
+			projectile.position.x,
+			projectile.position.y,
+			28.0f,
+			4,
+			projectile.position.x + projectile.position.y,
+			[this, projectile](const ActorTransform& transform)
+			{
+				ScreenPoint bullet = WorldToScreen(transform.x, transform.y, transform.height);
+				ScreenPoint previous = WorldToScreen(
+					projectile.previousPosition.x, projectile.previousPosition.y, transform.height);
+				float tracerWidth =
+					std::max(10.0f, Length(bullet.x - previous.x, bullet.y - previous.y) * 1.7f);
+				m_Renderer->DrawDiamond((bullet.x + previous.x) * 0.5f,
+					(bullet.y + previous.y) * 0.5f,
+					tracerWidth,
+					5.0f,
+					projectile.charged ? 1.0f : 0.10f,
+					projectile.charged ? 0.34f : 0.62f,
+					projectile.charged ? 0.08f : 0.94f,
+					projectile.charged ? 0.70f : 0.42f);
+				m_ModelLibrary.Draw(m_Renderer,
+					projectile.charged ? "charged_bullet" : "pulse_bullet",
+					bullet.x,
+					bullet.y,
+					1.0f);
+			});
 	}
 
 	for (size_t index = 0; index < m_ExperienceOrbs.size(); ++index)
 	{
-		float bob = std::sin(m_TotalTime * 7.0f + static_cast<float>(index)) * 8.0f;
-		ScreenPoint orb = WorldToScreen(
-			m_ExperienceOrbs[index].position.x, m_ExperienceOrbs[index].position.y, 28.0f + bob);
-		m_ModelLibrary.Draw(m_Renderer, "xp_orb", orb.x, orb.y, 1.0f);
-		m_Renderer->DrawString(orb.x - 19.0f, orb.y + 18.0f, L"+25 XP", 0.32f, 1.0f, 0.72f, 0.94f);
+		const ExperienceOrb orb = m_ExperienceOrbs[index];
+		const float animationOffset = static_cast<float>(index);
+		CreateSceneActor("ExperienceOrb",
+			orb.position.x,
+			orb.position.y,
+			28.0f,
+			4,
+			orb.position.x + orb.position.y,
+			[this, animationOffset](const ActorTransform& transform)
+			{
+				float bob = std::sin(m_TotalTime * 7.0f + animationOffset) * 8.0f;
+				ScreenPoint screen =
+					WorldToScreen(transform.x, transform.y, transform.height + bob);
+				m_ModelLibrary.Draw(m_Renderer, "xp_orb", screen.x, screen.y, 1.0f);
+				m_Renderer->DrawString(
+					screen.x - 19.0f, screen.y + 18.0f, L"+25 XP", 0.32f, 1.0f, 0.72f, 0.94f);
+			});
 	}
+
+	m_SceneGraph.Render();
 }
 
 void Game::RenderDestination()
 {
+	m_SceneGraph.Clear();
 	m_Renderer->BeginFrame(0.006f, 0.012f, 0.025f, 1.0f);
 	int width = m_Renderer->Width();
 	int height = m_Renderer->Height();
@@ -2204,7 +2457,24 @@ void Game::RenderDestination()
 	m_Renderer->DrawRect(90.0f, 28.0f, 155.0f, 62.0f, 0.24f, 0.05f, 0.30f, 0.95f);
 	m_Renderer->DrawRect(-115.0f, 62.0f, 8.0f, 42.0f, 0.18f, 0.85f, 0.90f, 0.75f);
 	m_Renderer->DrawDiamond(105.0f, 62.0f, 95.0f, 32.0f, 0.36f, 0.08f, 0.48f, 0.75f);
-	DrawShip(0.0f, -125.0f, Pi * 0.5f, 1.3f, 0.22f, 0.68f, 0.82f);
+	Actor* ship = CreateSceneActor("DockedPlayerShip",
+		0.0f,
+		-125.0f,
+		0.0f,
+		1,
+		0.0f,
+		[this](const ActorTransform& transform)
+		{
+			DrawShip(transform.x,
+				transform.y,
+				transform.rotation,
+				1.3f * transform.scaleX,
+				0.22f,
+				0.68f,
+				0.82f);
+		});
+	ship->LocalTransform().rotation = Pi * 0.5f;
+	m_SceneGraph.Render();
 }
 
 void Game::RenderInterface()

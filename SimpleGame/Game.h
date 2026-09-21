@@ -5,6 +5,7 @@
 
 #include "ModelLibrary.h"
 #include "PrototypeRenderer.h"
+#include "SceneGraph.h"
 
 struct WorldPoint
 {
@@ -157,6 +158,14 @@ class Game
 	ScreenPoint WorldToScreen(float x, float y, float height = 0.0f) const;
 	std::wstring ObjectiveText() const;
 	std::wstring InteractionText() const;
+	Actor* CreateSceneActor(const std::string& name,
+		float x,
+		float y,
+		float height,
+		int layer,
+		float sortOrder,
+		const Actor::RenderFunction& renderFunction,
+		Actor* parent = nullptr);
 
 	void RenderInterior();
 	void RenderSpace();
@@ -222,6 +231,7 @@ class Game
 	int m_FirstLevelSize;
 	unsigned int m_LevelSeed;
 	ModelLibrary m_ModelLibrary;
+	SceneGraph m_SceneGraph;
 
 	WorldPoint m_ShipPosition;
 	WorldPoint m_PreviousShipPosition;
