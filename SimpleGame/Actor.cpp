@@ -2,7 +2,6 @@
 #include "Actor.h"
 
 #include <cmath>
-#include <utility>
 
 namespace
 {
@@ -14,21 +13,31 @@ ActorTransform IdentityTransform()
 } // namespace
 
 Actor::Actor(const std::string& name)
-	: m_Name(name)
-	, m_LocalTransform(IdentityTransform())
+	: m_LocalTransform(IdentityTransform())
 	, m_WorldTransform(IdentityTransform())
 	, m_Visible(true)
 	, m_Layer(0)
 	, m_SortOrder(0.0f)
 {
+	Reset(name);
 }
 
-Actor* Actor::CreateChild(const std::string& name)
+void Actor::Reset(const std::string& name)
 {
-	std::unique_ptr<Actor> child(new Actor(name));
-	Actor* childPointer = child.get();
-	m_Children.push_back(std::move(child));
-	return childPointer;
+	m_Name = name;
+	m_LocalTransform = IdentityTransform();
+	m_WorldTransform = IdentityTransform();
+	m_Visible = true;
+	m_Layer = 0;
+	m_SortOrder = 0.0f;
+	m_RenderFunction = RenderFunction();
+	m_Children.clear();
+}
+
+void Actor::AddChild(Actor* child)
+{
+	if (child != nullptr)
+		m_Children.push_back(child);
 }
 
 void Actor::SetRenderFunction(const RenderFunction& renderFunction)

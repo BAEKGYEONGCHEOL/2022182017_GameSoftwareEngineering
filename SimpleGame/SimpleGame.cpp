@@ -1,5 +1,6 @@
 #include "stdafx.h"
 
+#include <chrono>
 #include <iostream>
 #include <Windows.h>
 #include "Dependencies\\glew.h"
@@ -20,7 +21,14 @@ void RenderScene()
 {
 	if (g_Game != NULL)
 		g_Game->Render();
+	const std::chrono::steady_clock::time_point swapStart = std::chrono::steady_clock::now();
 	glutSwapBuffers();
+	const std::chrono::steady_clock::time_point swapEnd = std::chrono::steady_clock::now();
+	if (g_Renderer != NULL)
+	{
+		double swapTimeMs = std::chrono::duration<double, std::milli>(swapEnd - swapStart).count();
+		g_Renderer->SetSwapTimeMs(swapTimeMs);
+	}
 }
 
 void Idle()
@@ -32,11 +40,19 @@ void Idle()
 		elapsedSeconds = 0.25f;
 	g_Accumulator += elapsedSeconds;
 
+	const std::chrono::steady_clock::time_point updateStart = std::chrono::steady_clock::now();
 	while (g_Accumulator >= FixedStep)
 	{
 		if (g_Game != NULL)
 			g_Game->Update(FixedStep);
 		g_Accumulator -= FixedStep;
+	}
+	const std::chrono::steady_clock::time_point updateEnd = std::chrono::steady_clock::now();
+	if (g_Renderer != NULL)
+	{
+		double updateTimeMs =
+			std::chrono::duration<double, std::milli>(updateEnd - updateStart).count();
+		g_Renderer->SetUpdateTimeMs(updateTimeMs);
 	}
 	glutPostRedisplay();
 }

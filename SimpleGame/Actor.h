@@ -1,7 +1,6 @@
 #pragma once
 
 #include <functional>
-#include <memory>
 #include <string>
 #include <vector>
 
@@ -22,7 +21,8 @@ class Actor
 
 	explicit Actor(const std::string& name = "Actor");
 
-	Actor* CreateChild(const std::string& name);
+	void Reset(const std::string& name);
+	void AddChild(Actor* child);
 	void SetRenderFunction(const RenderFunction& renderFunction);
 	void UpdateWorldTransform(const ActorTransform& parentTransform);
 	void CollectVisibleActors(std::vector<Actor*>& actors);
@@ -46,5 +46,5 @@ class Actor
 	int m_Layer;
 	float m_SortOrder;
 	RenderFunction m_RenderFunction;
-	std::vector<std::unique_ptr<Actor>> m_Children;
+	std::vector<Actor*> m_Children;
 };

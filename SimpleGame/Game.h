@@ -82,6 +82,13 @@ struct MagazinePickup
 	bool collected;
 };
 
+struct MapVisualTile
+{
+	WorldPoint position;
+	int type;
+	float variation;
+};
+
 struct NeutralNpc
 {
 	WorldPoint position;
@@ -224,6 +231,8 @@ class Game
 	float m_PlayerMaxHealth;
 	float m_LevelUpFlash;
 	std::vector<int> m_FirstLevelTiles;
+	std::vector<MapVisualTile> m_FirstLevelFloorVisuals;
+	std::vector<WorldPoint> m_FirstLevelWallVisuals;
 	std::vector<WorldPoint> m_LevelCorpses;
 	std::vector<StoryDocument> m_StoryDocuments;
 	std::vector<LevelSurvivor> m_LevelSurvivors;

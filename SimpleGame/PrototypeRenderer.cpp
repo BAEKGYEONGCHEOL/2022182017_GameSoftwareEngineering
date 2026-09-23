@@ -2,10 +2,29 @@
 #include <Windows.h>
 #include "PrototypeRenderer.h"
 
+#include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
+#include <sstream>
 #include "Dependencies\\freeglut.h"
+
+namespace
+{
+long long PerformanceTicks()
+{
+	return std::chrono::duration_cast<std::chrono::nanoseconds>(
+		std::chrono::steady_clock::now().time_since_epoch())
+		.count();
+}
+
+double TicksToMilliseconds(long long ticks)
+{
+	return static_cast<double>(ticks) / 1000000.0;
+}
+} // namespace
 
 PrototypeRenderer::PrototypeRenderer(int width, int height)
 	: m_Initialized(false)
@@ -19,14 +38,48 @@ PrototypeRenderer::PrototypeRenderer(int width, int height)
 	, m_SceneFramebuffer(0)
 	, m_SceneTexture(0)
 	, m_PositionAttribute(-1)
+	, m_ColorAttribute(-1)
+	, m_EffectCoordinateAttribute(-1)
+	, m_EffectTypeAttribute(-1)
 	, m_ScreenSizeUniform(-1)
-	, m_ColorUniform(-1)
 	, m_FontHandle(NULL)
 	, m_DrawCallCount(0)
+	, m_BatchCount(0)
+	, m_VertexCount(0)
+	, m_PrimitiveCount(0)
+	, m_TextBatchCount(0)
+	, m_VisibleActorCount(0)
+	, m_CulledActorCount(0)
+	, m_ActorPoolSize(0)
 	, m_FrameNumber(0)
+	, m_LastLogFrame(0)
+	, m_UpdateTimeMs(0.0)
+	, m_SwapTimeMs(0.0)
+	, m_LastGpuTimeMs(0.0)
+	, m_SceneTransformTimeMs(0.0)
+	, m_SceneSortTimeMs(0.0)
+	, m_ActorRenderTimeMs(0.0)
+	, m_GpuQueryIndex(0)
+	, m_GpuQueryActive(false)
+	, m_FrameStartTicks(0)
+	, m_LastLogTicks(0)
 {
+	m_BatchedVertices.reserve(262144);
+	m_TextCommands.reserve(64);
+	m_ProfileLog.open("PerformanceProfile.log", std::ios::out | std::ios::trunc);
+	if (m_ProfileLog.is_open())
+	{
+		m_ProfileLog << "PERF_SCHEMA version=1 units=time_ms,count,bytes "
+						"keys=frame,fps,frame_ms,cpu_update_ms,cpu_render_build_ms,cpu_swap_ms,"
+						"scene_transform_ms,scene_sort_ms,actor_render_ms,cpu_gpu_submit_ms,"
+						"gpu_frame_ms,draw_calls,batches,primitives,vertices,"
+						"text_batches,buffer_upload_bytes,visible_actors,culled_actors,"
+						"actor_pool_size,bottleneck_hint\n";
+	}
 	m_BloomFramebuffers[0] = m_BloomFramebuffers[1] = 0;
 	m_BloomTextures[0] = m_BloomTextures[1] = 0;
+	m_GpuQueries[0] = m_GpuQueries[1] = 0;
+	m_GpuQueryPending[0] = m_GpuQueryPending[1] = false;
 	m_Program = CreateProgram();
 	m_PostProgram = CreatePostProgram();
 	m_BloomProgram = CreateBloomProgram();
@@ -36,10 +89,13 @@ PrototypeRenderer::PrototypeRenderer(int width, int height)
 
 	glGenBuffers(1, &m_VertexBuffer);
 	m_PositionAttribute = glGetAttribLocation(m_Program, "a_Position");
+	m_ColorAttribute = glGetAttribLocation(m_Program, "a_Color");
+	m_EffectCoordinateAttribute = glGetAttribLocation(m_Program, "a_EffectCoordinate");
+	m_EffectTypeAttribute = glGetAttribLocation(m_Program, "a_EffectType");
 	m_ScreenSizeUniform = glGetUniformLocation(m_Program, "u_ScreenSize");
-	m_ColorUniform = glGetUniformLocation(m_Program, "u_Color");
-	if (m_VertexBuffer == 0 || m_PositionAttribute < 0 || m_ScreenSizeUniform < 0 ||
-		m_ColorUniform < 0 || !CreateSceneTarget())
+	if (m_VertexBuffer == 0 || m_PositionAttribute < 0 || m_ColorAttribute < 0 ||
+		m_EffectCoordinateAttribute < 0 || m_EffectTypeAttribute < 0 || m_ScreenSizeUniform < 0 ||
+		!CreateSceneTarget())
 	{
 		std::cerr << "Prototype renderer resource creation failed.\n";
 		return;
@@ -48,6 +104,7 @@ PrototypeRenderer::PrototypeRenderer(int width, int height)
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glDisable(GL_DEPTH_TEST);
+	glGenQueries(2, m_GpuQueries);
 	InitializeFont();
 	m_Initialized = true;
 }
@@ -63,6 +120,8 @@ PrototypeRenderer::~PrototypeRenderer()
 	DestroySceneTarget();
 	if (m_VertexBuffer != 0)
 		glDeleteBuffers(1, &m_VertexBuffer);
+	if (m_GpuQueries[0] != 0 || m_GpuQueries[1] != 0)
+		glDeleteQueries(2, m_GpuQueries);
 	if (m_Program != 0)
 		glDeleteProgram(m_Program);
 	if (m_PostProgram != 0)
@@ -91,6 +150,31 @@ unsigned int PrototypeRenderer::DrawCallCount() const
 	return m_DrawCallCount;
 }
 
+void PrototypeRenderer::SetUpdateTimeMs(double updateTimeMs)
+{
+	m_UpdateTimeMs = updateTimeMs;
+}
+
+void PrototypeRenderer::SetSwapTimeMs(double swapTimeMs)
+{
+	m_SwapTimeMs = swapTimeMs;
+}
+
+void PrototypeRenderer::SetSceneMetrics(unsigned int visibleActors,
+	unsigned int culledActors,
+	unsigned int actorPoolSize,
+	double transformTimeMs,
+	double sortTimeMs,
+	double actorRenderTimeMs)
+{
+	m_VisibleActorCount += visibleActors;
+	m_CulledActorCount += culledActors;
+	m_ActorPoolSize = m_ActorPoolSize > actorPoolSize ? m_ActorPoolSize : actorPoolSize;
+	m_SceneTransformTimeMs += transformTimeMs;
+	m_SceneSortTimeMs += sortTimeMs;
+	m_ActorRenderTimeMs += actorRenderTimeMs;
+}
+
 void PrototypeRenderer::Resize(int width, int height)
 {
 	m_Width = width > 1 ? width : 1;
@@ -102,18 +186,36 @@ void PrototypeRenderer::Resize(int width, int height)
 
 void PrototypeRenderer::BeginFrame(float r, float g, float b, float a)
 {
+	m_FrameStartTicks = PerformanceTicks();
 	m_DrawCallCount = 0;
+	m_BatchCount = 0;
+	m_VertexCount = 0;
+	m_PrimitiveCount = 0;
+	m_TextBatchCount = 0;
+	m_VisibleActorCount = 0;
+	m_CulledActorCount = 0;
+	m_ActorPoolSize = 0;
+	m_SceneTransformTimeMs = 0.0;
+	m_SceneSortTimeMs = 0.0;
+	m_ActorRenderTimeMs = 0.0;
+	m_BatchedVertices.clear();
+	m_TextCommands.clear();
 	++m_FrameNumber;
 	glBindFramebuffer(GL_FRAMEBUFFER, m_SceneFramebuffer);
 	glViewport(0, 0, m_Width, m_Height);
 	glClearColor(r, g, b, a);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	BeginGpuTimer();
 }
 
 void PrototypeRenderer::Present(float timeSeconds)
 {
 	if (!m_Initialized)
 		return;
+	const long long submitStart = PerformanceTicks();
+	const double renderBuildMs = TicksToMilliseconds(submitStart - m_FrameStartTicks);
+	FlushGeometryBatch();
+	FlushTextBatch();
 	glDisable(GL_BLEND);
 	const float vertices[] = {
 		-1.0f, -1.0f, 1.0f, -1.0f, 1.0f, 1.0f, -1.0f, -1.0f, 1.0f, 1.0f, -1.0f, 1.0f};
@@ -125,10 +227,13 @@ void PrototypeRenderer::Present(float timeSeconds)
 	glEnableVertexAttribArray(bloomPosition);
 	glVertexAttribPointer(bloomPosition, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
 	glUniform1i(glGetUniformLocation(m_BloomProgram, "u_Image"), 0);
+	const int bloomWidth = m_Width / 2 > 1 ? m_Width / 2 : 1;
+	const int bloomHeight = m_Height / 2 > 1 ? m_Height / 2 : 1;
 	glUniform2f(glGetUniformLocation(m_BloomProgram, "u_Resolution"),
-		static_cast<float>(m_Width),
-		static_cast<float>(m_Height));
+		static_cast<float>(bloomWidth),
+		static_cast<float>(bloomHeight));
 	glActiveTexture(GL_TEXTURE0);
+	glViewport(0, 0, bloomWidth, bloomHeight);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, m_BloomFramebuffers[0]);
 	glBindTexture(GL_TEXTURE_2D, m_SceneTexture);
@@ -179,9 +284,12 @@ void PrototypeRenderer::Present(float timeSeconds)
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glEnable(GL_BLEND);
+	EndGpuTimer();
 
-	std::cout << "\r[Frame " << m_FrameNumber << "] OpenGL draw calls: " << m_DrawCallCount
-			  << "        " << std::flush;
+	const long long frameEnd = PerformanceTicks();
+	const double submitTimeMs = TicksToMilliseconds(frameEnd - submitStart);
+	const double frameTimeMs = TicksToMilliseconds(frameEnd - m_FrameStartTicks);
+	LogPerformance(frameTimeMs, renderBuildMs, submitTimeMs);
 }
 
 void PrototypeRenderer::DrawQuad(const ScreenPoint& a,
@@ -245,6 +353,7 @@ void PrototypeRenderer::DrawSpaceBackground(float timeSeconds, float travelX, fl
 	if (!m_Initialized)
 		return;
 
+	FlushGeometryBatch();
 	const float vertices[] = {
 		-1.0f, -1.0f, 1.0f, -1.0f, 1.0f, 1.0f, -1.0f, -1.0f, 1.0f, 1.0f, -1.0f, 1.0f};
 
@@ -269,26 +378,38 @@ void PrototypeRenderer::DrawSpaceBackground(float timeSeconds, float travelX, fl
 
 void PrototypeRenderer::DrawSoftShadow(float x, float y, float width, float height, float strength)
 {
-	// More closely spaced layers create a smoother penumbra; the offset implies a shared overhead
-	// light.
-	for (int layer = 12; layer >= 1; --layer)
+	const float halfWidth = (width + 16.0f) * 0.5f;
+	const float halfHeight = (height + 9.0f) * 0.5f;
+	const float centerX = x - 5.0f;
+	const float centerY = y - 3.0f;
+	const float positions[] = {centerX - halfWidth,
+		centerY - halfHeight,
+		centerX + halfWidth,
+		centerY - halfHeight,
+		centerX + halfWidth,
+		centerY + halfHeight,
+		centerX - halfWidth,
+		centerY - halfHeight,
+		centerX + halfWidth,
+		centerY + halfHeight,
+		centerX - halfWidth,
+		centerY + halfHeight};
+	const float effectCoordinates[] = {
+		-1.0f, -1.0f, 1.0f, -1.0f, 1.0f, 1.0f, -1.0f, -1.0f, 1.0f, 1.0f, -1.0f, 1.0f};
+	m_BatchedVertices.reserve(m_BatchedVertices.size() + 54);
+	for (int index = 0; index < 6; ++index)
 	{
-		float normalized = (13.0f - static_cast<float>(layer)) / 12.0f;
-		float spread = static_cast<float>(layer) * 1.65f;
-		float alpha = strength * normalized * normalized * 0.075f;
-		DrawDiamond(x - 8.0f - layer * 0.55f,
-			y - 5.0f - layer * 0.12f,
-			width + spread * 2.5f,
-			height + spread,
-			0.0f,
-			0.0f,
-			0.010f,
-			alpha);
+		m_BatchedVertices.push_back(positions[index * 2]);
+		m_BatchedVertices.push_back(positions[index * 2 + 1]);
+		m_BatchedVertices.push_back(0.0f);
+		m_BatchedVertices.push_back(0.0f);
+		m_BatchedVertices.push_back(0.008f);
+		m_BatchedVertices.push_back(strength * 0.34f);
+		m_BatchedVertices.push_back(effectCoordinates[index * 2]);
+		m_BatchedVertices.push_back(effectCoordinates[index * 2 + 1]);
+		m_BatchedVertices.push_back(1.0f);
 	}
-	DrawDiamond(
-		x - 5.0f, y - 2.0f, width * 0.78f, height * 0.68f, 0.0f, 0.0f, 0.006f, strength * 0.27f);
-	DrawDiamond(
-		x - 2.0f, y - 1.0f, width * 0.54f, height * 0.46f, 0.0f, 0.0f, 0.004f, strength * 0.20f);
+	++m_PrimitiveCount;
 }
 
 void PrototypeRenderer::DrawVertices(
@@ -296,16 +417,20 @@ void PrototypeRenderer::DrawVertices(
 {
 	if (!m_Initialized)
 		return;
-	glUseProgram(m_Program);
-	glUniform2f(m_ScreenSizeUniform, static_cast<float>(m_Width), static_cast<float>(m_Height));
-	glUniform4f(m_ColorUniform, r, g, b, a);
-	glBindBuffer(GL_ARRAY_BUFFER, m_VertexBuffer);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 2 * count, vertices, GL_STREAM_DRAW);
-	glEnableVertexAttribArray(m_PositionAttribute);
-	glVertexAttribPointer(m_PositionAttribute, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
-	glDrawArrays(GL_TRIANGLES, 0, count);
-	++m_DrawCallCount;
-	glDisableVertexAttribArray(m_PositionAttribute);
+	m_BatchedVertices.reserve(m_BatchedVertices.size() + static_cast<size_t>(count) * 9);
+	for (int index = 0; index < count; ++index)
+	{
+		m_BatchedVertices.push_back(vertices[index * 2]);
+		m_BatchedVertices.push_back(vertices[index * 2 + 1]);
+		m_BatchedVertices.push_back(r);
+		m_BatchedVertices.push_back(g);
+		m_BatchedVertices.push_back(b);
+		m_BatchedVertices.push_back(a);
+		m_BatchedVertices.push_back(0.0f);
+		m_BatchedVertices.push_back(0.0f);
+		m_BatchedVertices.push_back(0.0f);
+	}
+	++m_PrimitiveCount;
 }
 
 void PrototypeRenderer::DrawString(
@@ -320,6 +445,63 @@ void PrototypeRenderer::DrawString(
 {
 	if (m_FontHandle == NULL)
 		return;
+	TextCommand command = {x, y, r, g, b, a, text};
+	m_TextCommands.push_back(command);
+}
+
+void PrototypeRenderer::FlushGeometryBatch()
+{
+	if (m_BatchedVertices.empty())
+		return;
+
+	const GLsizei stride = static_cast<GLsizei>(sizeof(float) * 9);
+	const GLsizei vertexCount = static_cast<GLsizei>(m_BatchedVertices.size() / 9);
+	glUseProgram(m_Program);
+	glUniform2f(m_ScreenSizeUniform, static_cast<float>(m_Width), static_cast<float>(m_Height));
+	glBindBuffer(GL_ARRAY_BUFFER, m_VertexBuffer);
+	glBufferData(GL_ARRAY_BUFFER,
+		static_cast<GLsizeiptr>(m_BatchedVertices.size() * sizeof(float)),
+		&m_BatchedVertices[0],
+		GL_STREAM_DRAW);
+	glEnableVertexAttribArray(m_PositionAttribute);
+	glEnableVertexAttribArray(m_ColorAttribute);
+	glEnableVertexAttribArray(m_EffectCoordinateAttribute);
+	glEnableVertexAttribArray(m_EffectTypeAttribute);
+	glVertexAttribPointer(m_PositionAttribute, 2, GL_FLOAT, GL_FALSE, stride, 0);
+	glVertexAttribPointer(m_ColorAttribute,
+		4,
+		GL_FLOAT,
+		GL_FALSE,
+		stride,
+		reinterpret_cast<const void*>(sizeof(float) * 2));
+	glVertexAttribPointer(m_EffectCoordinateAttribute,
+		2,
+		GL_FLOAT,
+		GL_FALSE,
+		stride,
+		reinterpret_cast<const void*>(sizeof(float) * 6));
+	glVertexAttribPointer(m_EffectTypeAttribute,
+		1,
+		GL_FLOAT,
+		GL_FALSE,
+		stride,
+		reinterpret_cast<const void*>(sizeof(float) * 8));
+	glDrawArrays(GL_TRIANGLES, 0, vertexCount);
+	glDisableVertexAttribArray(m_EffectTypeAttribute);
+	glDisableVertexAttribArray(m_EffectCoordinateAttribute);
+	glDisableVertexAttribArray(m_ColorAttribute);
+	glDisableVertexAttribArray(m_PositionAttribute);
+	++m_DrawCallCount;
+	++m_BatchCount;
+	m_VertexCount += static_cast<unsigned int>(vertexCount);
+	m_BatchedVertices.clear();
+}
+
+void PrototypeRenderer::FlushTextBatch()
+{
+	if (m_TextCommands.empty() || m_FontHandle == NULL)
+		return;
+
 	glUseProgram(0);
 	glMatrixMode(GL_PROJECTION);
 	glPushMatrix();
@@ -328,22 +510,125 @@ void PrototypeRenderer::DrawString(
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
 	glLoadIdentity();
-	glColor4f(r, g, b, a);
-	glRasterPos2f(x, y);
-	for (std::wstring::const_iterator character = text.begin(); character != text.end();
-		++character)
+	for (size_t commandIndex = 0; commandIndex < m_TextCommands.size(); ++commandIndex)
 	{
-		GLuint glyph = GetGlyph(*character);
-		if (glyph != 0)
+		const TextCommand& command = m_TextCommands[commandIndex];
+		std::vector<GLuint> glyphLists;
+		glyphLists.reserve(command.text.size());
+		for (std::wstring::const_iterator character = command.text.begin();
+			character != command.text.end();
+			++character)
 		{
-			glCallList(glyph);
-			++m_DrawCallCount;
+			GLuint glyph = GetGlyph(*character);
+			if (glyph != 0)
+				glyphLists.push_back(glyph);
 		}
+		if (glyphLists.empty())
+			continue;
+
+		glColor4f(command.r, command.g, command.b, command.a);
+		glRasterPos2f(command.x, command.y);
+		glListBase(0);
+		glCallLists(static_cast<GLsizei>(glyphLists.size()), GL_UNSIGNED_INT, &glyphLists[0]);
+		++m_DrawCallCount;
+		++m_BatchCount;
+		++m_TextBatchCount;
 	}
 	glPopMatrix();
 	glMatrixMode(GL_PROJECTION);
 	glPopMatrix();
 	glMatrixMode(GL_MODELVIEW);
+	m_TextCommands.clear();
+}
+
+void PrototypeRenderer::BeginGpuTimer()
+{
+	m_GpuQueryActive = false;
+	if (m_GpuQueries[m_GpuQueryIndex] != 0 && !m_GpuQueryPending[m_GpuQueryIndex])
+	{
+		glBeginQuery(GL_TIME_ELAPSED, m_GpuQueries[m_GpuQueryIndex]);
+		m_GpuQueryActive = true;
+	}
+}
+
+void PrototypeRenderer::EndGpuTimer()
+{
+	if (m_GpuQueryActive)
+	{
+		glEndQuery(GL_TIME_ELAPSED);
+		m_GpuQueryPending[m_GpuQueryIndex] = true;
+		m_GpuQueryActive = false;
+	}
+
+	for (int queryIndex = 0; queryIndex < 2; ++queryIndex)
+	{
+		if (m_GpuQueryPending[queryIndex])
+		{
+			GLint available = GL_FALSE;
+			glGetQueryObjectiv(m_GpuQueries[queryIndex], GL_QUERY_RESULT_AVAILABLE, &available);
+			if (available == GL_TRUE)
+			{
+				GLuint64 elapsedNanoseconds = 0;
+				glGetQueryObjectui64v(
+					m_GpuQueries[queryIndex], GL_QUERY_RESULT, &elapsedNanoseconds);
+				m_LastGpuTimeMs = static_cast<double>(elapsedNanoseconds) / 1000000.0;
+				m_GpuQueryPending[queryIndex] = false;
+			}
+		}
+	}
+	m_GpuQueryIndex = 1 - m_GpuQueryIndex;
+}
+
+void PrototypeRenderer::LogPerformance(
+	double frameTimeMs, double renderBuildMs, double submitTimeMs)
+{
+	const long long currentTicks = PerformanceTicks();
+	if (m_LastLogTicks == 0)
+	{
+		m_LastLogTicks = currentTicks;
+		m_LastLogFrame = m_FrameNumber;
+		return;
+	}
+
+	const double logElapsedSeconds =
+		static_cast<double>(currentTicks - m_LastLogTicks) / 1000000000.0;
+	if (logElapsedSeconds < 0.5)
+		return;
+
+	const unsigned long long framesSinceLog = m_FrameNumber - m_LastLogFrame;
+	const double framesPerSecond = framesSinceLog / logElapsedSeconds;
+	const char* bottleneckHint = "balanced";
+	if (m_SwapTimeMs > m_UpdateTimeMs && m_SwapTimeMs > renderBuildMs &&
+		m_SwapTimeMs > m_LastGpuTimeMs)
+		bottleneckHint = "swap_or_vsync";
+	else if (m_UpdateTimeMs > renderBuildMs && m_UpdateTimeMs > m_LastGpuTimeMs)
+		bottleneckHint = "cpu_update";
+	else if (renderBuildMs > m_LastGpuTimeMs)
+		bottleneckHint = "cpu_render_build";
+	else if (m_LastGpuTimeMs > 0.0)
+		bottleneckHint = "gpu_frame";
+	std::ostringstream logLine;
+	logLine << std::fixed << std::setprecision(2) << "PERF_FRAME"
+			<< " frame=" << m_FrameNumber << " fps=" << framesPerSecond
+			<< " frame_ms=" << frameTimeMs << " cpu_update_ms=" << m_UpdateTimeMs
+			<< " cpu_render_build_ms=" << renderBuildMs << " cpu_swap_ms=" << m_SwapTimeMs
+			<< " scene_transform_ms=" << m_SceneTransformTimeMs
+			<< " scene_sort_ms=" << m_SceneSortTimeMs << " actor_render_ms=" << m_ActorRenderTimeMs
+			<< " cpu_gpu_submit_ms=" << submitTimeMs << " gpu_frame_ms=" << m_LastGpuTimeMs
+			<< " draw_calls=" << m_DrawCallCount << " batches=" << m_BatchCount
+			<< " primitives=" << m_PrimitiveCount << " vertices=" << m_VertexCount
+			<< " text_batches=" << m_TextBatchCount
+			<< " buffer_upload_bytes=" << m_VertexCount * sizeof(float) * 9
+			<< " visible_actors=" << m_VisibleActorCount << " culled_actors=" << m_CulledActorCount
+			<< " actor_pool_size=" << m_ActorPoolSize << " bottleneck_hint=" << bottleneckHint;
+	std::cout << logLine.str() << '\n';
+	if (m_ProfileLog.is_open())
+	{
+		m_ProfileLog << logLine.str() << '\n';
+		m_ProfileLog.flush();
+	}
+	m_LastLogFrame = m_FrameNumber;
+	m_LastLogTicks = currentTicks;
 }
 
 bool PrototypeRenderer::InitializeFont()
@@ -655,6 +940,8 @@ GLuint PrototypeRenderer::CreateSpaceProgram()
 
 bool PrototypeRenderer::CreateSceneTarget()
 {
+	const int bloomWidth = m_Width / 2 > 1 ? m_Width / 2 : 1;
+	const int bloomHeight = m_Height / 2 > 1 ? m_Height / 2 : 1;
 	glGenFramebuffers(1, &m_SceneFramebuffer);
 	glBindFramebuffer(GL_FRAMEBUFFER, m_SceneFramebuffer);
 	glGenTextures(1, &m_SceneTexture);
@@ -672,8 +959,15 @@ bool PrototypeRenderer::CreateSceneTarget()
 		glBindFramebuffer(GL_FRAMEBUFFER, m_BloomFramebuffers[i]);
 		glGenTextures(1, &m_BloomTextures[i]);
 		glBindTexture(GL_TEXTURE_2D, m_BloomTextures[i]);
-		glTexImage2D(
-			GL_TEXTURE_2D, 0, GL_RGBA8, m_Width, m_Height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+		glTexImage2D(GL_TEXTURE_2D,
+			0,
+			GL_RGBA8,
+			bloomWidth,
+			bloomHeight,
+			0,
+			GL_RGBA,
+			GL_UNSIGNED_BYTE,
+			NULL);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);

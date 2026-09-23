@@ -653,6 +653,35 @@ void Game::GenerateFirstLevel()
 	for (int connectionIndex = 0; connectionIndex < 7; ++connectionIndex)
 		connectRooms(connections[connectionIndex][0], connections[connectionIndex][1]);
 
+	m_FirstLevelFloorVisuals.clear();
+	m_FirstLevelWallVisuals.clear();
+	for (int tileY = 0; tileY < m_FirstLevelSize; ++tileY)
+	{
+		for (int tileX = 0; tileX < m_FirstLevelSize; ++tileX)
+		{
+			const int tile = m_FirstLevelTiles[tileY * m_FirstLevelSize + tileX];
+			const WorldPoint position = {
+				static_cast<float>(tileX - halfSize), static_cast<float>(tileY - halfSize)};
+			if (tile > 0)
+			{
+				const float variation =
+					static_cast<float>((tileX * 13 + tileY * 7 + m_LevelSeed) % 5) * 0.006f;
+				m_FirstLevelFloorVisuals.push_back({position, tile, variation});
+			}
+			else if (tileX > 0 && tileY > 0 && tileX < m_FirstLevelSize - 1 &&
+					 tileY < m_FirstLevelSize - 1)
+			{
+				const bool besideFloor =
+					m_FirstLevelTiles[tileY * m_FirstLevelSize + tileX - 1] > 0 ||
+					m_FirstLevelTiles[tileY * m_FirstLevelSize + tileX + 1] > 0 ||
+					m_FirstLevelTiles[(tileY - 1) * m_FirstLevelSize + tileX] > 0 ||
+					m_FirstLevelTiles[(tileY + 1) * m_FirstLevelSize + tileX] > 0;
+				if (besideFloor)
+					m_FirstLevelWallVisuals.push_back(position);
+			}
+		}
+	}
+
 	auto toWorld = [halfSize](const Room& room, float offsetX, float offsetY)
 	{
 		return WorldPoint{static_cast<float>(room.centerX - halfSize) + offsetX,
@@ -1323,6 +1352,14 @@ Actor* Game::CreateSceneActor(const std::string& name,
 	actor->SetLayer(layer);
 	actor->SetSortOrder(sortOrder);
 	actor->SetRenderFunction(renderFunction);
+	if (m_Mode == OnFoot || m_Mode == FirstLevel)
+	{
+		const ScreenPoint screen = WorldToScreen(x, y, height);
+		const float horizontalLimit = static_cast<float>(m_Renderer->Width()) * 0.5f + 180.0f;
+		const float verticalLimit = static_cast<float>(m_Renderer->Height()) * 0.5f + 180.0f;
+		actor->SetVisible(
+			std::fabs(screen.x) <= horizontalLimit && std::fabs(screen.y) <= verticalLimit);
+	}
 	return actor;
 }
 
@@ -1339,6 +1376,9 @@ void Game::RenderInterior()
 		for (int y = -12; y <= 12; ++y)
 		{
 			ScreenPoint p = WorldToScreen(static_cast<float>(x), static_cast<float>(y));
+			if (std::fabs(p.x) > width * 0.5f + TileWidth ||
+				std::fabs(p.y) > height * 0.5f + TileHeight)
+				continue;
 			float checker = ((x + y) & 1) ? 0.015f : 0.0f;
 			float restored = m_CoreRecovered ? 0.035f : 0.0f;
 			m_Renderer->DrawDiamond(p.x,
@@ -1468,6 +1508,12 @@ void Game::RenderInterior()
 			});
 	}
 	m_SceneGraph.Render();
+	m_Renderer->SetSceneMetrics(m_SceneGraph.VisibleActorCount(),
+		m_SceneGraph.CulledActorCount(),
+		m_SceneGraph.ActorPoolSize(),
+		m_SceneGraph.TransformTimeMs(),
+		m_SceneGraph.SortTimeMs(),
+		m_SceneGraph.ActorRenderTimeMs());
 
 	if (m_CurrentShip == 0)
 	{
@@ -2075,6 +2121,12 @@ void Game::RenderSpace()
 		exhaust->SetSortOrder(shipY - 0.1f);
 	}
 	m_SceneGraph.Render();
+	m_Renderer->SetSceneMetrics(m_SceneGraph.VisibleActorCount(),
+		m_SceneGraph.CulledActorCount(),
+		m_SceneGraph.ActorPoolSize(),
+		m_SceneGraph.TransformTimeMs(),
+		m_SceneGraph.SortTimeMs(),
+		m_SceneGraph.ActorRenderTimeMs());
 
 	if (m_Mode == Transition)
 	{
@@ -2195,65 +2247,46 @@ void Game::RenderFirstLevel()
 {
 	m_SceneGraph.Clear();
 	m_Renderer->BeginFrame(0.008f, 0.014f, 0.025f, 1.0f);
-	int halfSize = m_FirstLevelSize / 2;
 	int screenWidth = m_Renderer->Width();
 	int screenHeight = m_Renderer->Height();
 
-	for (int tileY = 0; tileY < m_FirstLevelSize; ++tileY)
+	for (size_t index = 0; index < m_FirstLevelFloorVisuals.size(); ++index)
 	{
-		for (int tileX = 0; tileX < m_FirstLevelSize; ++tileX)
-		{
-			float worldX = static_cast<float>(tileX - halfSize);
-			float worldY = static_cast<float>(tileY - halfSize);
-			ScreenPoint screen = WorldToScreen(worldX, worldY);
-			if (std::fabs(screen.x) > screenWidth * 0.5f + 110.0f ||
-				std::fabs(screen.y) > screenHeight * 0.5f + 110.0f)
-				continue;
+		const MapVisualTile& tile = m_FirstLevelFloorVisuals[index];
+		ScreenPoint screen = WorldToScreen(tile.position.x, tile.position.y);
+		if (std::fabs(screen.x) > screenWidth * 0.5f + 110.0f ||
+			std::fabs(screen.y) > screenHeight * 0.5f + 110.0f)
+			continue;
 
-			int tile = m_FirstLevelTiles[tileY * m_FirstLevelSize + tileX];
+		float roomLight = tile.type == 2 ? 0.018f : 0.0f;
+		m_Renderer->DrawDiamond(screen.x,
+			screen.y,
+			TileWidth - 2.0f,
+			TileHeight - 1.0f,
+			0.050f + tile.variation + roomLight,
+			0.078f + tile.variation + roomLight,
+			0.098f + tile.variation + roomLight,
+			1.0f);
+		if (tile.type == 1 && (static_cast<int>(tile.position.x + tile.position.y) & 3) == 0)
+			m_Renderer->DrawDiamond(
+				screen.x, screen.y + 1.0f, 21.0f, 7.0f, 0.10f, 0.42f, 0.46f, 0.42f);
+	}
 
-			if (tile > 0)
+	for (size_t index = 0; index < m_FirstLevelWallVisuals.size(); ++index)
+	{
+		const WorldPoint position = m_FirstLevelWallVisuals[index];
+		CreateSceneActor("CorridorWall",
+			position.x,
+			position.y,
+			0.0f,
+			1,
+			position.x + position.y,
+			[this](const ActorTransform& transform)
 			{
-				float variation =
-					static_cast<float>((tileX * 13 + tileY * 7 + m_LevelSeed) % 5) * 0.006f;
-				float roomLight = tile == 2 ? 0.018f : 0.0f;
-				m_Renderer->DrawDiamond(screen.x,
-					screen.y,
-					TileWidth - 2.0f,
-					TileHeight - 1.0f,
-					0.050f + variation + roomLight,
-					0.078f + variation + roomLight,
-					0.098f + variation + roomLight,
-					1.0f);
-				if (tile == 1 && ((tileX + tileY) % 4 == 0))
-					m_Renderer->DrawDiamond(
-						screen.x, screen.y + 1.0f, 21.0f, 7.0f, 0.10f, 0.42f, 0.46f, 0.42f);
-			}
-			else if (tileX > 0 && tileY > 0 && tileX < m_FirstLevelSize - 1 &&
-					 tileY < m_FirstLevelSize - 1)
-			{
-				bool besideFloor = m_FirstLevelTiles[tileY * m_FirstLevelSize + tileX - 1] > 0 ||
-								   m_FirstLevelTiles[tileY * m_FirstLevelSize + tileX + 1] > 0 ||
-								   m_FirstLevelTiles[(tileY - 1) * m_FirstLevelSize + tileX] > 0 ||
-								   m_FirstLevelTiles[(tileY + 1) * m_FirstLevelSize + tileX] > 0;
-				if (besideFloor)
-				{
-					CreateSceneActor("CorridorWall",
-						worldX,
-						worldY,
-						0.0f,
-						1,
-						worldX + worldY,
-						[this](const ActorTransform& transform)
-						{
-							ScreenPoint wall =
-								WorldToScreen(transform.x, transform.y, transform.height);
-							m_Renderer->DrawSoftShadow(wall.x, wall.y, 52.0f, 16.0f, 0.76f);
-							m_ModelLibrary.Draw(m_Renderer, "corridor_wall", wall.x, wall.y, 0.92f);
-						});
-				}
-			}
-		}
+				ScreenPoint wall = WorldToScreen(transform.x, transform.y, transform.height);
+				m_Renderer->DrawSoftShadow(wall.x, wall.y, 52.0f, 16.0f, 0.76f);
+				m_ModelLibrary.Draw(m_Renderer, "corridor_wall", wall.x, wall.y, 0.92f);
+			});
 	}
 
 	if (!m_LevelWeaponCollected)
@@ -2444,6 +2477,12 @@ void Game::RenderFirstLevel()
 	}
 
 	m_SceneGraph.Render();
+	m_Renderer->SetSceneMetrics(m_SceneGraph.VisibleActorCount(),
+		m_SceneGraph.CulledActorCount(),
+		m_SceneGraph.ActorPoolSize(),
+		m_SceneGraph.TransformTimeMs(),
+		m_SceneGraph.SortTimeMs(),
+		m_SceneGraph.ActorRenderTimeMs());
 }
 
 void Game::RenderDestination()
@@ -2475,6 +2514,12 @@ void Game::RenderDestination()
 		});
 	ship->LocalTransform().rotation = Pi * 0.5f;
 	m_SceneGraph.Render();
+	m_Renderer->SetSceneMetrics(m_SceneGraph.VisibleActorCount(),
+		m_SceneGraph.CulledActorCount(),
+		m_SceneGraph.ActorPoolSize(),
+		m_SceneGraph.TransformTimeMs(),
+		m_SceneGraph.SortTimeMs(),
+		m_SceneGraph.ActorRenderTimeMs());
 }
 
 void Game::RenderInterface()

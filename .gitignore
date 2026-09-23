@@ -18,3 +18,4 @@ x64/Debug/Data/
 *.tlog
 *.lastbuildstate
 *.recipe
+PerformanceProfile.log
