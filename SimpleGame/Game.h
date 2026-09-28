@@ -54,6 +54,8 @@ struct Projectile
 	float maximumDistance;
 	int damage;
 	bool charged;
+	int ownerType;
+	int ownerId;
 };
 
 struct ExperienceOrb
@@ -74,6 +76,14 @@ struct LevelSurvivor
 	WorldPoint position;
 	int survivorId;
 	bool talked;
+	int pattern;
+	int health;
+	float fear;
+	float actionTimer;
+	float fireCooldown;
+	WorldPoint homePosition;
+	bool armed;
+	bool confused;
 };
 
 struct MagazinePickup
@@ -149,6 +159,7 @@ class Game
 	void UpdateShip(float deltaSeconds);
 	void UpdateAsteroids(float deltaSeconds);
 	void UpdateEnemies(float deltaSeconds);
+	void UpdateLevelSurvivors(float deltaSeconds);
 	void UpdateProjectiles(float deltaSeconds);
 	void UpdateFirstLevel(float deltaSeconds);
 	void GenerateFirstLevel();
@@ -182,6 +193,7 @@ class Game
 	void DrawWorldBlock(const Obstacle& obstacle);
 	void DrawCharacter(const WorldPoint& point, float r, float g, float b, bool enemy);
 	void DrawNeutralNpc(const NeutralNpc& npc);
+	void DrawLevelSurvivor(const LevelSurvivor& survivor, size_t survivorIndex);
 	void DrawAsteroid(const Asteroid& asteroid);
 	void DrawShip(float x, float y, float angle, float scale, float r, float g, float b);
 
