@@ -80,7 +80,7 @@ struct LevelSurvivor
 	int survivorId;
 	bool talked;
 	int pattern;
-	int health;
+	float health;
 	float fear;
 	float actionTimer;
 	float fireCooldown;

@@ -791,29 +791,33 @@ void Game::GenerateFirstLevel()
 	m_StoryDocuments.push_back({toWorld(rooms[10], -1.5f, 1.0f), 1, false});
 	m_StoryDocuments.push_back({toWorld(rooms[21], -1.5f, 1.5f), 2, false});
 	m_LevelSurvivors.clear();
+	const int squadRoomIndices[] = {3, 6, 9, 11};
+	const WorldPoint squadOffsets[] = {{-1.3f, -0.9f}, {1.3f, -0.9f}, {0.0f, 1.4f}};
 	for (int survivorIndex = 0; survivorIndex < 20; ++survivorIndex)
 	{
 		const int pattern = survivorIndex % 10;
-		const int roomIndex = survivorIndex / 2 + 2;
-		const float offsetX = survivorIndex % 2 == 0 ? -1.4f : 1.4f;
-		const float offsetY = survivorIndex % 3 == 0 ? -1.2f : 0.8f;
+		const bool squadMember = survivorIndex < 12;
+		const int squadIndex = survivorIndex / 3;
+		const int roomIndex = squadMember ? squadRoomIndices[squadIndex] : survivorIndex - 6;
+		const WorldPoint offset = squadMember ? squadOffsets[survivorIndex % 3]
+			: WorldPoint{survivorIndex % 2 == 0 ? -1.4f : 1.4f,
+				survivorIndex % 3 == 0 ? -1.2f : 0.8f};
 		const float fear = 0.28f + static_cast<float>((survivorIndex * 17) % 68) / 100.0f;
-		const bool armed =
-			pattern == SurvivorSearching || pattern == SurvivorGuard ||
-			pattern == SurvivorMechanic || pattern == SurvivorSignalAnalyst ||
-			pattern == SurvivorDeserter || pattern == SurvivorFanatic;
-		const bool confused = armed;
-		const WorldPoint position = toWorld(rooms[roomIndex], offsetX, offsetY);
+		const bool armed = squadMember;
+		const bool confused = squadMember;
+		const WorldPoint position = toWorld(rooms[roomIndex], offset.x, offset.y);
 		m_LevelSurvivors.push_back(
 			{position, survivorIndex, false, pattern, 3, fear, 0.0f, 0.5f, position, armed, confused, {1.0f, 0.0f}, -1});
 	}
 	AssignSurvivorSquads(m_LevelSurvivors);
 	m_MagazinePickups.clear();
-	m_MagazinePickups.push_back({toWorld(rooms[1], -2.0f, 1.5f), false});
-	m_MagazinePickups.push_back({toWorld(rooms[6], 2.0f, -1.5f), false});
-	m_MagazinePickups.push_back({toWorld(rooms[11], 2.0f, -1.5f), false});
-	m_MagazinePickups.push_back({toWorld(rooms[16], 1.5f, 1.5f), false});
-	m_MagazinePickups.push_back({toWorld(rooms[21], -2.0f, -1.5f), false});
+	const int magazineRoomIndices[] = {0, 1, 3, 5, 6, 9, 11, 15, 18, 21};
+	for (int magazineIndex = 0; magazineIndex < 10; ++magazineIndex)
+	{
+		const float side = magazineIndex % 2 == 0 ? -1.0f : 1.0f;
+		m_MagazinePickups.push_back(
+			{toWorld(rooms[magazineRoomIndices[magazineIndex]], side * 2.2f, 1.8f), false});
+	}
 
 	m_Enemies.clear();
 	const WorldPoint enemyOffsets[] = {{-2.0f, -1.5f}, {2.0f, 1.0f}, {0.0f, 2.0f}};
@@ -1041,7 +1045,8 @@ void Game::UpdateEnemies(float deltaSeconds)
 			else if (targetType == 1 && targetIndex >= 0)
 			{
 				LevelSurvivor& survivor = survivors[targetIndex];
-				--survivor.health;
+				const float voidDamage = survivor.confused ? 0.5f : 1.0f;
+				survivor.health -= voidDamage;
 				survivor.fear = 1.0f;
 				survivor.confused = survivor.armed && survivor.health > 0;
 				SetMessage(survivor.health > 0 ? L"공허종이 생존자를 공격했습니다."
@@ -1526,7 +1531,7 @@ void Game::UpdateProjectiles(float deltaSeconds)
 					continue;
 				}
 
-				--survivor.health;
+				survivor.health -= 1.0f;
 				survivor.fear = std::min(1.0f, survivor.fear + 0.35f);
 				survivor.confused = survivor.armed && survivor.health > 0;
 				remove = true;
@@ -2819,6 +2824,12 @@ void Game::DrawLevelSurvivor(const LevelSurvivor& survivor, size_t survivorIndex
 	std::wstring label = SurvivorRoleName(survivor.pattern);
 	if (survivor.confused)
 		label += L" [피아식별 불가]";
+	if (survivor.squadId >= 0)
+	{
+		std::wostringstream squadLabel;
+		squadLabel << L" [분대 " << survivor.squadId + 1 << L"]";
+		label += squadLabel.str();
+	}
 	m_Renderer->DrawString(screen.x - 34.0f,
 		screen.y + 61.0f,
 		label,
@@ -3051,6 +3062,10 @@ void Game::RenderFirstLevel()
 				float pulse = 1.0f + std::sin(m_TotalTime * 4.5f + animationOffset) * 0.08f;
 				ScreenPoint screen = WorldToScreen(transform.x, transform.y, transform.height);
 				m_Renderer->DrawSoftShadow(screen.x, screen.y - 7.0f, 32.0f, 10.0f, 0.70f);
+				m_Renderer->DrawDiamond(
+					screen.x, screen.y + 3.0f, 45.0f * pulse, 20.0f * pulse, 0.08f, 0.68f, 0.82f, 0.24f);
+				m_Renderer->DrawRect(
+					screen.x, screen.y + 22.0f, 4.0f, 34.0f, 0.10f, 0.72f, 0.88f, 0.28f);
 				m_ModelLibrary.Draw(m_Renderer, "ammo_magazine", screen.x, screen.y, pulse);
 			});
 	}
