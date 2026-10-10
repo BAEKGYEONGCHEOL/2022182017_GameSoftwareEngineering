@@ -42,6 +42,9 @@ struct Enemy
 	WorldPoint position;
 	int health;
 	bool active;
+	float attackCooldown;
+	WorldPoint homePosition;
+	float wanderPhase;
 };
 
 struct Projectile
@@ -84,6 +87,8 @@ struct LevelSurvivor
 	WorldPoint homePosition;
 	bool armed;
 	bool confused;
+	WorldPoint aimDirection;
+	int squadId;
 };
 
 struct MagazinePickup
@@ -160,6 +165,7 @@ class Game
 	void UpdateAsteroids(float deltaSeconds);
 	void UpdateEnemies(float deltaSeconds);
 	void UpdateLevelSurvivors(float deltaSeconds);
+	void AssignSurvivorSquads(std::vector<LevelSurvivor>& survivors);
 	void UpdateProjectiles(float deltaSeconds);
 	void UpdateFirstLevel(float deltaSeconds);
 	void GenerateFirstLevel();
@@ -171,6 +177,7 @@ class Game
 	void HandleAttack();
 	void SetMessage(const std::wstring& message, float seconds);
 	bool CanMoveTo(float x, float y) const;
+	bool IsTutorialFloor(float x, float y) const;
 	bool IsNear(const WorldPoint& point, float distance) const;
 	bool AllEnemiesDefeated() const;
 	ScreenPoint WorldToScreen(float x, float y, float height = 0.0f) const;
@@ -225,6 +232,7 @@ class Game
 	std::vector<Obstacle> m_Obstacles;
 	std::vector<Enemy> m_Enemies;
 	std::vector<NeutralNpc> m_NeutralNpcs;
+	std::vector<LevelSurvivor> m_TutorialSurvivors;
 	std::vector<Projectile> m_Projectiles;
 	std::vector<ExperienceOrb> m_ExperienceOrbs;
 	float m_WeaponEnergy;

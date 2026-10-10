@@ -15,11 +15,11 @@ namespace
 const float Pi = 3.1415926535f;
 const float TileWidth = 64.0f;
 const float TileHeight = 32.0f;
-const WorldPoint TerminalPosition = {-9.0f, -8.0f};
-const WorldPoint RecordPosition = {-4.0f, -4.5f};
-const WorldPoint SignalPosition = {0.0f, 3.0f};
-const WorldPoint CorePosition = {8.5f, 8.5f};
-const WorldPoint CockpitPosition = {-9.0f, 8.5f};
+const WorldPoint TerminalPosition = {-16.0f, -15.0f};
+const WorldPoint RecordPosition = {10.0f, -13.0f};
+const WorldPoint SignalPosition = {-9.0f, 13.0f};
+const WorldPoint CorePosition = {16.0f, 15.0f};
+const WorldPoint CockpitPosition = {-16.0f, 15.0f};
 const WorldPoint DestinationPosition = {0.0f, 650.0f};
 const WorldPoint FirstLevelWeaponPosition = {-1.5f, 0.0f};
 
@@ -180,7 +180,7 @@ void Game::Reset()
 	m_MousePressed = false;
 	m_MouseX = m_Renderer->Width() / 2;
 	m_MouseY = m_Renderer->Height() / 2;
-	m_Player = {-9.5f, -9.0f};
+	m_Player = {-17.0f, -17.0f};
 	m_LastMoveDirection = {1.0f, 0.0f};
 	m_PlayerHealth = 100.0f;
 	m_AttackCooldown = 0.0f;
@@ -226,30 +226,42 @@ void Game::Reset()
 	m_MessageTimer = 6.0f;
 
 	m_Obstacles.clear();
-	m_Obstacles.push_back({-7.1f, -7.2f, 0.65f, 0.55f, 42.0f, 0.16f, 0.25f, 0.30f, MedicalPod});
-	m_Obstacles.push_back({-4.6f, -6.4f, 0.75f, 0.50f, 48.0f, 0.20f, 0.25f, 0.28f, ControlConsole});
-	m_Obstacles.push_back({-1.8f, -3.6f, 0.55f, 0.85f, 52.0f, 0.19f, 0.23f, 0.28f, CoolantPipe});
-	m_Obstacles.push_back({1.4f, -1.6f, 0.80f, 0.55f, 38.0f, 0.24f, 0.20f, 0.25f, CargoCrate});
-	m_Obstacles.push_back({4.1f, 0.2f, 0.65f, 0.85f, 54.0f, 0.13f, 0.23f, 0.29f, PowerRelay});
-	m_Obstacles.push_back({6.1f, 3.1f, 0.80f, 0.60f, 44.0f, 0.19f, 0.25f, 0.29f, CargoCrate});
-	m_Obstacles.push_back({7.0f, 6.8f, 0.60f, 0.55f, 38.0f, 0.25f, 0.18f, 0.27f, PowerRelay});
-	m_Obstacles.push_back({3.2f, 7.1f, 0.60f, 0.80f, 50.0f, 0.14f, 0.21f, 0.27f, EngineModule});
-	m_Obstacles.push_back({-0.7f, 6.2f, 0.75f, 0.50f, 44.0f, 0.18f, 0.24f, 0.29f, ControlConsole});
-	m_Obstacles.push_back({-4.2f, 5.8f, 0.55f, 0.85f, 49.0f, 0.14f, 0.23f, 0.30f, CoolantPipe});
-	m_Obstacles.push_back({-7.1f, 4.0f, 0.80f, 0.55f, 45.0f, 0.17f, 0.25f, 0.31f, CargoCrate});
-	m_Obstacles.push_back({-2.6f, 1.0f, 0.65f, 0.65f, 40.0f, 0.21f, 0.22f, 0.27f, MedicalPod});
+	m_Obstacles.push_back({-18.0f, -14.5f, 0.65f, 0.55f, 42.0f, 0.16f, 0.25f, 0.30f, MedicalPod});
+	m_Obstacles.push_back({-10.0f, -17.0f, 0.75f, 0.50f, 48.0f, 0.20f, 0.25f, 0.28f, ControlConsole});
+	m_Obstacles.push_back({9.5f, -16.5f, 0.80f, 0.55f, 38.0f, 0.24f, 0.20f, 0.25f, CargoCrate});
+	m_Obstacles.push_back({16.5f, -9.5f, 0.65f, 0.85f, 54.0f, 0.13f, 0.23f, 0.29f, PowerRelay});
+	m_Obstacles.push_back({-18.0f, 10.0f, 0.60f, 0.80f, 50.0f, 0.14f, 0.21f, 0.27f, EngineModule});
+	m_Obstacles.push_back({-9.5f, 17.0f, 0.75f, 0.50f, 44.0f, 0.18f, 0.24f, 0.29f, ControlConsole});
+	m_Obstacles.push_back({10.0f, 16.5f, 0.55f, 0.85f, 49.0f, 0.14f, 0.23f, 0.30f, CoolantPipe});
+	m_Obstacles.push_back({17.5f, 10.0f, 0.80f, 0.55f, 45.0f, 0.17f, 0.25f, 0.31f, CargoCrate});
 
 	m_Enemies.clear();
-	m_Enemies.push_back({{9.2f, 7.2f}, 2, false});
-	m_Enemies.push_back({{7.3f, 9.4f}, 2, false});
-	m_Enemies.push_back({{9.7f, 9.2f}, 2, false});
-	m_Enemies.push_back({{6.8f, 7.8f}, 2, false});
+	m_Enemies.push_back({{15.0f, 11.0f}, 2, false, 0.0f, {15.0f, 11.0f}, 0.0f});
+	m_Enemies.push_back({{11.0f, 16.0f}, 2, false, 0.0f, {11.0f, 16.0f}, 1.4f});
+	m_Enemies.push_back({{17.0f, 17.0f}, 2, false, 0.0f, {17.0f, 17.0f}, 2.8f});
+	m_Enemies.push_back({{10.0f, 10.0f}, 2, false, 0.0f, {10.0f, 10.0f}, 4.2f});
 
 	m_NeutralNpcs.clear();
-	m_NeutralNpcs.push_back({{-6.5f, -3.0f}, true, 0.0f, -1, false});
-	m_NeutralNpcs.push_back({{2.8f, 2.4f}, true, 1.7f, -1, false});
-	m_NeutralNpcs.push_back({{-7.2f, 6.1f}, false, 0.8f, 0, false});
-	m_NeutralNpcs.push_back({{4.8f, -5.8f}, false, 2.4f, 1, false});
+	m_NeutralNpcs.push_back({{-11.0f, -10.0f}, true, 0.0f, -1, false});
+	m_NeutralNpcs.push_back({{11.0f, -10.0f}, true, 1.7f, -1, false});
+	m_NeutralNpcs.push_back({{-11.0f, 10.0f}, false, 0.8f, 0, false});
+	m_NeutralNpcs.push_back({{16.5f, -16.0f}, false, 2.4f, 1, false});
+
+	// The tutorial introduces survivor states gradually across its four connected rooms.
+	m_TutorialSurvivors.clear();
+	m_TutorialSurvivors.push_back(
+		{{-14.0f, -10.0f}, 100, false, SurvivorFrozen, 3, 0.35f, 0.0f, 0.0f, {-14.0f, -10.0f}, false, false, {1.0f, 0.0f}, -1});
+	m_TutorialSurvivors.push_back(
+		{{-3.0f, -13.0f}, 101, false, SurvivorTrembling, 3, 0.70f, 0.0f, 0.0f, {-3.0f, -13.0f}, false, false, {1.0f, 0.0f}, -1});
+	m_TutorialSurvivors.push_back(
+		{{13.0f, -10.0f}, 102, false, SurvivorSearching, 3, 0.48f, 0.0f, 0.0f, {13.0f, -10.0f}, false, false, {1.0f, 0.0f}, -1});
+	m_TutorialSurvivors.push_back(
+		{{-10.0f, 14.0f}, 103, false, SurvivorMedic, 3, 0.42f, 0.0f, 0.0f, {-10.0f, 14.0f}, false, false, {1.0f, 0.0f}, -1});
+	m_TutorialSurvivors.push_back(
+		{{10.0f, 13.0f}, 104, false, SurvivorMechanic, 3, 0.55f, 0.0f, 0.0f, {10.0f, 13.0f}, false, false, {1.0f, 0.0f}, -1});
+	m_TutorialSurvivors.push_back(
+		{{13.5f, 17.0f}, 105, false, SurvivorGuard, 3, 0.82f, 0.0f, 1.2f, {13.5f, 17.0f}, true, true, {1.0f, 0.0f}, -1});
+	AssignSurvivorSquads(m_TutorialSurvivors);
 
 	m_Asteroids.clear();
 	m_Asteroids.push_back({{-135.0f, 125.0f}, {31.0f, -8.0f}, 25.0f, 0.2f, 0.45f});
@@ -431,6 +443,7 @@ void Game::UpdateOnFoot(float deltaSeconds)
 	if (m_MousePressed)
 		HandleAttack();
 	UpdateEnemies(deltaSeconds);
+	UpdateLevelSurvivors(deltaSeconds);
 	UpdateProjectiles(deltaSeconds);
 	if (m_KeyPressed['e'] || m_KeyPressed['E'])
 		HandleInteraction();
@@ -786,12 +799,15 @@ void Game::GenerateFirstLevel()
 		const float offsetY = survivorIndex % 3 == 0 ? -1.2f : 0.8f;
 		const float fear = 0.28f + static_cast<float>((survivorIndex * 17) % 68) / 100.0f;
 		const bool armed =
-			pattern == SurvivorGuard || pattern == SurvivorDeserter || pattern == SurvivorFanatic;
-		const bool confused = armed && fear >= 0.60f;
+			pattern == SurvivorSearching || pattern == SurvivorGuard ||
+			pattern == SurvivorMechanic || pattern == SurvivorSignalAnalyst ||
+			pattern == SurvivorDeserter || pattern == SurvivorFanatic;
+		const bool confused = armed;
 		const WorldPoint position = toWorld(rooms[roomIndex], offsetX, offsetY);
 		m_LevelSurvivors.push_back(
-			{position, survivorIndex, false, pattern, 3, fear, 0.0f, 0.5f, position, armed, confused});
+			{position, survivorIndex, false, pattern, 3, fear, 0.0f, 0.5f, position, armed, confused, {1.0f, 0.0f}, -1});
 	}
+	AssignSurvivorSquads(m_LevelSurvivors);
 	m_MagazinePickups.clear();
 	m_MagazinePickups.push_back({toWorld(rooms[1], -2.0f, 1.5f), false});
 	m_MagazinePickups.push_back({toWorld(rooms[6], 2.0f, -1.5f), false});
@@ -808,11 +824,17 @@ void Game::GenerateFirstLevel()
 		{
 			WorldPoint position =
 				toWorld(rooms[roomIndex], enemyOffsets[enemyIndex].x, enemyOffsets[enemyIndex].y);
-			m_Enemies.push_back({position, 3, true});
+			m_Enemies.push_back(
+				{position, 3, true, 0.0f, position, static_cast<float>(roomIndex * 3 + enemyIndex)});
 		}
 	}
 	for (size_t patrolIndex = 0; patrolIndex < corridorPatrols.size(); patrolIndex += 2)
-		m_Enemies.push_back({corridorPatrols[patrolIndex], 3, true});
+		m_Enemies.push_back({corridorPatrols[patrolIndex],
+			3,
+			true,
+			0.0f,
+			corridorPatrols[patrolIndex],
+			static_cast<float>(patrolIndex) * 0.73f});
 }
 
 bool Game::IsFirstLevelConnected(const std::vector<int>& tiles) const
@@ -933,30 +955,105 @@ void Game::ApplyStatInput()
 
 void Game::UpdateEnemies(float deltaSeconds)
 {
+	std::vector<LevelSurvivor>& survivors =
+		m_Mode == FirstLevel ? m_LevelSurvivors : m_TutorialSurvivors;
 	for (size_t i = 0; i < m_Enemies.size(); ++i)
 	{
 		Enemy& enemy = m_Enemies[i];
 		if (!enemy.active || enemy.health <= 0)
 			continue;
-		float dx = m_Player.x - enemy.position.x;
-		float dy = m_Player.y - enemy.position.y;
+		enemy.attackCooldown = std::max(0.0f, enemy.attackCooldown - deltaSeconds);
+
+		WorldPoint target = m_Player;
+		int targetType = 0;
+		int targetIndex = -1;
+		float targetDistance =
+			Length(m_Player.x - enemy.position.x, m_Player.y - enemy.position.y);
+		for (size_t survivorIndex = 0; survivorIndex < survivors.size(); ++survivorIndex)
+		{
+			const LevelSurvivor& survivor = survivors[survivorIndex];
+			if (survivor.health <= 0)
+				continue;
+			const float survivorDistance = Length(
+				survivor.position.x - enemy.position.x, survivor.position.y - enemy.position.y);
+			if (survivorDistance < targetDistance)
+			{
+				target = survivor.position;
+				targetDistance = survivorDistance;
+				targetType = 1;
+				targetIndex = static_cast<int>(survivorIndex);
+			}
+		}
+		if (m_Mode == OnFoot)
+		{
+			for (size_t npcIndex = 0; npcIndex < m_NeutralNpcs.size(); ++npcIndex)
+			{
+				const NeutralNpc& npc = m_NeutralNpcs[npcIndex];
+				if (npc.dead)
+					continue;
+				const float npcDistance = Length(
+					npc.position.x - enemy.position.x, npc.position.y - enemy.position.y);
+				if (npcDistance < targetDistance)
+				{
+					target = npc.position;
+					targetDistance = npcDistance;
+					targetType = 2;
+					targetIndex = static_cast<int>(npcIndex);
+				}
+			}
+		}
+
+		const bool hasCombatTarget = targetDistance <= 10.0f;
+		float movementSpeed = 1.15f;
+		if (!hasCombatTarget)
+		{
+			enemy.wanderPhase += deltaSeconds * 0.42f;
+			const float wanderRadius = m_Mode == FirstLevel ? 2.8f : 3.8f;
+			target = {enemy.homePosition.x + std::cos(enemy.wanderPhase) * wanderRadius,
+				enemy.homePosition.y + std::sin(enemy.wanderPhase * 0.83f) * wanderRadius};
+			movementSpeed = 0.58f;
+		}
+
+		float dx = target.x - enemy.position.x;
+		float dy = target.y - enemy.position.y;
 		float distance = Length(dx, dy);
-		if (m_Mode == FirstLevel && distance > 7.0f)
-			continue;
 		if (distance > 0.65f)
 		{
-			float nextX = enemy.position.x + dx / distance * 1.15f * deltaSeconds;
-			float nextY = enemy.position.y + dy / distance * 1.15f * deltaSeconds;
-			if (m_Mode != FirstLevel || IsFirstLevelWalkable(nextX, enemy.position.y))
+			float nextX = enemy.position.x + dx / distance * movementSpeed * deltaSeconds;
+			float nextY = enemy.position.y + dy / distance * movementSpeed * deltaSeconds;
+			if ((m_Mode == FirstLevel && IsFirstLevelWalkable(nextX, enemy.position.y)) ||
+				(m_Mode != FirstLevel && CanMoveTo(nextX, enemy.position.y)))
 				enemy.position.x = nextX;
-			if (m_Mode != FirstLevel || IsFirstLevelWalkable(enemy.position.x, nextY))
+			if ((m_Mode == FirstLevel && IsFirstLevelWalkable(enemy.position.x, nextY)) ||
+				(m_Mode != FirstLevel && CanMoveTo(enemy.position.x, nextY)))
 				enemy.position.y = nextY;
 		}
-		else if (m_DamageCooldown <= 0.0f && m_DodgeTimer <= 0.0f)
+		else if (hasCombatTarget && enemy.attackCooldown <= 0.0f)
 		{
-			m_PlayerHealth -= 18.0f;
-			m_DamageCooldown = 0.8f;
-			SetMessage(L"공허종과 접촉했습니다. 계속 움직이십시오.", 1.4f);
+			if (targetType == 0)
+			{
+				if (m_DamageCooldown > 0.0f || m_DodgeTimer > 0.0f)
+					continue;
+				m_PlayerHealth -= 18.0f;
+				m_DamageCooldown = 0.8f;
+				SetMessage(L"공허종과 접촉했습니다. 계속 움직이십시오.", 1.4f);
+			}
+			else if (targetType == 1 && targetIndex >= 0)
+			{
+				LevelSurvivor& survivor = survivors[targetIndex];
+				--survivor.health;
+				survivor.fear = 1.0f;
+				survivor.confused = survivor.armed && survivor.health > 0;
+				SetMessage(survivor.health > 0 ? L"공허종이 생존자를 공격했습니다."
+										  : L"공허종의 공격으로 생존자가 사망했습니다.",
+					1.6f);
+			}
+			else if (targetType == 2 && targetIndex >= 0)
+			{
+				m_NeutralNpcs[targetIndex].dead = true;
+				SetMessage(L"공허종의 공격으로 승무원이 사망했습니다.", 1.6f);
+			}
+			enemy.attackCooldown = 0.9f;
 		}
 	}
 
@@ -976,7 +1073,7 @@ void Game::UpdateEnemies(float deltaSeconds)
 		}
 		else
 		{
-			m_Player = {5.0f, 5.0f};
+			m_Player = {-17.0f, -17.0f};
 			m_PlayerHealth = 100.0f;
 			for (size_t i = 0; i < m_Enemies.size(); ++i)
 			{
@@ -988,70 +1085,254 @@ void Game::UpdateEnemies(float deltaSeconds)
 	}
 }
 
+void Game::AssignSurvivorSquads(std::vector<LevelSurvivor>& survivors)
+{
+	for (size_t index = 0; index < survivors.size(); ++index)
+		survivors[index].squadId = -1;
+	int nextSquadId = 0;
+	for (size_t seedIndex = 0; seedIndex < survivors.size(); ++seedIndex)
+	{
+		if (survivors[seedIndex].health <= 0 || !survivors[seedIndex].confused ||
+			survivors[seedIndex].squadId >= 0)
+			continue;
+		std::vector<size_t> members(1, seedIndex);
+		survivors[seedIndex].squadId = nextSquadId;
+		for (size_t memberIndex = 0; memberIndex < members.size(); ++memberIndex)
+		{
+			const LevelSurvivor& member = survivors[members[memberIndex]];
+			for (size_t candidateIndex = 0; candidateIndex < survivors.size(); ++candidateIndex)
+			{
+				LevelSurvivor& candidate = survivors[candidateIndex];
+				if (candidate.health <= 0 || !candidate.confused || candidate.squadId >= 0)
+					continue;
+				if (Length(candidate.position.x - member.position.x,
+						candidate.position.y - member.position.y) > 7.0f)
+					continue;
+				candidate.squadId = nextSquadId;
+				members.push_back(candidateIndex);
+			}
+		}
+		if (members.size() < 2)
+		{
+			survivors[seedIndex].squadId = -1;
+		}
+		else
+		{
+			++nextSquadId;
+		}
+	}
+}
+
 void Game::UpdateLevelSurvivors(float deltaSeconds)
 {
-	for (size_t survivorIndex = 0; survivorIndex < m_LevelSurvivors.size(); ++survivorIndex)
+	std::vector<LevelSurvivor>& survivors =
+		m_Mode == FirstLevel ? m_LevelSurvivors : m_TutorialSurvivors;
+	for (size_t survivorIndex = 0; survivorIndex < survivors.size(); ++survivorIndex)
 	{
-		LevelSurvivor& survivor = m_LevelSurvivors[survivorIndex];
+		LevelSurvivor& survivor = survivors[survivorIndex];
 		if (survivor.health <= 0)
 			continue;
 
-		survivor.actionTimer += deltaSeconds;
+		if (m_Mode == FirstLevel)
+			survivor.actionTimer += deltaSeconds;
 		survivor.fireCooldown = std::max(0.0f, survivor.fireCooldown - deltaSeconds);
 
-		if (survivor.pattern == SurvivorSearching || survivor.pattern == SurvivorMedic ||
-			survivor.pattern == SurvivorSignalAnalyst)
+		size_t squadLeaderIndex = survivorIndex;
+		int squadRank = 0;
+		if (survivor.squadId >= 0)
 		{
-			const float radius = survivor.pattern == SurvivorSearching ? 2.4f : 1.2f;
-			const float speed = survivor.pattern == SurvivorSearching ? 0.65f : 0.32f;
-			const float targetX = survivor.homePosition.x +
-				std::cos(survivor.actionTimer * 0.55f + survivor.survivorId) * radius;
-			const float targetY = survivor.homePosition.y +
-				std::sin(survivor.actionTimer * 0.43f + survivor.survivorId) * radius;
+			for (size_t otherIndex = 0; otherIndex < survivors.size(); ++otherIndex)
+			{
+				if (survivors[otherIndex].squadId != survivor.squadId ||
+					survivors[otherIndex].health <= 0)
+					continue;
+				if (otherIndex < squadLeaderIndex)
+					squadLeaderIndex = otherIndex;
+				if (otherIndex < survivorIndex)
+					++squadRank;
+			}
+		}
+		const bool followsSquadLeader =
+			survivor.squadId >= 0 && squadLeaderIndex != survivorIndex;
+		if (survivor.pattern == SurvivorSearching || survivor.pattern == SurvivorMedic ||
+			survivor.pattern == SurvivorSignalAnalyst || survivor.pattern == SurvivorGuard ||
+			survivor.squadId >= 0)
+		{
+			float targetX = survivor.homePosition.x;
+			float targetY = survivor.homePosition.y;
+			float speed = survivor.pattern == SurvivorSearching ? 1.15f : 0.82f;
+			if (followsSquadLeader)
+			{
+				const LevelSurvivor& leader = survivors[squadLeaderIndex];
+				const float formationAngle = static_cast<float>(squadRank - 1) * 2.39996f;
+				const float formationRadius = 1.05f + 0.22f * static_cast<float>((squadRank - 1) / 4);
+				targetX = leader.position.x + std::cos(formationAngle) * formationRadius;
+				targetY = leader.position.y + std::sin(formationAngle) * formationRadius;
+				speed = 1.05f;
+			}
+			else if (m_Mode == OnFoot)
+			{
+				const WorldPoint tutorialRoute[] = {
+					{-13.0f, -13.0f}, {13.0f, -13.0f}, {13.0f, 13.0f}, {-13.0f, 13.0f}};
+				const int routeIndex =
+					(survivor.survivorId + static_cast<int>(survivor.actionTimer)) % 4;
+				targetX = tutorialRoute[routeIndex].x;
+				targetY = tutorialRoute[routeIndex].y;
+			}
+			else
+			{
+				const float radius = survivor.pattern == SurvivorSearching ? 5.5f : 3.0f;
+				targetX += std::cos(survivor.actionTimer * 0.24f + survivor.survivorId) * radius;
+				targetY += std::sin(survivor.actionTimer * 0.19f + survivor.survivorId) * radius;
+			}
 			const float deltaX = targetX - survivor.position.x;
 			const float deltaY = targetY - survivor.position.y;
 			const float distance = Length(deltaX, deltaY);
-			if (distance > 0.05f)
+			if (m_Mode == OnFoot && distance <= 0.45f)
+			{
+				survivor.actionTimer += 1.0f;
+			}
+			else if (distance > 0.05f)
 			{
 				const float nextX = survivor.position.x + deltaX / distance * speed * deltaSeconds;
 				const float nextY = survivor.position.y + deltaY / distance * speed * deltaSeconds;
-				if (IsFirstLevelWalkable(nextX, survivor.position.y))
+				bool separatedX = true;
+				bool separatedY = true;
+				for (size_t otherIndex = 0; otherIndex < survivors.size(); ++otherIndex)
+				{
+					if (otherIndex == survivorIndex || survivors[otherIndex].health <= 0)
+						continue;
+					separatedX = separatedX && Length(nextX - survivors[otherIndex].position.x,
+						survivor.position.y - survivors[otherIndex].position.y) >= 0.72f;
+					separatedY = separatedY && Length(survivor.position.x - survivors[otherIndex].position.x,
+						nextY - survivors[otherIndex].position.y) >= 0.72f;
+				}
+				const bool canMoveX = separatedX && (m_Mode == FirstLevel
+					? IsFirstLevelWalkable(nextX, survivor.position.y)
+					: CanMoveTo(nextX, survivor.position.y));
+				const bool canMoveY = separatedY && (m_Mode == FirstLevel
+					? IsFirstLevelWalkable(survivor.position.x, nextY)
+					: CanMoveTo(survivor.position.x, nextY));
+				if (canMoveX)
 					survivor.position.x = nextX;
-				if (IsFirstLevelWalkable(survivor.position.x, nextY))
+				if (canMoveY)
 					survivor.position.y = nextY;
 			}
 		}
 
-		if (!survivor.armed || !survivor.confused || survivor.fireCooldown > 0.0f)
+		if (!survivor.armed || survivor.fireCooldown > 0.0f)
 			continue;
 
-		WorldPoint target = m_Player;
-		float targetDistance = Length(target.x - survivor.position.x, target.y - survivor.position.y);
-		if ((survivor.survivorId & 1) != 0)
+		WorldPoint nearestEnemy = m_Player;
+		float nearestEnemyDistance = 10000.0f;
+		for (size_t enemyIndex = 0; enemyIndex < m_Enemies.size(); ++enemyIndex)
 		{
-			for (size_t otherIndex = 0; otherIndex < m_LevelSurvivors.size(); ++otherIndex)
+			const Enemy& enemy = m_Enemies[enemyIndex];
+			if (!enemy.active || enemy.health <= 0)
+				continue;
+			const float enemyDistance = Length(
+				enemy.position.x - survivor.position.x, enemy.position.y - survivor.position.y);
+			if (enemyDistance < nearestEnemyDistance)
 			{
-				if (otherIndex == survivorIndex || m_LevelSurvivors[otherIndex].health <= 0)
-					continue;
-
-				const LevelSurvivor& other = m_LevelSurvivors[otherIndex];
-				const float otherDistance =
-					Length(other.position.x - survivor.position.x, other.position.y - survivor.position.y);
-				if (otherDistance < targetDistance)
-				{
-					target = other.position;
-					targetDistance = otherDistance;
-				}
+				nearestEnemy = enemy.position;
+				nearestEnemyDistance = enemyDistance;
 			}
 		}
 
-		if (targetDistance < 1.5f || targetDistance > 8.0f)
+		WorldPoint target = nearestEnemy;
+		float targetDistance = nearestEnemyDistance;
+		if (survivor.confused)
+		{
+			WorldPoint nearestSurvivor = m_Player;
+			float nearestSurvivorDistance = 10000.0f;
+			for (size_t otherIndex = 0; otherIndex < survivors.size(); ++otherIndex)
+			{
+				if (otherIndex == survivorIndex || survivors[otherIndex].health <= 0 ||
+					(survivor.squadId >= 0 &&
+						survivors[otherIndex].squadId == survivor.squadId))
+					continue;
+				const LevelSurvivor& other = survivors[otherIndex];
+				const float otherDistance = Length(other.position.x - survivor.position.x,
+					other.position.y - survivor.position.y);
+				if (otherDistance < nearestSurvivorDistance)
+				{
+					nearestSurvivor = other.position;
+					nearestSurvivorDistance = otherDistance;
+				}
+			}
+
+			WorldPoint nearestNeutral = m_Player;
+			float nearestNeutralDistance = 10000.0f;
+			if (m_Mode == OnFoot)
+			{
+				for (size_t npcIndex = 0; npcIndex < m_NeutralNpcs.size(); ++npcIndex)
+				{
+					const NeutralNpc& npc = m_NeutralNpcs[npcIndex];
+					if (npc.dead)
+						continue;
+					const float npcDistance = Length(npc.position.x - survivor.position.x,
+						npc.position.y - survivor.position.y);
+					if (npcDistance < nearestNeutralDistance)
+					{
+						nearestNeutral = npc.position;
+						nearestNeutralDistance = npcDistance;
+					}
+				}
+			}
+
+			const float playerDistance =
+				Length(m_Player.x - survivor.position.x, m_Player.y - survivor.position.y);
+			target = m_Player;
+			targetDistance = playerDistance;
+			if (nearestSurvivorDistance < targetDistance)
+			{
+				target = nearestSurvivor;
+				targetDistance = nearestSurvivorDistance;
+			}
+			if (nearestNeutralDistance < targetDistance)
+			{
+				target = nearestNeutral;
+				targetDistance = nearestNeutralDistance;
+			}
+			if (nearestEnemyDistance < targetDistance)
+			{
+				target = nearestEnemy;
+				targetDistance = nearestEnemyDistance;
+			}
+
+			// Panic rotates the perceived threat so every nearby faction can be misidentified.
+			const int panicTarget =
+				(survivor.survivorId + static_cast<int>(m_TotalTime / 2.0f)) % 4;
+			if (panicTarget == 0 && nearestSurvivorDistance <= 10.0f)
+			{
+				target = nearestSurvivor;
+				targetDistance = nearestSurvivorDistance;
+			}
+			else if (panicTarget == 1 && nearestNeutralDistance <= 10.0f)
+			{
+				target = nearestNeutral;
+				targetDistance = nearestNeutralDistance;
+			}
+			else if (panicTarget == 2 && playerDistance <= 10.0f)
+			{
+				target = m_Player;
+				targetDistance = playerDistance;
+			}
+			else if (panicTarget == 3 && nearestEnemyDistance <= 10.0f)
+			{
+				target = nearestEnemy;
+				targetDistance = nearestEnemyDistance;
+			}
+		}
+
+		if (targetDistance < 0.45f || targetDistance > 10.0f)
 			continue;
 
 		WorldPoint direction = {
 			(target.x - survivor.position.x) / targetDistance,
 			(target.y - survivor.position.y) / targetDistance,
 		};
+		survivor.aimDirection = direction;
 		m_Projectiles.push_back({survivor.position,
 			survivor.position,
 			{direction.x * 8.5f, direction.y * 8.5f},
@@ -1148,6 +1429,9 @@ void Game::UpdateProjectiles(float deltaSeconds)
 		if (m_Mode == FirstLevel &&
 			!IsFirstLevelWalkable(projectile.position.x, projectile.position.y))
 			remove = true;
+		if (m_Mode == OnFoot &&
+			!IsTutorialFloor(projectile.position.x, projectile.position.y))
+			remove = true;
 
 		for (size_t enemyIndex = 0;
 			projectile.ownerType == ProjectileOwnerPlayer && enemyIndex < m_Enemies.size() && !remove;
@@ -1171,13 +1455,16 @@ void Game::UpdateProjectiles(float deltaSeconds)
 			}
 		}
 
-		if (m_Mode == FirstLevel && projectile.ownerType == ProjectileOwnerPlayer)
+		if ((m_Mode == FirstLevel || m_Mode == OnFoot) &&
+			projectile.ownerType == ProjectileOwnerPlayer)
 		{
+			std::vector<LevelSurvivor>& survivors =
+				m_Mode == FirstLevel ? m_LevelSurvivors : m_TutorialSurvivors;
 			for (size_t survivorIndex = 0;
-				survivorIndex < m_LevelSurvivors.size() && !remove;
+				survivorIndex < survivors.size() && !remove;
 				++survivorIndex)
 			{
-				LevelSurvivor& survivor = m_LevelSurvivors[survivorIndex];
+				LevelSurvivor& survivor = survivors[survivorIndex];
 				if (survivor.health <= 0 ||
 					Length(projectile.position.x - survivor.position.x,
 						survivor.position.y - projectile.position.y) >= 0.5f)
@@ -1195,9 +1482,28 @@ void Game::UpdateProjectiles(float deltaSeconds)
 			}
 		}
 
-		if (m_Mode == FirstLevel && projectile.ownerType == ProjectileOwnerSurvivor && !remove)
+		if ((m_Mode == FirstLevel || m_Mode == OnFoot) &&
+			projectile.ownerType == ProjectileOwnerSurvivor && !remove)
 		{
-			if (Length(projectile.position.x - m_Player.x, projectile.position.y - m_Player.y) < 0.5f)
+			std::vector<LevelSurvivor>& survivors =
+				m_Mode == FirstLevel ? m_LevelSurvivors : m_TutorialSurvivors;
+			for (size_t enemyIndex = 0; enemyIndex < m_Enemies.size() && !remove; ++enemyIndex)
+			{
+				Enemy& enemy = m_Enemies[enemyIndex];
+				if (!enemy.active || enemy.health <= 0 ||
+					Length(projectile.position.x - enemy.position.x,
+						projectile.position.y - enemy.position.y) >= 0.55f)
+					continue;
+				enemy.health -= projectile.damage;
+				remove = true;
+				if (enemy.health <= 0)
+					enemy.active = false;
+				SetMessage(enemy.health > 0 ? L"경비대원이 공허종을 공격했습니다."
+										: L"경비대원이 공허종을 제거했습니다.",
+					1.4f);
+			}
+			if (!remove &&
+				Length(projectile.position.x - m_Player.x, projectile.position.y - m_Player.y) < 0.5f)
 			{
 				m_PlayerHealth -= 9.0f;
 				m_DamageCooldown = 0.35f;
@@ -1206,13 +1512,13 @@ void Game::UpdateProjectiles(float deltaSeconds)
 			}
 
 			for (size_t survivorIndex = 0;
-				survivorIndex < m_LevelSurvivors.size() && !remove;
+				survivorIndex < survivors.size() && !remove;
 				++survivorIndex)
 			{
 				if (static_cast<int>(survivorIndex) == projectile.ownerId)
 					continue;
 
-				LevelSurvivor& survivor = m_LevelSurvivors[survivorIndex];
+				LevelSurvivor& survivor = survivors[survivorIndex];
 				if (survivor.health <= 0 ||
 					Length(projectile.position.x - survivor.position.x,
 						projectile.position.y - survivor.position.y) >= 0.5f)
@@ -1226,6 +1532,19 @@ void Game::UpdateProjectiles(float deltaSeconds)
 				remove = true;
 				SetMessage(L"피아식별 실패로 생존자 사이에 총격이 발생했습니다.", 2.0f);
 			}
+			if (m_Mode == OnFoot)
+			{
+				for (size_t npcIndex = 0; npcIndex < m_NeutralNpcs.size() && !remove; ++npcIndex)
+				{
+					NeutralNpc& npc = m_NeutralNpcs[npcIndex];
+					if (npc.dead || Length(projectile.position.x - npc.position.x,
+						projectile.position.y - npc.position.y) >= 0.5f)
+						continue;
+					npc.dead = true;
+					remove = true;
+					SetMessage(L"공황 상태의 오인 사격으로 승무원이 사망했습니다.", 2.0f);
+				}
+			}
 		}
 		if (remove)
 			m_Projectiles.erase(m_Projectiles.begin() + projectileIndex);
@@ -1236,6 +1555,20 @@ void Game::UpdateProjectiles(float deltaSeconds)
 
 void Game::HandleInteraction()
 {
+	for (size_t i = 0; i < m_TutorialSurvivors.size(); ++i)
+	{
+		LevelSurvivor& survivor = m_TutorialSurvivors[i];
+		if (survivor.health <= 0 || !IsNear(survivor.position, 1.3f))
+			continue;
+		SetMessage(SurvivorDialogue(survivor), 5.0f);
+		survivor.talked = true;
+		if (survivor.confused)
+		{
+			survivor.confused = false;
+			survivor.fear = std::max(0.45f, survivor.fear - 0.30f);
+		}
+		return;
+	}
 	for (size_t i = 0; i < m_NeutralNpcs.size(); ++i)
 	{
 		NeutralNpc& npc = m_NeutralNpcs[i];
@@ -1419,7 +1752,7 @@ void Game::UpdateAsteroids(float deltaSeconds)
 
 bool Game::CanMoveTo(float x, float y) const
 {
-	if (x < -11.7f || x > 11.7f || y < -11.7f || y > 11.7f)
+	if (!IsTutorialFloor(x, y))
 		return false;
 	const float radius = 0.28f;
 	for (size_t i = 0; i < m_Obstacles.size(); ++i)
@@ -1432,6 +1765,30 @@ bool Game::CanMoveTo(float x, float y) const
 			return false;
 	}
 	return true;
+}
+
+bool Game::IsTutorialFloor(float x, float y) const
+{
+	const float roomHalfSize = 8.0f;
+	const float corridorHalfWidth = 1.75f;
+	const float centers[] = {-13.0f, 13.0f};
+	for (int xIndex = 0; xIndex < 2; ++xIndex)
+	{
+		for (int yIndex = 0; yIndex < 2; ++yIndex)
+		{
+			if (std::fabs(x - centers[xIndex]) <= roomHalfSize &&
+				std::fabs(y - centers[yIndex]) <= roomHalfSize)
+				return true;
+		}
+	}
+
+	const bool horizontalCorridor = std::fabs(x) <= 5.0f &&
+		(std::fabs(y + 13.0f) <= corridorHalfWidth ||
+			std::fabs(y - 13.0f) <= corridorHalfWidth);
+	const bool verticalCorridor = std::fabs(y) <= 5.0f &&
+		(std::fabs(x + 13.0f) <= corridorHalfWidth ||
+			std::fabs(x - 13.0f) <= corridorHalfWidth);
+	return horizontalCorridor || verticalCorridor;
 }
 
 bool Game::IsNear(const WorldPoint& point, float distance) const
@@ -1528,6 +1885,12 @@ std::wstring Game::InteractionText() const
 	}
 	if (m_Mode != OnFoot)
 		return L"";
+	for (size_t index = 0; index < m_TutorialSurvivors.size(); ++index)
+	{
+		if (m_TutorialSurvivors[index].health > 0 &&
+			IsNear(m_TutorialSurvivors[index].position, 1.3f))
+			return L"[E] 생존자와 대화";
+	}
 	for (size_t i = 0; i < m_NeutralNpcs.size(); ++i)
 	{
 		const NeutralNpc& npc = m_NeutralNpcs[i];
@@ -1599,10 +1962,12 @@ void Game::RenderInterior()
 	int width = m_Renderer->Width();
 	int height = m_Renderer->Height();
 
-	for (int x = -12; x <= 12; ++x)
+	for (int x = -22; x <= 22; ++x)
 	{
-		for (int y = -12; y <= 12; ++y)
+		for (int y = -22; y <= 22; ++y)
 		{
+			if (!IsTutorialFloor(static_cast<float>(x), static_cast<float>(y)))
+				continue;
 			ScreenPoint p = WorldToScreen(static_cast<float>(x), static_cast<float>(y));
 			if (std::fabs(p.x) > width * 0.5f + TileWidth ||
 				std::fabs(p.y) > height * 0.5f + TileHeight)
@@ -1620,26 +1985,28 @@ void Game::RenderInterior()
 		}
 	}
 
-	for (int i = -12; i <= 12; ++i)
+	for (int x = -22; x <= 22; ++x)
 	{
-		Obstacle north = {
-			static_cast<float>(i), -12.2f, 0.48f, 0.25f, 58.0f, 0.12f, 0.18f, 0.22f, HullWall};
-		Obstacle south = {
-			static_cast<float>(i), 12.2f, 0.48f, 0.25f, 58.0f, 0.10f, 0.16f, 0.21f, HullWall};
-		Obstacle west = {
-			-12.2f, static_cast<float>(i), 0.25f, 0.48f, 58.0f, 0.11f, 0.17f, 0.22f, HullWall};
-		Obstacle east = {
-			12.2f, static_cast<float>(i), 0.25f, 0.48f, 58.0f, 0.11f, 0.16f, 0.21f, HullWall};
-		const Obstacle walls[] = {north, south, west, east};
-		for (int wallIndex = 0; wallIndex < 4; ++wallIndex)
+		for (int y = -22; y <= 22; ++y)
 		{
-			const Obstacle wall = walls[wallIndex];
-			CreateSceneActor("HullWall",
-				wall.x,
-				wall.y,
-				0.0f,
-				1,
-				wall.x + wall.y,
+			if (IsTutorialFloor(static_cast<float>(x), static_cast<float>(y)))
+				continue;
+			const bool besideFloor = IsTutorialFloor(static_cast<float>(x + 1), static_cast<float>(y)) ||
+				IsTutorialFloor(static_cast<float>(x - 1), static_cast<float>(y)) ||
+				IsTutorialFloor(static_cast<float>(x), static_cast<float>(y + 1)) ||
+				IsTutorialFloor(static_cast<float>(x), static_cast<float>(y - 1));
+			if (!besideFloor)
+				continue;
+			Obstacle wall = {static_cast<float>(x),
+				static_cast<float>(y),
+				0.48f,
+				0.48f,
+				58.0f,
+				0.11f,
+				0.17f,
+				0.22f,
+				HullWall};
+			CreateSceneActor("HullWall", wall.x, wall.y, 0.0f, 1, wall.x + wall.y,
 				[this, wall](const ActorTransform& transform)
 				{
 					Obstacle placedWall = wall;
@@ -1719,6 +2086,22 @@ void Game::RenderInterior()
 				DrawNeutralNpc(placedNpc);
 			});
 	}
+	for (size_t i = 0; i < m_TutorialSurvivors.size(); ++i)
+	{
+		const LevelSurvivor survivor = m_TutorialSurvivors[i];
+		CreateSceneActor("TutorialSurvivor",
+			survivor.position.x,
+			survivor.position.y,
+			0.0f,
+			1,
+			survivor.position.x + survivor.position.y,
+			[this, survivor, i](const ActorTransform& transform)
+			{
+				LevelSurvivor placedSurvivor = survivor;
+				placedSurvivor.position = {transform.x, transform.y};
+				DrawLevelSurvivor(placedSurvivor, i);
+			});
+	}
 	for (size_t i = 0; i < m_Projectiles.size(); ++i)
 	{
 		const WorldPoint position = m_Projectiles[i].position;
@@ -1728,11 +2111,19 @@ void Game::RenderInterior()
 			29.0f,
 			2,
 			position.x + position.y,
-			[this](const ActorTransform& transform)
+			[this, i](const ActorTransform& transform)
 			{
+				const bool survivorShot = m_Projectiles[i].ownerType == ProjectileOwnerSurvivor;
 				ScreenPoint shot = WorldToScreen(transform.x, transform.y, transform.height);
 				m_Renderer->DrawSoftShadow(shot.x, shot.y - 25.0f, 24.0f, 7.0f, 0.18f);
-				m_Renderer->DrawDiamond(shot.x, shot.y, 25.0f, 8.0f, 0.18f, 0.92f, 1.0f, 1.0f);
+				m_Renderer->DrawDiamond(shot.x,
+					shot.y,
+					25.0f,
+					8.0f,
+					survivorShot ? 1.0f : 0.18f,
+					survivorShot ? 0.12f : 0.92f,
+					survivorShot ? 0.10f : 1.0f,
+					1.0f);
 			});
 	}
 	m_SceneGraph.Render();
@@ -2403,10 +2794,22 @@ void Game::DrawLevelSurvivor(const LevelSurvivor& survivor, size_t survivorIndex
 	if (survivor.armed)
 	{
 		const float warning = survivor.confused ? 0.92f : 0.35f;
-		m_Renderer->DrawRect(screen.x + 18.0f,
-			screen.y + 31.0f,
+		float aimScreenX = (survivor.aimDirection.x - survivor.aimDirection.y) * TileWidth * 0.5f;
+		float aimScreenY =
+			-(survivor.aimDirection.x + survivor.aimDirection.y) * TileHeight * 0.5f;
+		const float aimScreenLength = Length(aimScreenX, aimScreenY);
+		if (aimScreenLength > 0.001f)
+		{
+			aimScreenX /= aimScreenLength;
+			aimScreenY /= aimScreenLength;
+		}
+		const float aimAngle = std::atan2(aimScreenY, aimScreenX);
+		DrawRotatedRect(m_Renderer,
+			screen.x + tremble + aimScreenX * 15.0f,
+			screen.y + 32.0f + aimScreenY * 15.0f,
 			25.0f,
 			5.0f,
+			aimAngle,
 			warning,
 			survivor.confused ? 0.12f : 0.52f,
 			0.10f,
