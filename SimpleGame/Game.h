@@ -111,6 +111,7 @@ struct NeutralNpc
 	float animationOffset;
 	int dialogueId;
 	bool talked;
+	float health;
 };
 
 struct Asteroid
@@ -150,6 +151,7 @@ class Game
 	enum QuestStage
 	{
 		InspectTerminal,
+		CollectTutorialWeapon,
 		FindCore,
 		ReturnToCockpit,
 		FlyToSignal,
@@ -157,12 +159,16 @@ class Game
 		CollectLevelWeapon,
 		EarnExperience,
 		AllocateStats,
-		FirstLevelComplete
+		FirstLevelComplete,
+		ExploreErebus,
+		ReturnToNoctis,
+		FlyToStation
 	};
 
 	void UpdateOnFoot(float deltaSeconds);
 	void UpdateShip(float deltaSeconds);
 	void UpdateAsteroids(float deltaSeconds);
+	void RespawnAsteroid(Asteroid& asteroid, size_t asteroidIndex);
 	void UpdateEnemies(float deltaSeconds);
 	void UpdateLevelSurvivors(float deltaSeconds);
 	void AssignSurvivorSquads(std::vector<LevelSurvivor>& survivors);
@@ -176,12 +182,18 @@ class Game
 	void HandleInteraction();
 	void HandleAttack();
 	void SetMessage(const std::wstring& message, float seconds);
+	void SetDialogue(const std::wstring& dialogue, const WorldPoint& speakerPosition, float seconds);
 	bool CanMoveTo(float x, float y) const;
 	bool IsTutorialFloor(float x, float y) const;
 	bool IsNear(const WorldPoint& point, float distance) const;
 	bool AllEnemiesDefeated() const;
+	bool AllStoryDocumentsRead() const;
+	bool AreLevelEnginesActive() const;
+	bool AreLevelHostilesCleared() const;
+	bool IsInsideSpaceBoundary(const WorldPoint& point) const;
 	ScreenPoint WorldToScreen(float x, float y, float height = 0.0f) const;
 	std::wstring ObjectiveText() const;
+	std::vector<std::wstring> ObjectiveLines() const;
 	std::wstring InteractionText() const;
 	Actor* CreateSceneActor(const std::string& name,
 		float x,
@@ -201,6 +213,7 @@ class Game
 	void DrawCharacter(const WorldPoint& point, float r, float g, float b, bool enemy);
 	void DrawNeutralNpc(const NeutralNpc& npc);
 	void DrawLevelSurvivor(const LevelSurvivor& survivor, size_t survivorIndex);
+	void DrawFlightControlConsole(float x, float y, bool powered, bool infected);
 	void DrawAsteroid(const Asteroid& asteroid);
 	void DrawShip(float x, float y, float angle, float scale, float r, float g, float b);
 
@@ -209,7 +222,7 @@ class Game
 	QuestStage m_Quest;
 	bool m_Paused;
 	bool m_CoreRecovered;
-	bool m_RecordRead;
+	bool m_TutorialRecordsRead[3];
 	bool m_SignalChecked;
 	bool m_MedicalDroneUsed;
 	bool m_Keys[256];
@@ -257,6 +270,9 @@ class Game
 	std::vector<StoryDocument> m_StoryDocuments;
 	std::vector<LevelSurvivor> m_LevelSurvivors;
 	std::vector<MagazinePickup> m_MagazinePickups;
+	WorldPoint m_LevelEnginePositions[4];
+	bool m_LevelEngineActive[4];
+	WorldPoint m_LevelControlPosition;
 	int m_FirstLevelSize;
 	unsigned int m_LevelSeed;
 	ModelLibrary m_ModelLibrary;
@@ -270,8 +286,12 @@ class Game
 	float m_ShipImpactFlash;
 	float m_TransitionTimer;
 	std::vector<Asteroid> m_Asteroids;
+	unsigned int m_AsteroidSpawnCounter;
 	int m_CurrentShip;
 	int m_TravelDestinationShip;
 	std::wstring m_Message;
 	float m_MessageTimer;
+	std::wstring m_Dialogue;
+	WorldPoint m_DialogueSpeakerPosition;
+	float m_DialogueTimer;
 };

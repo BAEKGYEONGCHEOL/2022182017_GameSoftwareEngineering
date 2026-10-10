@@ -8,6 +8,10 @@
 #include <queue>
 #include <random>
 #include <sstream>
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <Windows.h>
 #include "Dependencies\\freeglut.h"
 
 namespace
@@ -16,12 +20,65 @@ const float Pi = 3.1415926535f;
 const float TileWidth = 64.0f;
 const float TileHeight = 32.0f;
 const WorldPoint TerminalPosition = {-16.0f, -15.0f};
-const WorldPoint RecordPosition = {10.0f, -13.0f};
+const WorldPoint TutorialWeaponPosition = {-10.0f, -14.0f};
+const WorldPoint TutorialRecordPositions[] = {
+	{10.0f, -13.0f}, {-11.0f, 12.0f}, {12.0f, 10.0f}};
 const WorldPoint SignalPosition = {-9.0f, 13.0f};
 const WorldPoint CorePosition = {16.0f, 15.0f};
 const WorldPoint CockpitPosition = {-16.0f, 15.0f};
 const WorldPoint DestinationPosition = {0.0f, 650.0f};
 const WorldPoint FirstLevelWeaponPosition = {-1.5f, 0.0f};
+const WorldPoint SpaceBoundaryCenter = {0.0f, 325.0f};
+const float SpaceBoundaryHalfWidth = 620.0f;
+const float SpaceBoundaryHalfHeight = 720.0f;
+
+float EstimatedGlyphWidth(wchar_t character)
+{
+	if (character == L' ' || character == L'\t')
+		return 6.0f;
+	return character < 128 ? 9.0f : 17.0f;
+}
+
+float EstimatedTextWidth(const std::wstring& text)
+{
+	float width = 0.0f;
+	for (size_t characterIndex = 0; characterIndex < text.size(); ++characterIndex)
+		width += EstimatedGlyphWidth(text[characterIndex]);
+	return width;
+}
+
+std::vector<std::wstring> WrapTextToWidth(const std::wstring& text, float maximumWidth)
+{
+	std::vector<std::wstring> lines;
+	std::wstring currentLine;
+	float currentWidth = 0.0f;
+	for (size_t characterIndex = 0; characterIndex < text.size(); ++characterIndex)
+	{
+		const wchar_t character = text[characterIndex];
+		if (character == L'\n')
+		{
+			lines.push_back(currentLine);
+			currentLine.clear();
+			currentWidth = 0.0f;
+			continue;
+		}
+
+		const float glyphWidth = EstimatedGlyphWidth(character);
+		if (!currentLine.empty() && currentWidth + glyphWidth > maximumWidth)
+		{
+			lines.push_back(currentLine);
+			currentLine.clear();
+			currentWidth = 0.0f;
+			if (character == L' ' || character == L'\t')
+				continue;
+		}
+		currentLine.push_back(character);
+		currentWidth += glyphWidth;
+	}
+	if (!currentLine.empty() || lines.empty())
+		lines.push_back(currentLine);
+	return lines;
+}
 
 enum ProjectileOwnerType
 {
@@ -171,7 +228,8 @@ void Game::Reset()
 	m_Quest = InspectTerminal;
 	m_Paused = false;
 	m_CoreRecovered = false;
-	m_RecordRead = false;
+	for (int recordIndex = 0; recordIndex < 3; ++recordIndex)
+		m_TutorialRecordsRead[recordIndex] = false;
 	m_SignalChecked = false;
 	m_MedicalDroneUsed = false;
 	std::memset(m_Keys, 0, sizeof(m_Keys));
@@ -207,6 +265,9 @@ void Game::Reset()
 	m_Vitality = 1;
 	m_PlayerMaxHealth = 100.0f;
 	m_LevelUpFlash = 0.0f;
+	for (int engineIndex = 0; engineIndex < 4; ++engineIndex)
+		m_LevelEngineActive[engineIndex] = false;
+	m_LevelControlPosition = {0.0f, 0.0f};
 	// 127 x 127 is approximately eight times the walkable design area of the old 45 x 45 map.
 	m_FirstLevelSize = 127;
 	m_LevelSeed = static_cast<unsigned int>(std::time(NULL));
@@ -220,10 +281,14 @@ void Game::Reset()
 	m_ShipHealth = 100.0f;
 	m_ShipImpactFlash = 0.0f;
 	m_TransitionTimer = 0.0f;
+	m_AsteroidSpawnCounter = 0;
 	m_CurrentShip = 0;
 	m_TravelDestinationShip = 1;
 	m_Message = L"WASD: 이동    E: 상호작용";
 	m_MessageTimer = 6.0f;
+	m_Dialogue.clear();
+	m_DialogueSpeakerPosition = m_Player;
+	m_DialogueTimer = 0.0f;
 
 	m_Obstacles.clear();
 	m_Obstacles.push_back({-18.0f, -14.5f, 0.65f, 0.55f, 42.0f, 0.16f, 0.25f, 0.30f, MedicalPod});
@@ -242,10 +307,10 @@ void Game::Reset()
 	m_Enemies.push_back({{10.0f, 10.0f}, 2, false, 0.0f, {10.0f, 10.0f}, 4.2f});
 
 	m_NeutralNpcs.clear();
-	m_NeutralNpcs.push_back({{-11.0f, -10.0f}, true, 0.0f, -1, false});
-	m_NeutralNpcs.push_back({{11.0f, -10.0f}, true, 1.7f, -1, false});
-	m_NeutralNpcs.push_back({{-11.0f, 10.0f}, false, 0.8f, 0, false});
-	m_NeutralNpcs.push_back({{16.5f, -16.0f}, false, 2.4f, 1, false});
+	m_NeutralNpcs.push_back({{-11.0f, -10.0f}, true, 0.0f, -1, false, 0.0f});
+	m_NeutralNpcs.push_back({{11.0f, -10.0f}, true, 1.7f, -1, false, 0.0f});
+	m_NeutralNpcs.push_back({{-11.0f, 10.0f}, false, 0.8f, 0, false, 3.0f});
+	m_NeutralNpcs.push_back({{16.5f, -16.0f}, false, 2.4f, 1, false, 3.0f});
 
 	// The tutorial introduces survivor states gradually across its four connected rooms.
 	m_TutorialSurvivors.clear();
@@ -260,7 +325,7 @@ void Game::Reset()
 	m_TutorialSurvivors.push_back(
 		{{10.0f, 13.0f}, 104, false, SurvivorMechanic, 3, 0.55f, 0.0f, 0.0f, {10.0f, 13.0f}, false, false, {1.0f, 0.0f}, -1});
 	m_TutorialSurvivors.push_back(
-		{{13.5f, 17.0f}, 105, false, SurvivorGuard, 3, 0.82f, 0.0f, 1.2f, {13.5f, 17.0f}, true, true, {1.0f, 0.0f}, -1});
+		{{13.5f, 17.0f}, 105, false, SurvivorGuard, 3, 0.82f, 0.0f, 1.2f, {13.5f, 17.0f}, false, false, {1.0f, 0.0f}, -1});
 	AssignSurvivorSquads(m_TutorialSurvivors);
 
 	m_Asteroids.clear();
@@ -334,6 +399,7 @@ void Game::Update(float deltaSeconds)
 		m_ShipImpactFlash = std::max(0.0f, m_ShipImpactFlash - deltaSeconds);
 		m_LevelUpFlash = std::max(0.0f, m_LevelUpFlash - deltaSeconds);
 		m_MessageTimer = std::max(0.0f, m_MessageTimer - deltaSeconds);
+		m_DialogueTimer = std::max(0.0f, m_DialogueTimer - deltaSeconds);
 		if (m_ReloadTimer > 0.0f)
 		{
 			m_ReloadTimer -= deltaSeconds;
@@ -373,9 +439,22 @@ void Game::Update(float deltaSeconds)
 				if (m_CurrentShip == 1 && m_Quest == FlyToSignal)
 				{
 					m_Mode = FirstLevel;
-					m_Quest = CollectLevelWeapon;
+					m_Quest = ExploreErebus;
 					GenerateFirstLevel();
-					SetMessage(L"첫 레벨: 훈련용 펄스 소총을 회수하십시오. [E]", 4.0f);
+					m_LevelWeaponCollected = true;
+					SetMessage(L"거대 수송선 에레보스: 생존자와 기록을 조사하고 적대 개체를 제압하십시오.", 5.0f);
+				}
+				else if (m_CurrentShip == 0 && m_Quest == ReturnToNoctis)
+				{
+					m_Mode = OnFoot;
+					m_Quest = FlyToStation;
+					m_Player = {-9.0f, 8.0f};
+					SetMessage(L"노크티스로 귀환했습니다. 확보한 자료를 가지고 거대 우주 정거장으로 이동할 수 있습니다.", 5.0f);
+				}
+				else if (m_CurrentShip == 2 && m_Quest == FlyToStation)
+				{
+					m_Mode = Complete;
+					SetMessage(L"거대 우주 정거장에 도착했습니다. 다음 항로가 열렸습니다.", 6.0f);
 				}
 				else
 				{
@@ -508,8 +587,48 @@ void Game::UpdateFirstLevel(float deltaSeconds)
 	else if (m_KeyPressed['e'] || m_KeyPressed['E'])
 	{
 		bool interactionHandled = false;
+		for (int engineIndex = 0; engineIndex < 4; ++engineIndex)
+		{
+			if (m_LevelEngineActive[engineIndex] ||
+				!IsNear(m_LevelEnginePositions[engineIndex], 1.45f))
+				continue;
+			m_LevelEngineActive[engineIndex] = true;
+			interactionHandled = true;
+			int activeCount = 0;
+			for (int countIndex = 0; countIndex < 4; ++countIndex)
+				if (m_LevelEngineActive[countIndex])
+					++activeCount;
+			if (activeCount == 4)
+				SetMessage(L"네 개의 보조 엔진이 모두 가동되었습니다. 조종석의 감염막이 약해집니다.", 4.0f);
+			else
+				SetMessage(L"보조 엔진 가동: " + std::to_wstring(activeCount) + L" / 4", 2.5f);
+			break;
+		}
+
+		if (!interactionHandled && IsNear(m_LevelControlPosition, 1.5f))
+		{
+			interactionHandled = true;
+			if (!AreLevelEnginesActive())
+				SetMessage(L"이탈 제어 장치가 감염막에 잠겨 있습니다. 보조 엔진 네 개를 모두 가동하십시오.", 4.0f);
+			else if (!AreLevelHostilesCleared())
+				SetMessage(L"항로 안전 확보 실패: 모든 공허종과 공황 분대를 처치해야 합니다.", 4.0f);
+			else
+			{
+				m_Quest = ReturnToNoctis;
+				m_TravelDestinationShip = 0;
+				m_ShipPosition = {0.0f, 0.0f};
+				m_PreviousShipPosition = m_ShipPosition;
+				m_ShipVelocity = {0.0f, 0.0f};
+				m_ShipAngle = Pi * 0.5f;
+				m_Mode = ShipControl;
+				SetMessage(L"자료 전송 완료. 에레보스에서 이탈해 노크티스로 귀환하십시오.", 4.5f);
+				return;
+			}
+		}
 		for (size_t index = 0; index < m_MagazinePickups.size(); ++index)
 		{
+			if (interactionHandled)
+				break;
 			MagazinePickup& magazine = m_MagazinePickups[index];
 			if (magazine.collected || !IsNear(magazine.position, 1.1f))
 				continue;
@@ -554,14 +673,16 @@ void Game::UpdateFirstLevel(float deltaSeconds)
 			LevelSurvivor& survivor = m_LevelSurvivors[index];
 			if (survivor.health <= 0 || !IsNear(survivor.position, 1.3f))
 				continue;
-
-			SetMessage(SurvivorDialogue(survivor), 5.0f);
-			survivor.talked = true;
 			if (survivor.confused)
 			{
-				survivor.confused = false;
-				survivor.fear = std::max(0.45f, survivor.fear - 0.30f);
+				SetDialogue(L"무장 생존자: 다가오지 마! 전부 공허종이야!", survivor.position, 3.0f);
+				interactionHandled = true;
+				break;
 			}
+
+			SetDialogue(SurvivorDialogue(survivor), survivor.position, 5.0f);
+			survivor.talked = true;
+			interactionHandled = true;
 		}
 	}
 
@@ -778,6 +899,13 @@ void Game::GenerateFirstLevel()
 		return WorldPoint{static_cast<float>(room.centerX - halfSize) + offsetX,
 			static_cast<float>(room.centerY - halfSize) + offsetY};
 	};
+	m_LevelEnginePositions[0] = toWorld(rooms[3], -2.0f, 0.0f);
+	m_LevelEnginePositions[1] = toWorld(rooms[4], 2.0f, 0.0f);
+	m_LevelEnginePositions[2] = toWorld(rooms[16], 0.0f, -2.0f);
+	m_LevelEnginePositions[3] = toWorld(rooms[20], 0.0f, 2.0f);
+	for (int engineIndex = 0; engineIndex < 4; ++engineIndex)
+		m_LevelEngineActive[engineIndex] = false;
+	m_LevelControlPosition = toWorld(rooms[0], 2.5f, 0.0f);
 
 	m_Player = toWorld(rooms[0], 0.0f, 0.0f);
 	m_LevelCorpses.clear();
@@ -1055,8 +1183,12 @@ void Game::UpdateEnemies(float deltaSeconds)
 			}
 			else if (targetType == 2 && targetIndex >= 0)
 			{
-				m_NeutralNpcs[targetIndex].dead = true;
-				SetMessage(L"공허종의 공격으로 승무원이 사망했습니다.", 1.6f);
+				NeutralNpc& npc = m_NeutralNpcs[targetIndex];
+				npc.health -= 1.0f;
+				npc.dead = npc.health <= 0.0f;
+				SetMessage(npc.dead ? L"공허종의 공격으로 승무원이 사망했습니다."
+								 : L"공허종이 승무원을 공격했습니다.",
+					1.6f);
 			}
 			enemy.attackCooldown = 0.9f;
 		}
@@ -1354,7 +1486,8 @@ void Game::UpdateLevelSurvivors(float deltaSeconds)
 
 void Game::HandleAttack()
 {
-	if (m_Quest == InspectTerminal || m_AttackCooldown > 0.0f || m_ReloadTimer > 0.0f ||
+	if (m_Quest == InspectTerminal || m_Quest == CollectTutorialWeapon ||
+		m_AttackCooldown > 0.0f || m_ReloadTimer > 0.0f ||
 		(m_Mode == FirstLevel && !m_LevelWeaponCollected))
 		return;
 
@@ -1486,6 +1619,22 @@ void Game::UpdateProjectiles(float deltaSeconds)
 					2.2f);
 			}
 		}
+		if (m_Mode == OnFoot && projectile.ownerType == ProjectileOwnerPlayer && !remove)
+		{
+			for (size_t npcIndex = 0; npcIndex < m_NeutralNpcs.size() && !remove; ++npcIndex)
+			{
+				NeutralNpc& npc = m_NeutralNpcs[npcIndex];
+				if (npc.dead || Length(projectile.position.x - npc.position.x,
+					projectile.position.y - npc.position.y) >= 0.5f)
+					continue;
+				npc.health -= static_cast<float>(projectile.damage);
+				npc.dead = npc.health <= 0.0f;
+				remove = true;
+				SetMessage(npc.dead ? L"승무원이 사망했습니다. 이 결과는 되돌릴 수 없습니다."
+								 : L"승무원이 총격으로 부상했습니다.",
+					2.0f);
+			}
+		}
 
 		if ((m_Mode == FirstLevel || m_Mode == OnFoot) &&
 			projectile.ownerType == ProjectileOwnerSurvivor && !remove)
@@ -1545,9 +1694,12 @@ void Game::UpdateProjectiles(float deltaSeconds)
 					if (npc.dead || Length(projectile.position.x - npc.position.x,
 						projectile.position.y - npc.position.y) >= 0.5f)
 						continue;
-					npc.dead = true;
+					npc.health -= 1.0f;
+					npc.dead = npc.health <= 0.0f;
 					remove = true;
-					SetMessage(L"공황 상태의 오인 사격으로 승무원이 사망했습니다.", 2.0f);
+					SetMessage(npc.dead ? L"공황 상태의 오인 사격으로 승무원이 사망했습니다."
+									: L"승무원이 오인 사격으로 부상했습니다.",
+						2.0f);
 				}
 			}
 		}
@@ -1565,7 +1717,7 @@ void Game::HandleInteraction()
 		LevelSurvivor& survivor = m_TutorialSurvivors[i];
 		if (survivor.health <= 0 || !IsNear(survivor.position, 1.3f))
 			continue;
-		SetMessage(SurvivorDialogue(survivor), 5.0f);
+		SetDialogue(SurvivorDialogue(survivor), survivor.position, 5.0f);
 		survivor.talked = true;
 		if (survivor.confused)
 		{
@@ -1581,33 +1733,45 @@ void Game::HandleInteraction()
 			continue;
 		if (npc.dialogueId == 0)
 		{
-			SetMessage(npc.talked ? L"통신장교 서윤: 공허종의 신호에도 구조 요청이 섞여 있었어요. "
+			SetDialogue(npc.talked ? L"통신장교 서윤: 공허종의 신호에도 구조 요청이 섞여 있었어요. "
 									L"지휘부는 그 부분을 지웠습니다."
 								  : L"통신장교 서윤: 우리가 먼저 그 문을 열었어요... 그런데 모두 "
 									L"적이 먼저 공격했다고 믿고 있어요.",
-				5.0f);
+				npc.position, 5.0f);
 		}
 		else
 		{
-			SetMessage(npc.talked ? L"정비사 라울: 살아남으면 진실을 전해 주세요. 복수만으로는 이 "
+			SetDialogue(npc.talked ? L"정비사 라울: 살아남으면 진실을 전해 주세요. 복수만으로는 이 "
 									L"함선을 다시 움직일 수 없습니다."
 								  : L"정비사 라울: 냉각관이 터질 때 동료들을 두고 도망쳤습니다... "
 									L"아직도 그 소리가 들립니다.",
-				5.0f);
+				npc.position, 5.0f);
 		}
 		npc.talked = true;
 		return;
 	}
 	if (m_Quest == InspectTerminal && IsNear(TerminalPosition, 1.15f))
 	{
-		m_Quest = FindCore;
-		SetMessage(L"함선 AI: 기관실에서 항법 코어가 감지됩니다. 무기를 활성화합니다.", 3.2f);
+		m_Quest = CollectTutorialWeapon;
+		SetMessage(L"함선 AI: 무기 보관함이 해제되었습니다. 펄스 카빈을 회수하십시오.", 3.2f);
 		return;
 	}
-	if (m_CurrentShip == 0 && !m_RecordRead && IsNear(RecordPosition, 1.05f))
+	if (m_Quest == CollectTutorialWeapon && IsNear(TutorialWeaponPosition, 1.2f))
 	{
-		m_RecordRead = true;
-		SetMessage(L"기록: 공식 접촉 보고서와 봉인된 실험 자료가 서로 일치하지 않습니다.", 3.5f);
+		m_Quest = FindCore;
+		SetMessage(L"펄스 카빈을 획득했습니다. 기관실의 공허종을 처치하고 항법 코어를 회수하십시오.", 4.0f);
+		return;
+	}
+	for (int recordIndex = 0; recordIndex < 3; ++recordIndex)
+	{
+		if (m_CurrentShip != 0 || !IsNear(TutorialRecordPositions[recordIndex], 1.05f))
+			continue;
+		m_TutorialRecordsRead[recordIndex] = true;
+		const wchar_t* records[] = {
+			L"승무 기록: 누구도 이 전쟁을 원하지 않았다. 경보가 울릴 때마다 사람들은 서로의 손을 잡았다.",
+			L"보안 기록: 선내 침입체는 심연문 실험실에서 시작되었다. 외부 침입이라는 공식 발표와 다르다.",
+			L"항법 기록: 에레보스의 구조 신호가 반복된다. 생존자가 있다면 아직 늦지 않았을지도 모른다."};
+		SetMessage(records[recordIndex], 5.0f);
 		return;
 	}
 	if (m_CurrentShip == 0 && m_CoreRecovered && !m_SignalChecked && IsNear(SignalPosition, 1.05f))
@@ -1620,7 +1784,12 @@ void Game::HandleInteraction()
 	{
 		m_CoreRecovered = true;
 		m_Quest = ReturnToCockpit;
-		SetMessage(L"항법 코어를 회수했습니다. 비상 전력이 복구됩니다.", 3.0f);
+		SetMessage(L"항법 코어를 회수했습니다. 조종석의 항법 제어 장치를 사용할 수 있습니다.", 4.0f);
+		return;
+	}
+	if (m_CurrentShip == 0 && !m_CoreRecovered && IsNear(CockpitPosition, 1.25f))
+	{
+		SetMessage(L"항법 제어 장치가 응답하지 않습니다. 기관실에서 항법 코어를 먼저 회수하십시오.", 4.0f);
 		return;
 	}
 	if (m_Quest == ReturnToCockpit && IsNear(CockpitPosition, 1.25f))
@@ -1628,16 +1797,17 @@ void Game::HandleInteraction()
 		m_Mode = ShipControl;
 		m_Quest = FlyToSignal;
 		m_TravelDestinationShip = 1;
-		SetMessage(L"방향키: 회전/추진    Space: 가속    E: 신호 진입", 5.0f);
+		SetMessage(L"방향키: 회전/추진    왼쪽 Shift: 독립 부스터    E: 신호 진입", 5.0f);
 		return;
 	}
-	if (m_Quest == QuestComplete && IsNear(CockpitPosition, 1.25f))
+	if (m_Quest == FlyToStation && m_CurrentShip == 0 && IsNear(CockpitPosition, 1.25f))
 	{
-		m_TravelDestinationShip = 1 - m_CurrentShip;
+		m_TravelDestinationShip = 2;
 		m_Mode = ShipControl;
-		SetMessage(
-			m_TravelDestinationShip == 0 ? L"항로: 연구선 노크티스" : L"항로: 난민 수송선 에레보스",
-			2.5f);
+		m_ShipPosition = {0.0f, 0.0f};
+		m_PreviousShipPosition = m_ShipPosition;
+		m_ShipVelocity = {0.0f, 0.0f};
+		SetMessage(L"항로: 거대 우주 정거장", 3.0f);
 	}
 }
 
@@ -1653,8 +1823,9 @@ void Game::UpdateShip(float deltaSeconds)
 		thrust += 95.0f;
 	if (m_SpecialKeys[GLUT_KEY_DOWN])
 		thrust -= 48.0f;
-	if (m_Keys[' '])
-		thrust *= 1.8f;
+	const bool boostActive = (GetAsyncKeyState(VK_LSHIFT) & 0x8000) != 0;
+	if (boostActive)
+		thrust += 135.0f;
 	m_ShipVelocity.x += std::cos(m_ShipAngle) * thrust * deltaSeconds;
 	m_ShipVelocity.y += std::sin(m_ShipAngle) * thrust * deltaSeconds;
 	float speed = Length(m_ShipVelocity.x, m_ShipVelocity.y);
@@ -1667,6 +1838,20 @@ void Game::UpdateShip(float deltaSeconds)
 	m_ShipVelocity.y *= std::pow(0.38f, deltaSeconds);
 	m_ShipPosition.x += m_ShipVelocity.x * deltaSeconds;
 	m_ShipPosition.y += m_ShipVelocity.y * deltaSeconds;
+	const float boundaryAmount =
+		std::fabs(m_ShipPosition.x - SpaceBoundaryCenter.x) / SpaceBoundaryHalfWidth +
+		std::fabs(m_ShipPosition.y - SpaceBoundaryCenter.y) / SpaceBoundaryHalfHeight;
+	if (boundaryAmount > 1.0f)
+	{
+		const float boundaryScale = 0.985f / boundaryAmount;
+		m_ShipPosition.x = SpaceBoundaryCenter.x +
+			(m_ShipPosition.x - SpaceBoundaryCenter.x) * boundaryScale;
+		m_ShipPosition.y = SpaceBoundaryCenter.y +
+			(m_ShipPosition.y - SpaceBoundaryCenter.y) * boundaryScale;
+		m_ShipVelocity.x *= -0.25f;
+		m_ShipVelocity.y *= -0.25f;
+		SetMessage(L"항법 경계에 도달했습니다. 항로 안쪽으로 복귀하십시오.", 1.5f);
+	}
 	UpdateAsteroids(deltaSeconds);
 
 	const WorldPoint debris[] = {
@@ -1703,21 +1888,11 @@ void Game::UpdateAsteroids(float deltaSeconds)
 		asteroid.position.y += asteroid.velocity.y * deltaSeconds;
 		asteroid.rotation += asteroid.rotationSpeed * deltaSeconds;
 
-		if (asteroid.position.x < -210.0f || asteroid.position.x > 210.0f)
-			asteroid.velocity.x *= -1.0f;
-		bool wrapped = false;
-		if (asteroid.position.y < 45.0f)
+		if (!IsInsideSpaceBoundary(asteroid.position))
 		{
-			asteroid.position.y += 560.0f;
-			wrapped = true;
-		}
-		if (asteroid.position.y > 625.0f)
-		{
-			asteroid.position.y -= 560.0f;
-			wrapped = true;
-		}
-		if (wrapped)
+			RespawnAsteroid(asteroid, i);
 			previousAsteroidPosition = asteroid.position;
+		}
 
 		float dx = m_ShipPosition.x - asteroid.position.x;
 		float dy = m_ShipPosition.y - asteroid.position.y;
@@ -1736,8 +1911,6 @@ void Game::UpdateAsteroids(float deltaSeconds)
 			m_ShipPosition.y += normalY * separation;
 			m_ShipVelocity.x += normalX * 75.0f;
 			m_ShipVelocity.y += normalY * 75.0f;
-			asteroid.velocity.x -= normalX * 24.0f;
-			asteroid.velocity.y -= normalY * 24.0f;
 			m_ShipHealth = std::max(0.0f, m_ShipHealth - 12.0f);
 			m_DamageCooldown = 1.0f;
 			m_ShipImpactFlash = 0.45f;
@@ -1753,6 +1926,32 @@ void Game::UpdateAsteroids(float deltaSeconds)
 		m_ShipVelocity = {0.0f, 0.0f};
 		SetMessage(L"비상 자동 항법이 작동했습니다. 선체 내구도 35%로 복구합니다.", 3.0f);
 	}
+}
+
+void Game::RespawnAsteroid(Asteroid& asteroid, size_t asteroidIndex)
+{
+	std::mt19937 random(
+		m_LevelSeed + (++m_AsteroidSpawnCounter * 2654435761u) + static_cast<unsigned int>(asteroidIndex));
+	std::uniform_real_distribution<float> unit(-1.0f, 1.0f);
+	std::uniform_real_distribution<float> angleDistribution(0.0f, Pi * 2.0f);
+	std::uniform_real_distribution<float> speedDistribution(24.0f, 48.0f);
+	std::uniform_real_distribution<float> radiusDistribution(19.0f, 32.0f);
+	float normalizedX = 0.0f;
+	float normalizedY = 0.0f;
+	do
+	{
+		normalizedX = unit(random);
+		normalizedY = unit(random);
+		asteroid.position = {SpaceBoundaryCenter.x + normalizedX * SpaceBoundaryHalfWidth,
+			SpaceBoundaryCenter.y + normalizedY * SpaceBoundaryHalfHeight};
+	} while (std::fabs(normalizedX) + std::fabs(normalizedY) > 0.82f ||
+		Length(asteroid.position.x - m_ShipPosition.x, asteroid.position.y - m_ShipPosition.y) < 115.0f);
+	const float angle = angleDistribution(random);
+	const float speed = speedDistribution(random);
+	asteroid.velocity = {std::cos(angle) * speed, std::sin(angle) * speed};
+	asteroid.radius = radiusDistribution(random);
+	asteroid.rotation = angleDistribution(random);
+	asteroid.rotationSpeed = unit(random) * 0.75f;
 }
 
 bool Game::CanMoveTo(float x, float y) const
@@ -1809,6 +2008,44 @@ bool Game::AllEnemiesDefeated() const
 	return true;
 }
 
+bool Game::AllStoryDocumentsRead() const
+{
+	if (m_StoryDocuments.empty())
+		return false;
+	for (size_t documentIndex = 0; documentIndex < m_StoryDocuments.size(); ++documentIndex)
+		if (!m_StoryDocuments[documentIndex].read)
+			return false;
+	return true;
+}
+
+bool Game::AreLevelEnginesActive() const
+{
+	for (int engineIndex = 0; engineIndex < 4; ++engineIndex)
+		if (!m_LevelEngineActive[engineIndex])
+			return false;
+	return true;
+}
+
+bool Game::AreLevelHostilesCleared() const
+{
+	if (!AllEnemiesDefeated())
+		return false;
+	for (size_t survivorIndex = 0; survivorIndex < m_LevelSurvivors.size(); ++survivorIndex)
+	{
+		const LevelSurvivor& survivor = m_LevelSurvivors[survivorIndex];
+		if (survivor.squadId >= 0 && survivor.health > 0.0f)
+			return false;
+	}
+	return true;
+}
+
+bool Game::IsInsideSpaceBoundary(const WorldPoint& point) const
+{
+	const float normalized = std::fabs(point.x - SpaceBoundaryCenter.x) / SpaceBoundaryHalfWidth +
+		std::fabs(point.y - SpaceBoundaryCenter.y) / SpaceBoundaryHalfHeight;
+	return normalized <= 1.0f;
+}
+
 void Game::SetMessage(const std::wstring& message, float seconds)
 {
 	m_Message = message;
@@ -1826,22 +2063,25 @@ ScreenPoint Game::WorldToScreen(float x, float y, float height) const
 
 std::wstring Game::ObjectiveText() const
 {
+	if (m_Mode == Complete)
+		return L"거대 우주 정거장 도착: 다음 장으로 이어지는 항로를 확보했습니다";
 	if (m_Mode == FirstLevel)
 	{
-		if (m_Quest == CollectLevelWeapon)
-			return L"첫 레벨: 훈련용 펄스 소총을 회수하십시오 [E]";
-		if (m_Quest == EarnExperience)
-			return L"첫 레벨: 공허종 정찰체를 제거해 레벨 2에 도달하십시오";
-		if (m_Quest == AllocateStats)
-			return L"첫 레벨: 스탯 배분  [1] 화력  [2] 기동  [3] 생존";
-		return L"첫 레벨 완료: 경험치 획득과 능력 조정 훈련 완료";
+		if (!AreLevelEnginesActive())
+			return L"에레보스: 보조 엔진 네 개를 가동하십시오";
+		if (!AreLevelHostilesCleared())
+			return L"에레보스: 공격하는 생존자와 공허종을 처치하십시오";
+		return L"에레보스: 중앙 이탈 제어 장치로 함선을 빠져나오십시오 [E]";
 	}
 
-	if ((m_Mode == ShipControl || m_Mode == Transition) && m_Quest == QuestComplete)
-		return m_TravelDestinationShip == 0 ? L"목표: 연구선 노크티스에 도킹하십시오"
-											: L"목표: 난민 수송선 에레보스에 도킹하십시오";
+	if ((m_Mode == ShipControl || m_Mode == Transition) && m_Quest == ReturnToNoctis)
+		return L"목표: 연구선 노크티스에 도킹하십시오";
+	if ((m_Mode == ShipControl || m_Mode == Transition) && m_Quest == FlyToStation)
+		return L"목표: 거대 우주 정거장에 도킹하십시오";
 	if (m_Quest == InspectTerminal)
 		return L"목표: 의료실 단말기를 조사하십시오 [E]";
+	if (m_Quest == CollectTutorialWeapon)
+		return L"목표: 무기 보관함에서 펄스 카빈을 획득하십시오 [E]";
 	if (m_Quest == FindCore && !AllEnemiesDefeated())
 		return L"목표: 기관실로 이동하여 침입체를 제거하십시오";
 	if (m_Quest == FindCore)
@@ -1850,8 +2090,62 @@ std::wstring Game::ObjectiveText() const
 		return L"목표: 조종석으로 돌아가 항법 코어를 설치하십시오 [E]";
 	if (m_Quest == FlyToSignal)
 		return L"목표: 노크티스를 조종하여 구조 신호로 이동하십시오";
-	return m_CurrentShip == 1 ? L"현재 위치: 난민 수송선 에레보스 | 조종석에서 노크티스로 귀환 가능"
-							  : L"현재 위치: 연구선 노크티스 | 조종석에서 에레보스로 이동 가능";
+	if (m_Quest == FlyToStation)
+		return L"목표: 노크티스 조종석에서 거대 우주 정거장 항로를 설정하십시오";
+	return L"현재 위치: 연구선 노크티스";
+}
+
+std::vector<std::wstring> Game::ObjectiveLines() const
+{
+	std::vector<std::wstring> objectives;
+	if (m_Mode == FirstLevel)
+	{
+		int activeEngineCount = 0;
+		for (int engineIndex = 0; engineIndex < 4; ++engineIndex)
+			if (m_LevelEngineActive[engineIndex])
+				++activeEngineCount;
+
+		int defeatedVoidCount = 0;
+		for (size_t enemyIndex = 0; enemyIndex < m_Enemies.size(); ++enemyIndex)
+			if (m_Enemies[enemyIndex].health <= 0)
+				++defeatedVoidCount;
+
+		int hostilePanicTotal = 0;
+		int defeatedPanicCount = 0;
+		for (size_t survivorIndex = 0; survivorIndex < m_LevelSurvivors.size(); ++survivorIndex)
+		{
+			const LevelSurvivor& survivor = m_LevelSurvivors[survivorIndex];
+			if (survivor.squadId < 0)
+				continue;
+			++hostilePanicTotal;
+			if (survivor.health <= 0.0f)
+				++defeatedPanicCount;
+		}
+
+		int readDocumentCount = 0;
+		for (size_t documentIndex = 0; documentIndex < m_StoryDocuments.size(); ++documentIndex)
+			if (m_StoryDocuments[documentIndex].read)
+				++readDocumentCount;
+
+		objectives.push_back(std::wstring(activeEngineCount == 4 ? L"[완료] " : L"[진행] ") +
+			L"보조 엔진 가동  [" + std::to_wstring(activeEngineCount) + L"/4]");
+		objectives.push_back(
+			std::wstring(defeatedVoidCount == static_cast<int>(m_Enemies.size()) ? L"[완료] " : L"[진행] ") +
+			L"공허종 제압  [" + std::to_wstring(defeatedVoidCount) + L"/" +
+			std::to_wstring(m_Enemies.size()) + L"]");
+		objectives.push_back(std::wstring(defeatedPanicCount == hostilePanicTotal ? L"[완료] " : L"[진행] ") +
+			L"적대 공황 생존자 제압  [" + std::to_wstring(defeatedPanicCount) + L"/" +
+			std::to_wstring(hostilePanicTotal) + L"]");
+		objectives.push_back(std::wstring(AllStoryDocumentsRead() ? L"[완료/선택] " : L"[선택] ") +
+			L"전쟁 자료 열람  [" + std::to_wstring(readDocumentCount) + L"/" +
+			std::to_wstring(m_StoryDocuments.size()) + L"]");
+		objectives.push_back(AreLevelEnginesActive() && AreLevelHostilesCleared()
+			? L"[가능] 중앙 이탈 제어 장치 사용"
+			: L"[잠김] 중앙 이탈 제어 장치 사용");
+		return objectives;
+	}
+	objectives.push_back(ObjectiveText());
+	return objectives;
 }
 
 std::wstring Game::InteractionText() const
@@ -1864,12 +2158,30 @@ std::wstring Game::InteractionText() const
 			return L"";
 		if (m_Quest == FlyToSignal)
 			return L"[E] 구조 신호에 진입";
-		return m_TravelDestinationShip == 0 ? L"[E] 노크티스에 도킹" : L"[E] 에레보스에 도킹";
+		if (m_TravelDestinationShip == 0)
+			return L"[E] 노크티스에 도킹";
+		if (m_TravelDestinationShip == 2)
+			return L"[E] 거대 우주 정거장에 도킹";
+		return L"[E] 에레보스에 도킹";
 	}
 	if (m_Mode == FirstLevel && !m_LevelWeaponCollected && IsNear(FirstLevelWeaponPosition, 1.2f))
 		return L"[E] 훈련용 펄스 소총 회수";
 	if (m_Mode == FirstLevel)
 	{
+		for (int engineIndex = 0; engineIndex < 4; ++engineIndex)
+		{
+			if (IsNear(m_LevelEnginePositions[engineIndex], 1.45f))
+				return m_LevelEngineActive[engineIndex] ? L"보조 엔진 가동 중"
+											 : L"[E] 정지된 보조 엔진 가동";
+		}
+		if (IsNear(m_LevelControlPosition, 1.5f))
+		{
+			if (!AreLevelEnginesActive())
+				return L"[E] 감염된 이탈 제어 장치 - 엔진 복구 필요";
+			if (!AreLevelHostilesCleared())
+				return L"[E] 조종 장치 확인 - 적대 개체 제거 필요";
+			return L"[E] 에레보스에서 이탈하여 노크티스로 귀환";
+		}
 		for (size_t index = 0; index < m_MagazinePickups.size(); ++index)
 		{
 			if (!m_MagazinePickups[index].collected &&
@@ -1885,11 +2197,19 @@ std::wstring Game::InteractionText() const
 		{
 			if (m_LevelSurvivors[index].health > 0 &&
 				IsNear(m_LevelSurvivors[index].position, 1.3f))
-				return L"[E] 생존자와 대화";
+				return m_LevelSurvivors[index].confused ? L"적대적인 무장 생존자"
+												 : L"[E] 생존자와 대화";
 		}
 	}
 	if (m_Mode != OnFoot)
 		return L"";
+	if (m_CurrentShip == 0 && IsNear(CockpitPosition, 1.25f))
+	{
+		if (!m_CoreRecovered)
+			return L"[E] 노크티스 항법 제어 장치 - 항법 코어 필요";
+		if (m_Quest == ReturnToCockpit)
+			return L"[E] 노크티스 조종석 사용";
+	}
 	for (size_t index = 0; index < m_TutorialSurvivors.size(); ++index)
 	{
 		if (m_TutorialSurvivors[index].health > 0 &&
@@ -1904,16 +2224,19 @@ std::wstring Game::InteractionText() const
 	}
 	if (m_Quest == InspectTerminal && IsNear(TerminalPosition, 1.15f))
 		return L"[E] 단말기 조사";
-	if (m_CurrentShip == 0 && !m_RecordRead && IsNear(RecordPosition, 1.05f))
-		return L"[E] 손상된 기록 읽기";
+	if (m_Quest == CollectTutorialWeapon && IsNear(TutorialWeaponPosition, 1.2f))
+		return L"[E] 펄스 카빈 획득";
+	for (int recordIndex = 0; recordIndex < 3; ++recordIndex)
+		if (m_CurrentShip == 0 && IsNear(TutorialRecordPositions[recordIndex], 1.05f))
+			return m_TutorialRecordsRead[recordIndex] ? L"[E] 기록 다시 읽기" : L"[E] 함선 기록 읽기";
 	if (m_CurrentShip == 0 && m_CoreRecovered && !m_SignalChecked && IsNear(SignalPosition, 1.05f))
 		return L"[E] 구조 신호 조사";
 	if (m_Quest == FindCore && AllEnemiesDefeated() && IsNear(CorePosition, 1.2f))
 		return L"[E] 항법 코어 회수";
 	if (m_Quest == ReturnToCockpit && IsNear(CockpitPosition, 1.25f))
 		return L"[E] 코어 설치 및 우주선 조종";
-	if (m_Quest == QuestComplete && IsNear(CockpitPosition, 1.25f))
-		return m_CurrentShip == 1 ? L"[E] 노크티스로 귀환" : L"[E] 에레보스로 이동";
+	if (m_Quest == FlyToStation && m_CurrentShip == 0 && IsNear(CockpitPosition, 1.25f))
+		return L"[E] 거대 우주 정거장으로 이동";
 	return L"";
 }
 
@@ -2143,9 +2466,26 @@ void Game::RenderInterior()
 	{
 		ScreenPoint terminal = WorldToScreen(TerminalPosition.x, TerminalPosition.y, 22.0f);
 		m_Renderer->DrawRect(terminal.x, terminal.y, 22.0f, 34.0f, 0.10f, 0.75f, 0.92f, 0.9f);
-		ScreenPoint record = WorldToScreen(RecordPosition.x, RecordPosition.y, 5.0f);
-		m_Renderer->DrawDiamond(
-			record.x, record.y, 24.0f, 12.0f, m_RecordRead ? 0.18f : 0.75f, 0.58f, 0.18f, 0.95f);
+		if (m_Quest == CollectTutorialWeapon)
+		{
+			ScreenPoint weapon = WorldToScreen(TutorialWeaponPosition.x, TutorialWeaponPosition.y, 11.0f);
+			m_Renderer->DrawSoftShadow(weapon.x, weapon.y - 10.0f, 60.0f, 16.0f, 0.65f);
+			m_ModelLibrary.Draw(m_Renderer, "pulse_rifle_pickup", weapon.x, weapon.y,
+				1.0f + std::sin(m_TotalTime * 4.0f) * 0.08f);
+		}
+		for (int recordIndex = 0; recordIndex < 3; ++recordIndex)
+		{
+			ScreenPoint record = WorldToScreen(
+				TutorialRecordPositions[recordIndex].x, TutorialRecordPositions[recordIndex].y, 5.0f);
+			m_Renderer->DrawDiamond(record.x,
+				record.y,
+				24.0f,
+				12.0f,
+				m_TutorialRecordsRead[recordIndex] ? 0.18f : 0.75f,
+				0.58f,
+				0.18f,
+				0.95f);
+		}
 		ScreenPoint core = WorldToScreen(CorePosition.x, CorePosition.y, 18.0f);
 		if (!m_CoreRecovered)
 			m_Renderer->DrawDiamond(core.x,
@@ -2158,32 +2498,14 @@ void Game::RenderInterior()
 				AllEnemiesDefeated() ? 1.0f : 0.45f);
 	}
 	ScreenPoint cockpit = WorldToScreen(CockpitPosition.x, CockpitPosition.y, 24.0f);
-	m_Renderer->DrawRect(cockpit.x,
-		cockpit.y,
-		55.0f,
-		36.0f,
-		m_CoreRecovered ? 0.10f : 0.22f,
-		m_CoreRecovered ? 0.72f : 0.16f,
-		m_CoreRecovered ? 0.82f : 0.18f,
-		0.9f);
-	// Pilot station: raised chair, wraparound console, holographic gauges and forward canopy.
-	m_Renderer->DrawSoftShadow(cockpit.x, cockpit.y - 7.0f, 105.0f, 24.0f, 0.85f);
-	m_Renderer->DrawDiamond(cockpit.x, cockpit.y + 7.0f, 118.0f, 38.0f, 0.055f, 0.11f, 0.15f, 1.0f);
-	m_Renderer->DrawRect(cockpit.x, cockpit.y + 34.0f, 35.0f, 48.0f, 0.07f, 0.12f, 0.16f, 1.0f);
-	m_Renderer->DrawDiamond(
-		cockpit.x - 42.0f, cockpit.y + 28.0f, 40.0f, 18.0f, 0.08f, 0.58f, 0.68f, 0.82f);
-	m_Renderer->DrawDiamond(
-		cockpit.x + 42.0f, cockpit.y + 28.0f, 40.0f, 18.0f, 0.08f, 0.58f, 0.68f, 0.82f);
-	m_Renderer->DrawRect(cockpit.x, cockpit.y + 61.0f, 98.0f, 7.0f, 0.20f, 0.68f, 0.78f, 0.60f);
-	for (int gauge = -2; gauge <= 2; ++gauge)
-		m_Renderer->DrawRect(cockpit.x + gauge * 17.0f,
-			cockpit.y + 18.0f,
-			8.0f,
-			4.0f,
-			gauge == 0 ? 0.92f : 0.18f,
-			gauge == 0 ? 0.28f : 0.82f,
-			0.86f,
-			0.92f);
+	DrawFlightControlConsole(cockpit.x, cockpit.y, m_CoreRecovered, false);
+	m_Renderer->DrawString(cockpit.x - 75.0f,
+		cockpit.y + 92.0f,
+		L"노크티스 항법 제어 장치",
+		m_CoreRecovered ? 0.28f : 0.70f,
+		m_CoreRecovered ? 0.88f : 0.36f,
+		m_CoreRecovered ? 0.92f : 0.34f,
+		0.95f);
 	if (m_CurrentShip == 0)
 	{
 		ScreenPoint signal = WorldToScreen(SignalPosition.x, SignalPosition.y, 12.0f);
@@ -2195,14 +2517,108 @@ void Game::RenderInterior()
 	ScreenPoint warningLight = WorldToScreen(-10.5f, -10.5f, 55.0f);
 	m_Renderer->DrawDiamond(
 		warningLight.x, warningLight.y, 42.0f, 18.0f, 0.85f, 0.04f, 0.05f, pulse);
-	m_Renderer->DrawString(-width * 0.5f + 22.0f,
-		height * 0.5f - 58.0f,
-		m_CurrentShip == 0 ? L"비상 전력" : L"에레보스 생체 신호 감지",
-		m_CurrentShip == 0 ? 0.90f : 0.72f,
-		0.30f,
-		m_CurrentShip == 0 ? 0.25f : 0.82f,
-		0.88f);
 	m_Renderer->DrawRect(width * 0.42f, -height * 0.27f, 12.0f, 42.0f, 0.12f, 0.60f, 0.75f, 0.55f);
+}
+
+void Game::SetDialogue(
+	const std::wstring& dialogue, const WorldPoint& speakerPosition, float seconds)
+{
+	m_Dialogue = dialogue;
+	m_DialogueSpeakerPosition = speakerPosition;
+	m_DialogueTimer = seconds;
+}
+
+void Game::DrawFlightControlConsole(float x, float y, bool powered, bool infected)
+{
+	const float pulse = 0.76f + std::sin(m_TotalTime * 5.0f) * 0.16f;
+	const float signalRed = infected ? 0.72f : (powered ? 0.10f : 0.34f);
+	const float signalGreen = infected ? 0.08f : (powered ? 0.72f : 0.22f);
+	const float signalBlue = infected ? 0.88f : (powered ? 0.84f : 0.25f);
+
+	// Raised pilot chair and armored pedestal.
+	m_Renderer->DrawSoftShadow(x, y - 10.0f, 138.0f, 30.0f, 0.88f);
+	m_Renderer->DrawDiamond(x, y - 1.0f, 134.0f, 47.0f, 0.045f, 0.085f, 0.11f, 1.0f);
+	m_Renderer->DrawRect(x, y + 36.0f, 32.0f, 54.0f, 0.07f, 0.11f, 0.14f, 1.0f);
+	m_Renderer->DrawRect(x, y + 59.0f, 46.0f, 8.0f, 0.14f, 0.21f, 0.24f, 1.0f);
+	m_Renderer->DrawDiamond(x, y + 17.0f, 50.0f, 24.0f, 0.08f, 0.15f, 0.18f, 1.0f);
+
+	// Wraparound side consoles with layered screens and key clusters.
+	for (int side = -1; side <= 1; side += 2)
+	{
+		const float sideX = x + side * 48.0f;
+		m_Renderer->DrawDiamond(sideX, y + 24.0f, 48.0f, 25.0f, 0.065f, 0.13f, 0.16f, 1.0f);
+		m_Renderer->DrawDiamond(sideX,
+			y + 29.0f,
+			37.0f,
+			16.0f,
+			signalRed * 0.48f,
+			signalGreen * 0.58f,
+			signalBlue * 0.62f,
+			powered || infected ? pulse : 0.55f);
+		for (int button = 0; button < 3; ++button)
+			m_Renderer->DrawRect(sideX - 10.0f + button * 10.0f,
+				y + 13.0f,
+				5.0f,
+				4.0f,
+				button == 1 ? 0.92f : signalRed,
+				button == 1 ? 0.46f : signalGreen,
+				signalBlue,
+				0.94f);
+		DrawRotatedRect(m_Renderer,
+			sideX + side * 11.0f,
+			y + 7.0f,
+			5.0f,
+			22.0f,
+			side * 0.24f,
+			0.24f,
+			0.34f,
+			0.37f,
+			1.0f);
+	}
+
+	// Central navigation radar, rotating sweep, status bars, and targeting reticle.
+	m_Renderer->DrawDiamond(x, y + 46.0f, 61.0f, 38.0f, 0.035f, 0.08f, 0.10f, 1.0f);
+	m_Renderer->DrawDiamond(
+		x, y + 46.0f, 49.0f, 30.0f, signalRed * 0.34f, signalGreen * 0.46f, signalBlue * 0.50f, 0.90f);
+	m_Renderer->DrawDiamond(x, y + 46.0f, 28.0f, 17.0f, 0.025f, 0.09f, 0.11f, 0.96f);
+	const float sweepAngle = powered ? m_TotalTime * 1.8f : -0.65f;
+	DrawRotatedRect(m_Renderer,
+		x + std::cos(sweepAngle) * 10.0f,
+		y + 46.0f + std::sin(sweepAngle) * 6.0f,
+		24.0f,
+		2.5f,
+		sweepAngle,
+		signalRed,
+		signalGreen,
+		signalBlue,
+		0.94f);
+	m_Renderer->DrawDiamond(x, y + 46.0f, 7.0f, 7.0f, 0.86f, 0.94f, 0.94f, 1.0f);
+	for (int gauge = -3; gauge <= 3; ++gauge)
+		m_Renderer->DrawRect(x + gauge * 14.0f,
+			y + 2.0f,
+			8.0f,
+			4.0f,
+			gauge == 0 ? 0.94f : signalRed,
+			gauge == 0 ? 0.38f : signalGreen,
+			signalBlue,
+			powered || infected ? 0.94f : 0.48f);
+
+	if (infected)
+	{
+		// Organic-looking infection veins overlay the same console model.
+		for (int vein = -2; vein <= 2; ++vein)
+			DrawRotatedRect(m_Renderer,
+				x + vein * 23.0f,
+				y + 33.0f + std::sin(m_TotalTime * 3.0f + vein) * 3.0f,
+				36.0f,
+				4.0f,
+				0.72f + vein * 0.18f,
+				0.55f,
+				0.04f,
+				0.76f,
+				pulse);
+		m_Renderer->DrawDiamond(x, y + 36.0f, 118.0f, 48.0f, 0.46f, 0.03f, 0.62f, 0.20f);
+	}
 }
 
 void Game::DrawWorldBlock(const Obstacle& obstacle)
@@ -2615,6 +3031,35 @@ void Game::RenderSpace()
 	m_Renderer->DrawDiamond(
 		width * 0.37f, height * 0.34f, 255.0f, 145.0f, 0.16f, 0.24f, 0.39f, 0.32f);
 
+	const WorldPoint boundaryWorld[] = {{SpaceBoundaryCenter.x, SpaceBoundaryCenter.y - SpaceBoundaryHalfHeight},
+		{SpaceBoundaryCenter.x + SpaceBoundaryHalfWidth, SpaceBoundaryCenter.y},
+		{SpaceBoundaryCenter.x, SpaceBoundaryCenter.y + SpaceBoundaryHalfHeight},
+		{SpaceBoundaryCenter.x - SpaceBoundaryHalfWidth, SpaceBoundaryCenter.y}};
+	ScreenPoint boundaryScreen[4];
+	for (int vertexIndex = 0; vertexIndex < 4; ++vertexIndex)
+	{
+		boundaryScreen[vertexIndex] = {
+			(boundaryWorld[vertexIndex].x - m_ShipPosition.x) * 0.72f,
+			(boundaryWorld[vertexIndex].y - m_ShipPosition.y) * 0.72f};
+	}
+	for (int edgeIndex = 0; edgeIndex < 4; ++edgeIndex)
+	{
+		const ScreenPoint start = boundaryScreen[edgeIndex];
+		const ScreenPoint end = boundaryScreen[(edgeIndex + 1) % 4];
+		const float edgeX = end.x - start.x;
+		const float edgeY = end.y - start.y;
+		DrawRotatedRect(m_Renderer,
+			(start.x + end.x) * 0.5f,
+			(start.y + end.y) * 0.5f,
+			Length(edgeX, edgeY),
+			4.0f,
+			std::atan2(edgeY, edgeX),
+			0.18f,
+			0.52f,
+			0.68f,
+			0.50f);
+	}
+
 	const WorldPoint debris[] = {
 		{-90.0f, 170.0f}, {85.0f, 290.0f}, {-70.0f, 410.0f}, {55.0f, 520.0f}};
 	for (int i = 0; i < 4; ++i)
@@ -2667,25 +3112,39 @@ void Game::RenderSpace()
 		destinationX, destinationY, 125.0f, 58.0f, 0.08f, 0.34f, 0.46f, beaconPulse);
 	m_Renderer->DrawRect(
 		destinationX, destinationY + 12.0f, 70.0f, 20.0f, 0.10f, 0.18f, 0.23f, 1.0f);
-	const float destinationScale = m_TravelDestinationShip == 1 ? 2.3f : 1.6f;
-	const float destinationRed = m_TravelDestinationShip == 1 ? 0.32f : 0.20f;
-	Actor* destinationShip = CreateSceneActor("DestinationShip",
-		destinationX,
-		destinationY + 14.0f,
-		0.0f,
-		3,
-		destinationY,
-		[this, destinationScale, destinationRed](const ActorTransform& transform)
-		{
-			DrawShip(transform.x,
-				transform.y,
-				transform.rotation,
-				destinationScale * transform.scaleX,
-				destinationRed,
-				0.48f,
-				0.58f);
-		});
-	destinationShip->LocalTransform().rotation = -Pi * 0.5f;
+	if (m_TravelDestinationShip == 2)
+	{
+		m_Renderer->DrawDiamond(destinationX, destinationY + 12.0f, 270.0f, 126.0f,
+			0.08f, 0.15f, 0.22f, 1.0f);
+		m_Renderer->DrawDiamond(destinationX, destinationY + 12.0f, 180.0f, 86.0f,
+			0.12f, 0.48f, 0.58f, 0.92f);
+		m_Renderer->DrawRect(destinationX, destinationY + 55.0f, 34.0f, 150.0f,
+			0.10f, 0.24f, 0.31f, 1.0f);
+		m_Renderer->DrawString(destinationX - 78.0f, destinationY + 116.0f,
+			L"거대 우주 정거장", 0.48f, 0.90f, 0.94f, 1.0f);
+	}
+	else
+	{
+		const float destinationScale = m_TravelDestinationShip == 1 ? 2.3f : 1.6f;
+		const float destinationRed = m_TravelDestinationShip == 1 ? 0.32f : 0.20f;
+		Actor* destinationShip = CreateSceneActor("DestinationShip",
+			destinationX,
+			destinationY + 14.0f,
+			0.0f,
+			3,
+			destinationY,
+			[this, destinationScale, destinationRed](const ActorTransform& transform)
+			{
+				DrawShip(transform.x,
+					transform.y,
+					transform.rotation,
+					destinationScale * transform.scaleX,
+					destinationRed,
+					0.48f,
+					0.58f);
+			});
+		destinationShip->LocalTransform().rotation = -Pi * 0.5f;
+	}
 	float impactShake = m_ShipImpactFlash > 0.0f ? std::sin(m_TotalTime * 95.0f) * 6.0f : 0.0f;
 	float shipX = impactShake;
 	float shipY = -35.0f + impactShake * 0.35f;
@@ -2707,6 +3166,26 @@ void Game::RenderSpace()
 				0.82f);
 		});
 	playerShip->LocalTransform().rotation = m_ShipAngle;
+	float destinationDirectionX = DestinationPosition.x - m_ShipPosition.x;
+	float destinationDirectionY = DestinationPosition.y - m_ShipPosition.y;
+	const float destinationDirectionLength = Length(destinationDirectionX, destinationDirectionY);
+	if (destinationDirectionLength > 0.001f)
+	{
+		destinationDirectionX /= destinationDirectionLength;
+		destinationDirectionY /= destinationDirectionLength;
+		const float arrowRadius = 112.0f;
+		const float arrowX = shipX + destinationDirectionX * arrowRadius;
+		const float arrowY = shipY + destinationDirectionY * arrowRadius;
+		const float perpendicularX = -destinationDirectionY;
+		const float perpendicularY = destinationDirectionX;
+		const ScreenPoint tip = {arrowX + destinationDirectionX * 14.0f,
+			arrowY + destinationDirectionY * 14.0f};
+		const ScreenPoint left = {arrowX - destinationDirectionX * 10.0f + perpendicularX * 8.0f,
+			arrowY - destinationDirectionY * 10.0f + perpendicularY * 8.0f};
+		const ScreenPoint right = {arrowX - destinationDirectionX * 10.0f - perpendicularX * 8.0f,
+			arrowY - destinationDirectionY * 10.0f - perpendicularY * 8.0f};
+		m_Renderer->DrawQuad(tip, left, right, right, 1.0f, 0.08f, 0.05f, 0.96f);
+	}
 	if (shipSpeed > 35.0f)
 	{
 		float flameLength = 34.0f + Clamp(shipSpeed / 180.0f, 0.0f, 1.0f) * 28.0f;
@@ -2997,6 +3476,122 @@ void Game::RenderFirstLevel()
 			});
 	}
 
+	for (int engineIndex = 0; engineIndex < 4; ++engineIndex)
+	{
+		const WorldPoint enginePosition = m_LevelEnginePositions[engineIndex];
+		const bool active = m_LevelEngineActive[engineIndex];
+		CreateSceneActor("LevelAuxiliaryEngine",
+			enginePosition.x,
+			enginePosition.y,
+			0.0f,
+			2,
+			enginePosition.x + enginePosition.y,
+			[this, active, engineIndex](const ActorTransform& transform)
+			{
+				const ScreenPoint engine = WorldToScreen(transform.x, transform.y, 8.0f);
+				const float rotation = active ? m_TotalTime * (2.4f + engineIndex * 0.12f) : 0.0f;
+				const float glow = active ? 0.72f + std::sin(m_TotalTime * 6.0f + engineIndex) * 0.18f : 0.20f;
+				const float casingRed = active ? 0.08f : 0.17f;
+				const float casingGreen = active ? 0.42f : 0.18f;
+				const float casingBlue = active ? 0.52f : 0.22f;
+				m_Renderer->DrawSoftShadow(engine.x + 12.0f, engine.y - 8.0f, 116.0f, 30.0f, 0.84f);
+				m_Renderer->DrawDiamond(engine.x + 32.0f,
+					engine.y + 3.0f,
+					88.0f,
+					46.0f,
+					casingRed * 0.72f,
+					casingGreen * 0.72f,
+					casingBlue * 0.72f,
+					1.0f);
+				for (int housingBand = 0; housingBand < 3; ++housingBand)
+				{
+					const float bandX = engine.x + 18.0f + housingBand * 20.0f;
+					DrawRotatedRect(m_Renderer,
+						bandX,
+						engine.y + 4.0f,
+						6.0f,
+						45.0f - housingBand * 5.0f,
+						0.0f,
+						active ? 0.20f : 0.30f,
+						active ? 0.68f : 0.28f,
+						active ? 0.72f : 0.27f,
+						0.92f);
+				}
+				m_Renderer->DrawDiamond(engine.x - 8.0f,
+					engine.y + 8.0f,
+					108.0f,
+					88.0f,
+					active ? 0.18f : 0.30f,
+					active ? 0.72f : 0.30f,
+					active ? 0.76f : 0.29f,
+					1.0f);
+				m_Renderer->DrawDiamond(engine.x - 8.0f,
+					engine.y + 8.0f,
+					91.0f,
+					72.0f,
+					0.025f,
+					active ? 0.16f : 0.07f,
+					active ? 0.19f : 0.08f,
+					1.0f);
+				for (int bladeIndex = 0; bladeIndex < 12; ++bladeIndex)
+				{
+					const float bladeAngle = rotation + static_cast<float>(bladeIndex) * Pi / 6.0f;
+					const float bladeX = engine.x - 8.0f + std::cos(bladeAngle) * 23.0f;
+					const float bladeY = engine.y + 8.0f + std::sin(bladeAngle) * 17.0f;
+					DrawRotatedRect(m_Renderer,
+						bladeX,
+						bladeY,
+						34.0f,
+						5.5f,
+						bladeAngle,
+						active ? 0.28f : 0.34f,
+						active ? 0.82f : 0.34f,
+						active ? 0.86f : 0.32f,
+						0.94f);
+				}
+				m_Renderer->DrawDiamond(
+					engine.x - 8.0f, engine.y + 8.0f, 29.0f, 25.0f, 0.12f, glow, glow, 1.0f);
+				m_Renderer->DrawDiamond(engine.x - 8.0f,
+					engine.y + 12.0f,
+					12.0f,
+					14.0f,
+					active ? 0.62f : 0.42f,
+					active ? 0.98f : 0.40f,
+					active ? 1.0f : 0.36f,
+					1.0f);
+				m_Renderer->DrawString(engine.x - 61.0f,
+					engine.y + 62.0f,
+					active ? L"보조 엔진 가동" : L"정지된 보조 엔진 [E]",
+					active ? 0.30f : 0.92f,
+					active ? 0.90f : 0.42f,
+					active ? 0.92f : 0.30f,
+					0.95f);
+			});
+	}
+
+	const bool enginesActive = AreLevelEnginesActive();
+	const bool departureReady = enginesActive && AreLevelHostilesCleared();
+	CreateSceneActor("InfectedFlightControl",
+		m_LevelControlPosition.x,
+		m_LevelControlPosition.y,
+		0.0f,
+		2,
+		m_LevelControlPosition.x + m_LevelControlPosition.y,
+		[this, enginesActive, departureReady](const ActorTransform& transform)
+		{
+			const ScreenPoint control = WorldToScreen(transform.x, transform.y, 14.0f);
+			DrawFlightControlConsole(control.x, control.y, enginesActive, !enginesActive);
+			m_Renderer->DrawString(control.x - 75.0f,
+				control.y + 92.0f,
+				!enginesActive ? L"감염된 이탈 제어 장치"
+							   : (departureReady ? L"에레보스 이탈 제어 장치 [E]"
+											 : L"이탈 잠금: 적대 개체 제거 필요"),
+				enginesActive ? 0.34f : 0.90f,
+				enginesActive ? 0.90f : 0.24f,
+				enginesActive ? 0.92f : 0.96f,
+				0.96f);
+		});
+
 	for (size_t index = 0; index < m_LevelCorpses.size(); ++index)
 	{
 		const WorldPoint position = m_LevelCorpses[index];
@@ -3028,7 +3623,7 @@ void Game::RenderFirstLevel()
 			document.position.x,
 			document.position.y,
 			7.0f,
-			2,
+			8,
 			document.position.x + document.position.y,
 			[this, document, animationOffset](const ActorTransform& transform)
 			{
@@ -3235,19 +3830,67 @@ void Game::RenderInterface()
 {
 	int width = m_Renderer->Width();
 	int height = m_Renderer->Height();
-	m_Renderer->DrawRect(0.0f,
-		height * 0.5f - 27.0f,
-		static_cast<float>(width),
-		54.0f,
+	const std::vector<std::wstring> objectives = ObjectiveLines();
+	const float missionWidth = std::min(560.0f, static_cast<float>(width) - 28.0f);
+	const float missionHeight = 42.0f + static_cast<float>(objectives.size()) * 25.0f;
+	const float missionCenterX = -width * 0.5f + missionWidth * 0.5f + 14.0f;
+	const float missionCenterY = height * 0.5f - missionHeight * 0.5f - 14.0f;
+	m_Renderer->DrawRect(missionCenterX,
+		missionCenterY,
+		missionWidth,
+		missionHeight,
 		0.015f,
 		0.025f,
 		0.045f,
-		0.88f);
-	m_Renderer->DrawString(
-		-width * 0.5f + 20.0f, height * 0.5f - 33.0f, ObjectiveText(), 0.62f, 0.88f, 0.94f, 1.0f);
+		0.92f);
+	m_Renderer->DrawString(-width * 0.5f + 28.0f,
+		height * 0.5f - 39.0f,
+		L"임무",
+		0.32f,
+		0.82f,
+		0.94f,
+		1.0f);
+	for (size_t objectiveIndex = 0; objectiveIndex < objectives.size(); ++objectiveIndex)
+	{
+		const bool optional = objectives[objectiveIndex].find(L"선택") != std::wstring::npos;
+		m_Renderer->DrawString(-width * 0.5f + 28.0f,
+			height * 0.5f - 68.0f - static_cast<float>(objectiveIndex) * 25.0f,
+			objectives[objectiveIndex],
+			optional ? 0.66f : 0.76f,
+			optional ? 0.72f : 0.88f,
+			optional ? 0.76f : 0.94f,
+			1.0f);
+	}
 
 	if (m_Mode == OnFoot || m_Mode == FirstLevel)
 	{
+		if (m_Mode == OnFoot)
+		{
+			const bool emergencyPower = m_CurrentShip == 0;
+			m_Renderer->DrawRect(-width * 0.5f + 108.0f,
+				-height * 0.5f + 91.0f,
+				200.0f,
+				24.0f,
+				0.025f,
+				0.04f,
+				0.06f,
+				0.90f);
+			m_Renderer->DrawDiamond(-width * 0.5f + 24.0f,
+				-height * 0.5f + 91.0f,
+				10.0f,
+				10.0f,
+				emergencyPower ? 0.92f : 0.62f,
+				emergencyPower ? 0.20f : 0.30f,
+				emergencyPower ? 0.16f : 0.84f,
+				0.96f);
+			m_Renderer->DrawString(-width * 0.5f + 36.0f,
+				-height * 0.5f + 88.0f,
+				emergencyPower ? L"함선 상태: 비상 전력" : L"함선 상태: 생체 신호 감지",
+				emergencyPower ? 0.94f : 0.72f,
+				emergencyPower ? 0.42f : 0.58f,
+				emergencyPower ? 0.30f : 0.90f,
+				1.0f);
+		}
 		std::wostringstream health;
 		health << L"전투복 " << static_cast<int>(m_PlayerHealth) << L" / "
 			   << static_cast<int>(m_PlayerMaxHealth);
@@ -3380,6 +4023,13 @@ void Game::RenderInterface()
 			1.0f);
 		m_Renderer->DrawString(
 			-width * 0.5f + 22.0f, -height * 0.5f + 25.0f, ship.str(), 0.58f, 0.82f, 0.92f, 1.0f);
+		m_Renderer->DrawString(-width * 0.5f + 22.0f,
+			-height * 0.5f + 60.0f,
+			L"방향키 회전/추진 | 왼쪽 Shift 독립 부스터 | 목적지 근처 E 도킹",
+			0.54f,
+			0.72f,
+			0.80f,
+			0.92f);
 		if (m_ShipImpactFlash > 0.0f)
 			m_Renderer->DrawString(
 				-90.0f, height * 0.5f - 67.0f, L"경고: 선체 충격 감지", 1.0f, 0.28f, 0.16f, 1.0f);
@@ -3409,17 +4059,96 @@ void Game::RenderInterface()
 	std::wstring interaction = InteractionText();
 	if (!interaction.empty())
 	{
+		const float interactionWidth = std::min(
+			std::max(210.0f, EstimatedTextWidth(interaction) + 28.0f),
+			static_cast<float>(width) - 28.0f);
 		m_Renderer->DrawRect(
-			0.0f, -height * 0.5f + 72.0f, 310.0f, 34.0f, 0.02f, 0.05f, 0.07f, 0.92f);
-		m_Renderer->DrawString(
-			-145.0f, -height * 0.5f + 68.0f, interaction, 0.78f, 0.94f, 0.96f, 1.0f);
+			0.0f, -height * 0.5f + 27.0f, interactionWidth, 34.0f, 0.02f, 0.05f, 0.07f, 0.92f);
+		m_Renderer->DrawString(-interactionWidth * 0.5f + 14.0f,
+			-height * 0.5f + 23.0f,
+			interaction,
+			0.78f,
+			0.94f,
+			0.96f,
+			1.0f);
 	}
 	if (m_MessageTimer > 0.0f)
 	{
-		m_Renderer->DrawRect(
-			0.0f, -height * 0.5f + 28.0f, 590.0f, 32.0f, 0.025f, 0.025f, 0.045f, 0.92f);
-		m_Renderer->DrawString(
-			-280.0f, -height * 0.5f + 24.0f, m_Message, 0.76f, 0.78f, 0.88f, 1.0f);
+		const float statusWidth = std::min(430.0f, static_cast<float>(width) * 0.46f);
+		const float statusLeft = -width * 0.5f + 14.0f;
+		const float statusBottom = -height * 0.5f + 113.0f;
+		const float horizontalPadding = 13.0f;
+		const float verticalPadding = 11.0f;
+		const float lineHeight = 22.0f;
+		const std::vector<std::wstring> messageLines =
+			WrapTextToWidth(m_Message, statusWidth - horizontalPadding * 2.0f);
+		const float statusHeight = verticalPadding * 2.0f +
+			lineHeight * static_cast<float>(messageLines.size());
+		m_Renderer->DrawRect(statusLeft + statusWidth * 0.5f,
+			statusBottom + statusHeight * 0.5f,
+			statusWidth,
+			statusHeight,
+			0.025f,
+			0.025f,
+			0.045f,
+			0.94f);
+		m_Renderer->DrawRect(statusLeft + 3.0f,
+			statusBottom + statusHeight * 0.5f,
+			6.0f,
+			statusHeight,
+			0.94f,
+			0.56f,
+			0.20f,
+			0.92f);
+		for (size_t lineIndex = 0; lineIndex < messageLines.size(); ++lineIndex)
+			m_Renderer->DrawString(statusLeft + horizontalPadding,
+				statusBottom + statusHeight - verticalPadding - 17.0f -
+					static_cast<float>(lineIndex) * lineHeight,
+				messageLines[lineIndex],
+				0.82f,
+				0.82f,
+				0.90f,
+				1.0f);
+	}
+	if (m_DialogueTimer > 0.0f && (m_Mode == OnFoot || m_Mode == FirstLevel))
+	{
+		const float dialogueWidth = std::min(500.0f, static_cast<float>(width) * 0.50f);
+		const float dialogueRight = width * 0.5f - 14.0f;
+		const float dialogueLeft = dialogueRight - dialogueWidth;
+		const float dialogueBottom =
+			-height * 0.5f + (m_Mode == FirstLevel ? 105.0f : 52.0f);
+		const float horizontalPadding = 13.0f;
+		const float verticalPadding = 11.0f;
+		const float lineHeight = 22.0f;
+		const std::vector<std::wstring> dialogueLines =
+			WrapTextToWidth(m_Dialogue, dialogueWidth - horizontalPadding * 2.0f);
+		const float dialogueHeight = verticalPadding * 2.0f +
+			lineHeight * static_cast<float>(dialogueLines.size());
+		m_Renderer->DrawRect(dialogueLeft + dialogueWidth * 0.5f,
+			dialogueBottom + dialogueHeight * 0.5f,
+			dialogueWidth,
+			dialogueHeight,
+			0.025f,
+			0.045f,
+			0.055f,
+			0.95f);
+		m_Renderer->DrawRect(dialogueLeft + 3.0f,
+			dialogueBottom + dialogueHeight * 0.5f,
+			6.0f,
+			dialogueHeight,
+			0.20f,
+			0.76f,
+			0.84f,
+			0.94f);
+		for (size_t lineIndex = 0; lineIndex < dialogueLines.size(); ++lineIndex)
+			m_Renderer->DrawString(dialogueLeft + horizontalPadding,
+				dialogueBottom + dialogueHeight - verticalPadding - 17.0f -
+					static_cast<float>(lineIndex) * lineHeight,
+				dialogueLines[lineIndex],
+				0.88f,
+				0.92f,
+				0.94f,
+				1.0f);
 	}
 	if (m_Keys['\t'] && (m_Mode == OnFoot || m_Mode == FirstLevel))
 		m_Renderer->DrawString(-220.0f,
