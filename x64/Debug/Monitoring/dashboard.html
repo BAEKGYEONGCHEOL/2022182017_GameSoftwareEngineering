@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NOCTIS Local Monitor</title>
+  <style>
+    :root { color-scheme: dark; --bg:#061018; --panel:#0d1b25; --line:#24404e; --cyan:#67d9e8; --warn:#ffb55b; --danger:#ff6b72; --muted:#8ea4af; }
+    * { box-sizing:border-box; }
+    body { margin:0; padding:24px; background:radial-gradient(circle at top,#102836,var(--bg) 55%); color:#e6f1f4; font-family:"Malgun Gothic",sans-serif; }
+    header { display:flex; justify-content:space-between; align-items:end; gap:16px; margin-bottom:18px; }
+    h1 { margin:0; font-size:26px; letter-spacing:.04em; }
+    .connection { color:var(--muted); font-size:13px; }
+    .connection.online { color:#72e6a4; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:12px; margin-bottom:18px; }
+    .card, section { border:1px solid var(--line); background:rgba(13,27,37,.93); border-radius:10px; box-shadow:0 10px 30px #0005; }
+    .card { padding:15px; }
+    .card h2 { margin:0 0 9px; font-size:15px; color:var(--cyan); }
+    .status { font-size:21px; font-weight:700; }
+    .counts { display:flex; gap:16px; margin-top:9px; color:var(--muted); }
+    section { padding:16px; overflow:auto; }
+    section h2 { margin:0 0 12px; font-size:18px; }
+    table { width:100%; border-collapse:collapse; min-width:760px; }
+    th, td { padding:9px 10px; border-bottom:1px solid #1b3441; text-align:left; white-space:nowrap; }
+    th { color:var(--muted); font-size:12px; text-transform:uppercase; }
+    .dead { color:var(--danger); } .panic { color:var(--warn); } .stable { color:#72e6a4; }
+    .empty { color:var(--muted); padding:18px 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <div><h1>NOCTIS 세계 모니터</h1><div id="summary" class="connection">게임 상태 수신 대기 중</div></div>
+    <div id="connection" class="connection">연결 중…</div>
+  </header>
+  <div id="regions" class="grid"></div>
+  <section>
+    <h2>NPC 상태</h2>
+    <table>
+      <thead><tr><th>ID</th><th>이름</th><th>지역</th><th>상태</th><th>체력</th><th>공포</th><th>무장</th><th>분대</th></tr></thead>
+      <tbody id="npcs"></tbody>
+    </table>
+    <div id="empty" class="empty" hidden>표시할 NPC가 없습니다.</div>
+  </section>
+  <script>
+    const escapeText = value => String(value ?? '');
+    const statusNames = {current_secured:'현재 지역 · 안정',current_emergency:'현재 지역 · 비상',secured:'안정',emergency:'비상',unvisited:'미방문',current_contested:'현재 지역 · 교전 중',contested:'교전 중',current_reached:'현재 지역 · 도착'};
+    const stateNames = {dead:'사망',panic:'공황',frightened:'공포',stable:'안정'};
+    function render(data) {
+      document.querySelector('#connection').textContent = 'JSON 연결됨 · ' + new Date().toLocaleTimeString();
+      document.querySelector('#connection').className = 'connection online';
+      document.querySelector('#summary').textContent = `현재 위치: ${escapeText(data.currentRegion)} · 모드: ${escapeText(data.gameMode)}`;
+      const regions = document.querySelector('#regions'); regions.replaceChildren();
+      for (const region of data.regions || []) {
+        const card = document.createElement('article'); card.className = 'card';
+        const title = document.createElement('h2'); title.textContent = region.name;
+        const status = document.createElement('div'); status.className = 'status'; status.textContent = statusNames[region.status] || region.status;
+        const counts = document.createElement('div'); counts.className = 'counts';
+        counts.textContent = `NPC ${region.npcAlive}/${region.npcTotal} · 몹 ${region.mobAlive}/${region.mobTotal}`;
+        card.append(title, status, counts); regions.append(card);
+      }
+      const body = document.querySelector('#npcs'); body.replaceChildren();
+      for (const npc of data.npcs || []) {
+        const row = document.createElement('tr');
+        row.className = npc.state === 'dead' ? 'dead' : (npc.state === 'panic' ? 'panic' : 'stable');
+        for (const value of [npc.id,npc.name,npc.region,stateNames[npc.state] || npc.state,npc.health,npc.fear,npc.armed ? '예':'아니오',npc.squad]) {
+          const cell = document.createElement('td'); cell.textContent = escapeText(value); row.append(cell);
+        }
+        body.append(row);
+      }
+      document.querySelector('#empty').hidden = (data.npcs || []).length !== 0;
+    }
+    async function update() {
+      try { const response = await fetch('/api/state', {cache:'no-store'}); if (!response.ok) throw new Error(response.status); render(await response.json()); }
+      catch (error) { const connection=document.querySelector('#connection'); connection.textContent='연결 끊김 · 재시도 중'; connection.className='connection'; }
+    }
+    update(); setInterval(update, 500);
+  </script>
+</body>
+</html>

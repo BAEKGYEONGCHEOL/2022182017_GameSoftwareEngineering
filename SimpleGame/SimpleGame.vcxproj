@@ -162,6 +162,7 @@
 	<ItemGroup>
 	<ClInclude Include="Actor.h" />
 	<ClInclude Include="Game.h" />
+	<ClInclude Include="LocalMonitoringServer.h" />
 	<ClInclude Include="ModelLibrary.h" />
 	<ClInclude Include="PrototypeRenderer.h" />
 	<ClInclude Include="SceneGraph.h" />
@@ -172,6 +173,7 @@
 	<ItemGroup>
 	<ClCompile Include="Actor.cpp" />
 	<ClCompile Include="Game.cpp" />
+	<ClCompile Include="LocalMonitoringServer.cpp" />
 	<ClCompile Include="ModelLibrary.cpp" />
 	<ClCompile Include="PrototypeRenderer.cpp" />
 	<ClCompile Include="SceneGraph.cpp" />
@@ -207,6 +209,9 @@
 	  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	</None>
 	<None Include="Data\Models.txt">
+	  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	</None>
+	<None Include="Monitoring\dashboard.html">
 	  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	</None>
     <None Include="Shaders\SolidRect.fs" />

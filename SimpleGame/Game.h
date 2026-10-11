@@ -7,6 +7,8 @@
 #include "PrototypeRenderer.h"
 #include "SceneGraph.h"
 
+class LocalMonitoringServer;
+
 struct WorldPoint
 {
 	float x;
@@ -127,6 +129,7 @@ class Game
 {
   public:
 	explicit Game(PrototypeRenderer* renderer);
+	~Game();
 	void Reset();
 	void Update(float deltaSeconds);
 	void Render();
@@ -195,6 +198,8 @@ class Game
 	std::wstring ObjectiveText() const;
 	std::vector<std::wstring> ObjectiveLines() const;
 	std::wstring InteractionText() const;
+	std::string BuildMonitoringJson() const;
+	void PublishMonitoringState(float deltaSeconds, bool force = false);
 	Actor* CreateSceneActor(const std::string& name,
 		float x,
 		float y,
@@ -218,6 +223,9 @@ class Game
 	void DrawShip(float x, float y, float angle, float scale, float r, float g, float b);
 
 	PrototypeRenderer* m_Renderer;
+	LocalMonitoringServer* m_MonitoringServer;
+	float m_MonitoringPublishTimer;
+	unsigned int m_MonitoringSequence;
 	GameMode m_Mode;
 	QuestStage m_Quest;
 	bool m_Paused;

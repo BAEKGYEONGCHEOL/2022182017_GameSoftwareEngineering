@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstring>
 #include <ctime>
+#include <iomanip>
 #include <queue>
 #include <random>
 #include <sstream>
@@ -13,6 +14,7 @@
 #endif
 #include <Windows.h>
 #include "Dependencies\\freeglut.h"
+#include "LocalMonitoringServer.h"
 
 namespace
 {
@@ -78,6 +80,64 @@ std::vector<std::wstring> WrapTextToWidth(const std::wstring& text, float maximu
 	if (!currentLine.empty() || lines.empty())
 		lines.push_back(currentLine);
 	return lines;
+}
+
+std::string ToUtf8(const std::wstring& text)
+{
+	if (text.empty())
+		return std::string();
+	const int requiredBytes =
+		WideCharToMultiByte(CP_UTF8, 0, text.c_str(), static_cast<int>(text.size()), NULL, 0, NULL, NULL);
+	if (requiredBytes <= 0)
+		return std::string();
+	std::string utf8(static_cast<size_t>(requiredBytes), '\0');
+	WideCharToMultiByte(CP_UTF8,
+		0,
+		text.c_str(),
+		static_cast<int>(text.size()),
+		&utf8[0],
+		requiredBytes,
+		NULL,
+		NULL);
+	return utf8;
+}
+
+std::string JsonEscape(const std::string& value)
+{
+	std::ostringstream escaped;
+	for (size_t index = 0; index < value.size(); ++index)
+	{
+		const unsigned char character = static_cast<unsigned char>(value[index]);
+		switch (character)
+		{
+			case '"': escaped << "\\\""; break;
+			case '\\': escaped << "\\\\"; break;
+			case '\b': escaped << "\\b"; break;
+			case '\f': escaped << "\\f"; break;
+			case '\n': escaped << "\\n"; break;
+			case '\r': escaped << "\\r"; break;
+			case '\t': escaped << "\\t"; break;
+			default:
+				if (character < 0x20)
+				{
+					const char hex[] = "0123456789abcdef";
+					escaped << "\\u00" << hex[(character >> 4) & 0x0f] << hex[character & 0x0f];
+				}
+				else
+					escaped << static_cast<char>(character);
+		}
+	}
+	return escaped.str();
+}
+
+std::string JsonString(const std::string& value)
+{
+	return "\"" + JsonEscape(value) + "\"";
+}
+
+std::string JsonString(const std::wstring& value)
+{
+	return JsonString(ToUtf8(value));
 }
 
 enum ProjectileOwnerType
@@ -217,9 +277,24 @@ void DrawRotatedRect(PrototypeRenderer* renderer,
 } // namespace
 
 Game::Game(PrototypeRenderer* renderer)
-	: m_Renderer(renderer)
+	: m_Renderer(renderer),
+	  m_MonitoringServer(new LocalMonitoringServer()),
+	  m_MonitoringPublishTimer(0.0f),
+	  m_MonitoringSequence(0)
 {
 	Reset();
+	if (m_MonitoringServer->Start(8787))
+		PublishMonitoringState(0.0f, true);
+}
+
+Game::~Game()
+{
+	if (m_MonitoringServer != NULL)
+	{
+		m_MonitoringServer->Stop();
+		delete m_MonitoringServer;
+		m_MonitoringServer = NULL;
+	}
 }
 
 void Game::Reset()
@@ -288,6 +363,7 @@ void Game::Reset()
 	m_MessageTimer = 6.0f;
 	m_Dialogue.clear();
 	m_DialogueSpeakerPosition = m_Player;
+	m_MonitoringPublishTimer = 0.0f;
 	m_DialogueTimer = 0.0f;
 
 	m_Obstacles.clear();
@@ -469,6 +545,8 @@ void Game::Update(float deltaSeconds)
 		else if (m_Mode == FirstLevel)
 			UpdateFirstLevel(deltaSeconds);
 	}
+
+	PublishMonitoringState(deltaSeconds);
 
 	std::memset(m_KeyPressed, 0, sizeof(m_KeyPressed));
 	m_MousePressed = false;
@@ -2146,6 +2224,132 @@ std::vector<std::wstring> Game::ObjectiveLines() const
 	}
 	objectives.push_back(ObjectiveText());
 	return objectives;
+}
+
+std::string Game::BuildMonitoringJson() const
+{
+	const char* modeName = "on_foot";
+	switch (m_Mode)
+	{
+		case ShipControl: modeName = "ship_control"; break;
+		case Transition: modeName = "transition"; break;
+		case FirstLevel: modeName = "erebus_level_1"; break;
+		case Complete: modeName = "complete"; break;
+		default: break;
+	}
+	const char* currentRegion = m_CurrentShip == 2 ? "station" : (m_CurrentShip == 1 ? "erebus" : "noctis");
+	const bool erebusGenerated = !m_FirstLevelTiles.empty();
+
+	int noctisNpcAlive = 0;
+	for (size_t index = 0; index < m_TutorialSurvivors.size(); ++index)
+		if (m_TutorialSurvivors[index].health > 0.0f)
+			++noctisNpcAlive;
+	for (size_t index = 0; index < m_NeutralNpcs.size(); ++index)
+		if (!m_NeutralNpcs[index].dead && m_NeutralNpcs[index].health > 0.0f)
+			++noctisNpcAlive;
+	const int noctisNpcTotal =
+		static_cast<int>(m_TutorialSurvivors.size() + m_NeutralNpcs.size());
+
+	int erebusNpcAlive = 0;
+	for (size_t index = 0; index < m_LevelSurvivors.size(); ++index)
+		if (m_LevelSurvivors[index].health > 0.0f)
+			++erebusNpcAlive;
+	const int erebusNpcTotal = static_cast<int>(m_LevelSurvivors.size());
+
+	int activeMobCount = 0;
+	for (size_t index = 0; index < m_Enemies.size(); ++index)
+		if (m_Enemies[index].health > 0)
+			++activeMobCount;
+	const int currentMobTotal = static_cast<int>(m_Enemies.size());
+	const int noctisMobAlive = erebusGenerated ? 0 : activeMobCount;
+	const int noctisMobTotal = 4;
+	const int erebusMobAlive = erebusGenerated ? activeMobCount : 0;
+	const int erebusMobTotal = erebusGenerated ? currentMobTotal : 0;
+
+	const std::string noctisStatus = m_CurrentShip == 0
+		? (m_CoreRecovered ? "current_secured" : "current_emergency")
+		: (m_CoreRecovered ? "secured" : "emergency");
+	const std::string erebusStatus = !erebusGenerated
+		? "unvisited"
+		: (AreLevelHostilesCleared() ? "secured" : (m_CurrentShip == 1 ? "current_contested" : "contested"));
+	const std::string stationStatus = m_CurrentShip == 2 ? "current_reached" : "unvisited";
+
+	std::ostringstream json;
+	json << std::fixed << std::setprecision(2);
+	json << "{\"schemaVersion\":1,\"sequence\":" << m_MonitoringSequence
+		 << ",\"gameMode\":" << JsonString(modeName)
+		 << ",\"currentRegion\":" << JsonString(currentRegion)
+		 << ",\"regions\":[";
+	json << "{\"id\":\"noctis\",\"name\":" << JsonString(L"연구선 노크티스")
+		 << ",\"status\":" << JsonString(noctisStatus)
+		 << ",\"npcAlive\":" << noctisNpcAlive << ",\"npcTotal\":" << noctisNpcTotal
+		 << ",\"mobAlive\":" << noctisMobAlive << ",\"mobTotal\":" << noctisMobTotal << "},";
+	json << "{\"id\":\"erebus\",\"name\":" << JsonString(L"수송선 에레보스")
+		 << ",\"status\":" << JsonString(erebusStatus)
+		 << ",\"npcAlive\":" << erebusNpcAlive << ",\"npcTotal\":" << erebusNpcTotal
+		 << ",\"mobAlive\":" << erebusMobAlive << ",\"mobTotal\":" << erebusMobTotal << "},";
+	json << "{\"id\":\"station\",\"name\":" << JsonString(L"거대 우주 정거장")
+		 << ",\"status\":" << JsonString(stationStatus)
+		 << ",\"npcAlive\":0,\"npcTotal\":0,\"mobAlive\":0,\"mobTotal\":0}],";
+	json << "\"npcs\":[";
+	bool firstNpc = true;
+	auto appendNpc = [&json, &firstNpc](const std::string& id,
+		const std::wstring& name,
+		const char* region,
+		const char* state,
+		float health,
+		float fear,
+		bool armed,
+		int squad,
+		const WorldPoint& position)
+	{
+		if (!firstNpc)
+			json << ',';
+		firstNpc = false;
+		json << "{\"id\":" << JsonString(id) << ",\"name\":" << JsonString(name)
+			 << ",\"region\":" << JsonString(region) << ",\"state\":" << JsonString(state)
+			 << ",\"health\":" << std::max(0.0f, health) << ",\"fear\":" << std::max(0.0f, fear)
+			 << ",\"armed\":" << (armed ? "true" : "false")
+			 << ",\"squad\":" << (squad >= 0 ? std::to_string(squad + 1) : "null")
+			 << ",\"position\":{\"x\":" << position.x << ",\"y\":" << position.y << "}}";
+	};
+
+	for (size_t index = 0; index < m_TutorialSurvivors.size(); ++index)
+	{
+		const LevelSurvivor& npc = m_TutorialSurvivors[index];
+		const char* state = npc.health <= 0.0f ? "dead" : (npc.confused ? "panic" : (npc.fear >= 60.0f ? "frightened" : "stable"));
+		appendNpc("noctis_survivor_" + std::to_string(index),
+			SurvivorRoleName(npc.pattern), "noctis", state, npc.health, npc.fear, npc.armed, npc.squadId, npc.position);
+	}
+	for (size_t index = 0; index < m_NeutralNpcs.size(); ++index)
+	{
+		const NeutralNpc& npc = m_NeutralNpcs[index];
+		const std::wstring name = npc.dialogueId == 0 ? L"통신장교 서윤" :
+			(npc.dialogueId == 1 ? L"정비사 라울" : L"노크티스 승무원");
+		appendNpc("noctis_crew_" + std::to_string(index), name, "noctis",
+			npc.dead || npc.health <= 0.0f ? "dead" : "stable", npc.health, 0.0f, false, -1, npc.position);
+	}
+	for (size_t index = 0; index < m_LevelSurvivors.size(); ++index)
+	{
+		const LevelSurvivor& npc = m_LevelSurvivors[index];
+		const char* state = npc.health <= 0.0f ? "dead" : (npc.confused ? "panic" : (npc.fear >= 60.0f ? "frightened" : "stable"));
+		appendNpc("erebus_survivor_" + std::to_string(index),
+			SurvivorRoleName(npc.pattern), "erebus", state, npc.health, npc.fear, npc.armed, npc.squadId, npc.position);
+	}
+	json << "]}";
+	return json.str();
+}
+
+void Game::PublishMonitoringState(float deltaSeconds, bool force)
+{
+	if (m_MonitoringServer == NULL || !m_MonitoringServer->IsRunning())
+		return;
+	m_MonitoringPublishTimer += deltaSeconds;
+	if (!force && m_MonitoringPublishTimer < 0.25f)
+		return;
+	m_MonitoringPublishTimer = 0.0f;
+	++m_MonitoringSequence;
+	m_MonitoringServer->SetStateJson(BuildMonitoringJson());
 }
 
 std::wstring Game::InteractionText() const
