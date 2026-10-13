@@ -2323,21 +2323,29 @@ std::string Game::BuildMonitoringJson() const
 
 	std::ostringstream json;
 	json << std::fixed << std::setprecision(2);
-	json << "{\"schemaVersion\":1,\"sequence\":" << m_MonitoringSequence
+	json << "{\"schemaVersion\":2,\"sequence\":" << m_MonitoringSequence
 		 << ",\"gameMode\":" << JsonString(modeName)
 		 << ",\"currentRegion\":" << JsonString(currentRegion)
 		 << ",\"regions\":[";
 	json << "{\"id\":\"noctis\",\"name\":" << JsonString(L"연구선 노크티스")
 		 << ",\"status\":" << JsonString(noctisStatus)
 		 << ",\"npcAlive\":" << noctisNpcAlive << ",\"npcTotal\":" << noctisNpcTotal
-		 << ",\"mobAlive\":" << noctisMobAlive << ",\"mobTotal\":" << noctisMobTotal << "},";
+		 << ",\"mobAlive\":" << noctisMobAlive << ",\"mobTotal\":" << noctisMobTotal
+		 << ",\"mapAvailable\":true,\"bounds\":{\"minX\":-22,\"maxX\":22,\"minY\":-22,\"maxY\":22}},";
 	json << "{\"id\":\"erebus\",\"name\":" << JsonString(L"수송선 에레보스")
 		 << ",\"status\":" << JsonString(erebusStatus)
 		 << ",\"npcAlive\":" << erebusNpcAlive << ",\"npcTotal\":" << erebusNpcTotal
-		 << ",\"mobAlive\":" << erebusMobAlive << ",\"mobTotal\":" << erebusMobTotal << "},";
+		 << ",\"mobAlive\":" << erebusMobAlive << ",\"mobTotal\":" << erebusMobTotal
+		 << ",\"mapAvailable\":" << (erebusGenerated ? "true" : "false")
+		 << ",\"bounds\":{\"minX\":-64,\"maxX\":64,\"minY\":-64,\"maxY\":64}},";
 	json << "{\"id\":\"station\",\"name\":" << JsonString(L"거대 우주 정거장")
 		 << ",\"status\":" << JsonString(stationStatus)
-		 << ",\"npcAlive\":0,\"npcTotal\":0,\"mobAlive\":0,\"mobTotal\":0}],";
+		 << ",\"npcAlive\":0,\"npcTotal\":0,\"mobAlive\":0,\"mobTotal\":0"
+		 << ",\"mapAvailable\":false,\"bounds\":{\"minX\":-1,\"maxX\":1,\"minY\":-1,\"maxY\":1}}],";
+	const bool playerVisible = m_Mode == OnFoot || m_Mode == FirstLevel;
+	json << "\"player\":{\"visible\":" << (playerVisible ? "true" : "false")
+		 << ",\"region\":" << JsonString(currentRegion)
+		 << ",\"position\":{\"x\":" << m_Player.x << ",\"y\":" << m_Player.y << "}},";
 	json << "\"npcs\":[";
 	bool firstNpc = true;
 	auto appendNpc = [&json, &firstNpc](const std::string& id,
@@ -2345,6 +2353,7 @@ std::string Game::BuildMonitoringJson() const
 		const char* region,
 		const char* state,
 		float health,
+		float maxHealth,
 		float fear,
 		bool armed,
 		int squad,
@@ -2355,7 +2364,8 @@ std::string Game::BuildMonitoringJson() const
 		firstNpc = false;
 		json << "{\"id\":" << JsonString(id) << ",\"name\":" << JsonString(name)
 			 << ",\"region\":" << JsonString(region) << ",\"state\":" << JsonString(state)
-			 << ",\"health\":" << std::max(0.0f, health) << ",\"fear\":" << std::max(0.0f, fear)
+			 << ",\"health\":" << std::max(0.0f, health) << ",\"maxHealth\":" << maxHealth
+			 << ",\"fear\":" << std::max(0.0f, fear)
 			 << ",\"armed\":" << (armed ? "true" : "false")
 			 << ",\"squad\":" << (squad >= 0 ? std::to_string(squad + 1) : "null")
 			 << ",\"position\":{\"x\":" << position.x << ",\"y\":" << position.y << "}}";
@@ -2366,7 +2376,7 @@ std::string Game::BuildMonitoringJson() const
 		const LevelSurvivor& npc = m_TutorialSurvivors[index];
 		const char* state = npc.health <= 0.0f ? "dead" : (npc.confused ? "panic" : (npc.fear >= 60.0f ? "frightened" : "stable"));
 		appendNpc("noctis_survivor_" + std::to_string(index),
-			SurvivorRoleName(npc.pattern), "noctis", state, npc.health, npc.fear, npc.armed, npc.squadId, npc.position);
+			SurvivorRoleName(npc.pattern), "noctis", state, npc.health, 3.0f, npc.fear, npc.armed, npc.squadId, npc.position);
 	}
 	for (size_t index = 0; index < m_NeutralNpcs.size(); ++index)
 	{
@@ -2374,16 +2384,101 @@ std::string Game::BuildMonitoringJson() const
 		const std::wstring name = npc.dialogueId == 0 ? L"통신장교 서윤" :
 			(npc.dialogueId == 1 ? L"정비사 라울" : L"노크티스 승무원");
 		appendNpc("noctis_crew_" + std::to_string(index), name, "noctis",
-			npc.dead || npc.health <= 0.0f ? "dead" : "stable", npc.health, 0.0f, false, -1, npc.position);
+			npc.dead || npc.health <= 0.0f ? "dead" : "stable", npc.health, 3.0f, 0.0f, false, -1, npc.position);
 	}
 	for (size_t index = 0; index < m_LevelSurvivors.size(); ++index)
 	{
 		const LevelSurvivor& npc = m_LevelSurvivors[index];
 		const char* state = npc.health <= 0.0f ? "dead" : (npc.confused ? "panic" : (npc.fear >= 60.0f ? "frightened" : "stable"));
 		appendNpc("erebus_survivor_" + std::to_string(index),
-			SurvivorRoleName(npc.pattern), "erebus", state, npc.health, npc.fear, npc.armed, npc.squadId, npc.position);
+			SurvivorRoleName(npc.pattern), "erebus", state, npc.health, 3.0f, npc.fear, npc.armed, npc.squadId, npc.position);
 	}
-	json << "]}";
+	json << "],\"mobs\":[";
+	bool firstMob = true;
+	for (size_t index = 0; index < m_Enemies.size(); ++index)
+	{
+		const Enemy& enemy = m_Enemies[index];
+		if (enemy.health <= 0)
+			continue;
+		if (!firstMob)
+			json << ',';
+		firstMob = false;
+		json << "{\"id\":" << JsonString(std::string(erebusGenerated ? "erebus_void_" : "noctis_void_") + std::to_string(index))
+			 << ",\"region\":" << JsonString(erebusGenerated ? "erebus" : "noctis")
+			 << ",\"health\":" << enemy.health << ",\"maxHealth\":2"
+			 << ",\"position\":{\"x\":" << enemy.position.x << ",\"y\":" << enemy.position.y << "}}";
+	}
+	json << "],\"objects\":[";
+	bool firstObject = true;
+	auto appendObject = [&json, &firstObject](const std::string& id,
+		const std::wstring& name,
+		const char* region,
+		const char* type,
+		const WorldPoint& position)
+	{
+		if (!firstObject)
+			json << ',';
+		firstObject = false;
+		json << "{\"id\":" << JsonString(id) << ",\"name\":" << JsonString(name)
+			 << ",\"region\":" << JsonString(region) << ",\"type\":" << JsonString(type)
+			 << ",\"position\":{\"x\":" << position.x << ",\"y\":" << position.y << "}}";
+	};
+	if (m_Quest == InspectTerminal)
+		appendObject("noctis_terminal", L"함선 터미널", "noctis", "terminal", TerminalPosition);
+	if (m_Quest == CollectTutorialWeapon)
+		appendObject("noctis_weapon", L"훈련용 무기", "noctis", "pickup", TutorialWeaponPosition);
+	for (size_t index = 0; index < 3; ++index)
+		appendObject("noctis_record_" + std::to_string(index), L"함선 기록", "noctis", "document", TutorialRecordPositions[index]);
+	if (!m_CoreRecovered)
+		appendObject("noctis_core", L"항법 코어", "noctis", "core", CorePosition);
+	if (m_CoreRecovered && !m_SignalChecked)
+		appendObject("noctis_signal", L"구조 신호 단말", "noctis", "terminal", SignalPosition);
+	appendObject("noctis_cockpit", L"조종 장치", "noctis", "console", CockpitPosition);
+	if (erebusGenerated)
+	{
+		if (!m_LevelWeaponCollected)
+			appendObject("erebus_weapon", L"펄스 소총", "erebus", "pickup", FirstLevelWeaponPosition);
+		for (int index = 0; index < 4; ++index)
+			if (!m_LevelEngineActive[index])
+				appendObject("erebus_engine_" + std::to_string(index), L"보조 엔진", "erebus", "engine", m_LevelEnginePositions[index]);
+		appendObject("erebus_control", L"이탈 제어 장치", "erebus", "console", m_LevelControlPosition);
+		for (size_t index = 0; index < m_StoryDocuments.size(); ++index)
+			appendObject("erebus_document_" + std::to_string(index), L"현장 문서", "erebus", "document", m_StoryDocuments[index].position);
+		for (size_t index = 0; index < m_MagazinePickups.size(); ++index)
+			if (!m_MagazinePickups[index].collected)
+				appendObject("erebus_magazine_" + std::to_string(index), L"예비 탄창", "erebus", "pickup", m_MagazinePickups[index].position);
+	}
+	json << "],\"terrain\":{\"noctis\":[";
+	bool firstTerrainTile = true;
+	for (int tileY = -22; tileY <= 22; ++tileY)
+	{
+		for (int tileX = -22; tileX <= 22; ++tileX)
+		{
+			if (!IsTutorialFloor(static_cast<float>(tileX), static_cast<float>(tileY)))
+				continue;
+			bool roomTile = false;
+			const int roomCenters[] = {-13, 13};
+			for (int centerX = 0; centerX < 2 && !roomTile; ++centerX)
+				for (int centerY = 0; centerY < 2 && !roomTile; ++centerY)
+					roomTile = std::abs(tileX - roomCenters[centerX]) <= 8 &&
+						std::abs(tileY - roomCenters[centerY]) <= 8;
+			if (!firstTerrainTile)
+				json << ',';
+			firstTerrainTile = false;
+			json << "[" << tileX << ',' << tileY << ',' << (roomTile ? 2 : 1) << "]";
+		}
+	}
+	json << "],\"erebus\":[";
+	firstTerrainTile = true;
+	for (size_t index = 0; index < m_FirstLevelFloorVisuals.size(); ++index)
+	{
+		const MapVisualTile& tile = m_FirstLevelFloorVisuals[index];
+		if (!firstTerrainTile)
+			json << ',';
+		firstTerrainTile = false;
+		json << "[" << tile.position.x << ',' << tile.position.y << ',' << tile.type << "]";
+	}
+	json << "]}}";
 	return json.str();
 }
 
@@ -2392,7 +2487,7 @@ void Game::PublishMonitoringState(float deltaSeconds, bool force)
 	if (m_MonitoringServer == NULL || !m_MonitoringServer->IsRunning())
 		return;
 	m_MonitoringPublishTimer += deltaSeconds;
-	if (!force && m_MonitoringPublishTimer < 0.25f)
+	if (!force && m_MonitoringPublishTimer < 0.10f)
 		return;
 	m_MonitoringPublishTimer = 0.0f;
 	++m_MonitoringSequence;

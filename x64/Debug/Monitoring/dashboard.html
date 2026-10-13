@@ -25,6 +25,17 @@
     th { color:var(--muted); font-size:12px; text-transform:uppercase; }
     .dead { color:var(--danger); } .panic { color:var(--warn); } .stable { color:#72e6a4; }
     .empty { color:var(--muted); padding:18px 0; }
+    .health-value { display:block; margin-bottom:5px; font-variant-numeric:tabular-nums; }
+    .gauge { width:120px; height:8px; overflow:hidden; border-radius:999px; background:#162b36; box-shadow:inset 0 0 0 1px #294653; }
+    .gauge-fill { height:100%; border-radius:inherit; background:#72e6a4; transition:width .2s ease; }
+    .gauge-fill.low { background:var(--danger); } .gauge-fill.medium { background:var(--warn); }
+    .minimap-section { margin-top:18px; }
+    .minimap-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:14px; }
+    .minimap-card { padding:13px; border:1px solid var(--line); border-radius:9px; background:#08151e; }
+    .minimap-card h3 { margin:0 0 9px; color:var(--cyan); font-size:15px; }
+    canvas { display:block; width:100%; height:auto; border:1px solid #294653; border-radius:6px; background:#040b10; }
+    .legend { display:flex; flex-wrap:wrap; gap:12px; margin-top:9px; color:var(--muted); font-size:12px; }
+    .legend span::before { content:''; display:inline-block; width:8px; height:8px; margin-right:5px; border-radius:50%; background:var(--dot); }
   </style>
 </head>
 <body>
@@ -41,10 +52,93 @@
     </table>
     <div id="empty" class="empty" hidden>표시할 NPC가 없습니다.</div>
   </section>
+  <section class="minimap-section">
+    <h2>지역 미니맵</h2>
+    <div id="minimaps" class="minimap-grid"></div>
+  </section>
   <script>
     const escapeText = value => String(value ?? '');
     const statusNames = {current_secured:'현재 지역 · 안정',current_emergency:'현재 지역 · 비상',secured:'안정',emergency:'비상',unvisited:'미방문',current_contested:'현재 지역 · 교전 중',contested:'교전 중',current_reached:'현재 지역 · 도착'};
     const stateNames = {dead:'사망',panic:'공황',frightened:'공포',stable:'안정'};
+    let previousSnapshot=null, currentSnapshot=null, transitionStarted=0, minimapLayoutKey='', updateInFlight=false;
+    const minimapViews=new Map(), transitionDuration=120;
+    function appendHealthCell(row, current, maximum) {
+      const cell = document.createElement('td');
+      const max = Number(maximum) > 0 ? Number(maximum) : 1;
+      const value = Math.max(0, Number(current) || 0);
+      const ratio = Math.max(0, Math.min(1, value / max));
+      const label = document.createElement('span'); label.className = 'health-value'; label.textContent = `${value.toFixed(1)} / ${max.toFixed(1)}`;
+      const gauge = document.createElement('div'); gauge.className = 'gauge'; gauge.setAttribute('role','meter'); gauge.setAttribute('aria-valuenow',value); gauge.setAttribute('aria-valuemax',max);
+      const fill = document.createElement('div'); fill.className = 'gauge-fill' + (ratio <= .33 ? ' low' : ratio <= .66 ? ' medium' : ''); fill.style.width = `${ratio * 100}%`;
+      gauge.append(fill); cell.append(label,gauge); row.append(cell);
+    }
+    function createIsometricProjector(terrain, bounds, width, height) {
+      const samples=terrain.length ? terrain : [[bounds.minX,bounds.minY],[bounds.maxX,bounds.minY],[bounds.minX,bounds.maxY],[bounds.maxX,bounds.maxY]];
+      let minU=Infinity,maxU=-Infinity,minV=Infinity,maxV=-Infinity;
+      for (const tile of samples) { const x=Number(tile[0]),y=Number(tile[1]),u=x-y,v=(x+y)*.5; minU=Math.min(minU,u-1); maxU=Math.max(maxU,u+1); minV=Math.min(minV,v-.5); maxV=Math.max(maxV,v+.5); }
+      const padding=24, scale=Math.min((width-padding*2)/(maxU-minU),(height-padding*2)/(maxV-minV));
+      const usedWidth=(maxU-minU)*scale,usedHeight=(maxV-minV)*scale;
+      const offsetX=(width-usedWidth)*.5-minU*scale,offsetY=(height-usedHeight)*.5-minV*scale;
+      return point => ({x:(Number(point.x)-Number(point.y))*scale+offsetX,y:(Number(point.x)+Number(point.y))*.5*scale+offsetY,scale});
+    }
+    function drawDot(context, point, projector, color, radius) {
+      if (!point || !Number.isFinite(Number(point.x)) || !Number.isFinite(Number(point.y))) return;
+      const screen=projector(point);
+      context.beginPath(); context.arc(screen.x,screen.y,radius,0,Math.PI*2); context.fillStyle=color; context.fill();
+      context.strokeStyle='#041017'; context.lineWidth=1.5; context.stroke();
+    }
+    function previousPosition(collection, id) {
+      const item=(previousSnapshot?.[collection] || []).find(candidate => candidate.id === id);
+      return item?.position;
+    }
+    function interpolatedPosition(current, previous, ratio) {
+      if (!previous) return current;
+      return {x:Number(previous.x)+(Number(current.x)-Number(previous.x))*ratio,y:Number(previous.y)+(Number(current.y)-Number(previous.y))*ratio};
+    }
+    function animateMinimaps(now) {
+      if (currentSnapshot) {
+        const ratio=Math.min(1,Math.max(0,(now-transitionStarted)/transitionDuration));
+        for (const [regionId,view] of minimapViews) {
+          const {canvas,context,background,projector}=view;
+          context.clearRect(0,0,canvas.width,canvas.height); context.drawImage(background,0,0);
+          for (const object of (currentSnapshot.objects || []).filter(item => item.region === regionId)) drawDot(context,object.position,projector,'#ffd166',4);
+          for (const npc of (currentSnapshot.npcs || []).filter(item => item.region === regionId && item.state !== 'dead')) drawDot(context,interpolatedPosition(npc.position,previousPosition('npcs',npc.id),ratio),projector,npc.state === 'panic' ? '#ff9f43' : '#72e6a4',4.5);
+          for (const mob of (currentSnapshot.mobs || []).filter(item => item.region === regionId)) drawDot(context,interpolatedPosition(mob.position,previousPosition('mobs',mob.id),ratio),projector,'#c778ff',5);
+          if (currentSnapshot.player?.visible && currentSnapshot.player.region === regionId) {
+            const oldPlayer=previousSnapshot?.player?.region === regionId ? previousSnapshot.player.position : null;
+            drawDot(context,interpolatedPosition(currentSnapshot.player.position,oldPlayer,ratio),projector,'#67d9e8',6.5);
+          }
+        }
+      }
+      requestAnimationFrame(animateMinimaps);
+    }
+    function renderMinimaps(data) {
+      const regions=(data.regions || []).filter(region => region.mapAvailable && region.bounds);
+      const layoutKey=regions.map(region => { const tiles=(data.terrain && data.terrain[region.id]) || []; const first=tiles[0] || []; const last=tiles[tiles.length-1] || []; return `${region.id}:${tiles.length}:${first.join(',')}:${last.join(',')}`; }).join('|');
+      if (layoutKey === minimapLayoutKey) return;
+      minimapLayoutKey=layoutKey;
+      const host=document.querySelector('#minimaps'); host.replaceChildren(); minimapViews.clear();
+      for (const region of regions) {
+        const card=document.createElement('article'); card.className='minimap-card';
+        const title=document.createElement('h3'); title.textContent=region.name;
+        const canvas=document.createElement('canvas'); canvas.width=720; canvas.height=420;
+        const background=document.createElement('canvas'); background.width=canvas.width; background.height=canvas.height;
+        const context=background.getContext('2d'); const bounds=region.bounds; const terrain=(data.terrain && data.terrain[region.id]) || [];
+        const projector=createIsometricProjector(terrain,bounds,canvas.width,canvas.height);
+        context.fillStyle='#040b10'; context.fillRect(0,0,canvas.width,canvas.height);
+        const orderedTerrain=[...terrain].sort((left,right)=>(left[0]+left[1])-(right[0]+right[1]));
+        for (const tile of orderedTerrain) {
+          const screen=projector({x:tile[0],y:tile[1]}),halfWidth=screen.scale,halfHeight=screen.scale*.5;
+          context.beginPath(); context.moveTo(screen.x,screen.y-halfHeight); context.lineTo(screen.x+halfWidth,screen.y); context.lineTo(screen.x,screen.y+halfHeight); context.lineTo(screen.x-halfWidth,screen.y); context.closePath();
+          context.fillStyle=tile[2] === 2 ? '#183543' : '#12303a'; context.fill(); context.strokeStyle=tile[2] === 2 ? '#285160' : '#1c4651'; context.lineWidth=.7; context.stroke();
+        }
+        minimapViews.set(region.id,{canvas,context:canvas.getContext('2d'),background,projector});
+        const legend=document.createElement('div'); legend.className='legend';
+        for (const [label,color] of [['플레이어','#67d9e8'],['NPC','#72e6a4'],['공황 NPC','#ff9f43'],['공허종','#c778ff'],['사용 오브젝트','#ffd166']]) { const item=document.createElement('span'); item.textContent=label; item.style.setProperty('--dot',color); legend.append(item); }
+        card.append(title,canvas,legend); host.append(card);
+      }
+      if (regions.length === 0) { const empty=document.createElement('div'); empty.className='empty'; empty.textContent='생성된 지역 지도가 없습니다.'; host.append(empty); }
+    }
     function render(data) {
       document.querySelector('#connection').textContent = 'JSON 연결됨 · ' + new Date().toLocaleTimeString();
       document.querySelector('#connection').className = 'connection online';
@@ -62,18 +156,25 @@
       for (const npc of data.npcs || []) {
         const row = document.createElement('tr');
         row.className = npc.state === 'dead' ? 'dead' : (npc.state === 'panic' ? 'panic' : 'stable');
-        for (const value of [npc.id,npc.name,npc.region,stateNames[npc.state] || npc.state,npc.health,npc.fear,npc.armed ? '예':'아니오',npc.squad]) {
+        for (const value of [npc.id,npc.name,npc.region,stateNames[npc.state] || npc.state]) {
           const cell = document.createElement('td'); cell.textContent = escapeText(value); row.append(cell);
         }
+        appendHealthCell(row,npc.health,npc.maxHealth);
+        for (const value of [npc.fear,npc.armed ? '예':'아니오',npc.squad]) { const cell=document.createElement('td'); cell.textContent=escapeText(value); row.append(cell); }
         body.append(row);
       }
       document.querySelector('#empty').hidden = (data.npcs || []).length !== 0;
+      renderMinimaps(data);
     }
     async function update() {
-      try { const response = await fetch('/api/state', {cache:'no-store'}); if (!response.ok) throw new Error(response.status); render(await response.json()); }
+      if (updateInFlight) return;
+      updateInFlight=true;
+      try { const response = await fetch('/api/state', {cache:'no-store'}); if (!response.ok) throw new Error(response.status); const next=await response.json(); previousSnapshot=currentSnapshot; currentSnapshot=next; transitionStarted=performance.now(); render(next); }
       catch (error) { const connection=document.querySelector('#connection'); connection.textContent='연결 끊김 · 재시도 중'; connection.className='connection'; }
+      finally { updateInFlight=false; }
     }
-    update(); setInterval(update, 500);
+    requestAnimationFrame(animateMinimaps);
+    update(); setInterval(update, 100);
   </script>
 </body>
 </html>
