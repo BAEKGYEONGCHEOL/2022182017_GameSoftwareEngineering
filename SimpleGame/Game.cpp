@@ -274,6 +274,53 @@ void DrawRotatedRect(PrototypeRenderer* renderer,
 	ScreenPoint p3 = Rotate(-width * 0.5f, height * 0.5f, angle, x, y);
 	renderer->DrawQuad(p0, p1, p2, p3, r, g, b, alpha);
 }
+
+float ProjectileScreenAngle(const Projectile& projectile)
+{
+	const float screenDirectionX =
+		(projectile.velocity.x - projectile.velocity.y) * TileWidth * 0.5f;
+	const float screenDirectionY =
+		-(projectile.velocity.x + projectile.velocity.y) * TileHeight * 0.5f;
+	return std::atan2(screenDirectionY, screenDirectionX);
+}
+
+void DrawProjectileVisual(PrototypeRenderer* renderer,
+	const Projectile& projectile,
+	float x,
+	float y,
+	float angle)
+{
+	const bool survivorShot = projectile.ownerType == ProjectileOwnerSurvivor;
+	const float bodyLength = projectile.charged ? 31.0f : (survivorShot ? 25.0f : 22.0f);
+	const float bodyWidth = projectile.charged ? 10.0f : 7.0f;
+	const float red = projectile.charged || survivorShot ? 1.0f : 0.20f;
+	const float green = projectile.charged ? 0.46f : (survivorShot ? 0.12f : 0.92f);
+	const float blue = projectile.charged ? 0.10f : (survivorShot ? 0.10f : 1.0f);
+
+	const float directionX = std::cos(angle);
+	const float directionY = std::sin(angle);
+	DrawRotatedRect(renderer,
+		x - directionX * bodyLength * 0.38f,
+		y - directionY * bodyLength * 0.38f,
+		bodyLength * 1.25f,
+		bodyWidth * 0.58f,
+		angle,
+		red,
+		green * 0.70f,
+		blue,
+		0.46f);
+	DrawRotatedRect(renderer, x, y, bodyLength, bodyWidth, angle, red, green, blue, 1.0f);
+	DrawRotatedRect(renderer,
+		x + directionX * bodyLength * 0.27f,
+		y + directionY * bodyLength * 0.27f,
+		bodyLength * 0.28f,
+		bodyWidth * 0.38f,
+		angle,
+		1.0f,
+		projectile.charged ? 0.94f : 1.0f,
+		projectile.charged ? 0.54f : 1.0f,
+		1.0f);
+}
 } // namespace
 
 Game::Game(PrototypeRenderer* renderer)
@@ -2636,26 +2683,20 @@ void Game::RenderInterior()
 	}
 	for (size_t i = 0; i < m_Projectiles.size(); ++i)
 	{
-		const WorldPoint position = m_Projectiles[i].position;
+		const Projectile projectile = m_Projectiles[i];
+		const WorldPoint position = projectile.position;
 		CreateSceneActor("Projectile",
 			position.x,
 			position.y,
 			29.0f,
 			2,
 			position.x + position.y,
-			[this, i](const ActorTransform& transform)
+			[this, projectile](const ActorTransform& transform)
 			{
-				const bool survivorShot = m_Projectiles[i].ownerType == ProjectileOwnerSurvivor;
 				ScreenPoint shot = WorldToScreen(transform.x, transform.y, transform.height);
 				m_Renderer->DrawSoftShadow(shot.x, shot.y - 25.0f, 24.0f, 7.0f, 0.18f);
-				m_Renderer->DrawDiamond(shot.x,
-					shot.y,
-					25.0f,
-					8.0f,
-					survivorShot ? 1.0f : 0.18f,
-					survivorShot ? 0.12f : 0.92f,
-					survivorShot ? 0.10f : 1.0f,
-					1.0f);
+				DrawProjectileVisual(
+					m_Renderer, projectile, shot.x, shot.y, ProjectileScreenAngle(projectile));
 			});
 	}
 	m_SceneGraph.Render();
@@ -3947,19 +3988,18 @@ void Game::RenderFirstLevel()
 				float tracerWidth =
 					std::max(10.0f, Length(bullet.x - previous.x, bullet.y - previous.y) * 1.7f);
 				const bool survivorShot = projectile.ownerType == ProjectileOwnerSurvivor;
-				m_Renderer->DrawDiamond((bullet.x + previous.x) * 0.5f,
+				const float projectileAngle = ProjectileScreenAngle(projectile);
+				DrawRotatedRect(m_Renderer,
+					(bullet.x + previous.x) * 0.5f,
 					(bullet.y + previous.y) * 0.5f,
 					tracerWidth,
 					5.0f,
+					projectileAngle,
 					projectile.charged || survivorShot ? 1.0f : 0.10f,
 					projectile.charged ? 0.34f : (survivorShot ? 0.12f : 0.62f),
 					projectile.charged ? 0.08f : (survivorShot ? 0.10f : 0.94f),
 					projectile.charged ? 0.70f : 0.42f);
-				m_ModelLibrary.Draw(m_Renderer,
-					projectile.charged || survivorShot ? "charged_bullet" : "pulse_bullet",
-					bullet.x,
-					bullet.y,
-					1.0f);
+				DrawProjectileVisual(m_Renderer, projectile, bullet.x, bullet.y, projectileAngle);
 			});
 	}
 
