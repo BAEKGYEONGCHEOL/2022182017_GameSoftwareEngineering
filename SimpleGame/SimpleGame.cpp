@@ -15,6 +15,7 @@ Game* g_Game = NULL;
 int g_PreviousTime = 0;
 float g_Accumulator = 0.0f;
 const float FixedStep = 1.0f / 60.0f;
+const unsigned int MaximumFixedUpdatesPerIdle = 4;
 } // namespace
 
 void RenderScene()
@@ -41,18 +42,23 @@ void Idle()
 	g_Accumulator += elapsedSeconds;
 
 	const std::chrono::steady_clock::time_point updateStart = std::chrono::steady_clock::now();
-	while (g_Accumulator >= FixedStep)
+	unsigned int fixedUpdateCount = 0;
+	while (g_Accumulator >= FixedStep && fixedUpdateCount < MaximumFixedUpdatesPerIdle)
 	{
 		if (g_Game != NULL)
 			g_Game->Update(FixedStep);
 		g_Accumulator -= FixedStep;
+		++fixedUpdateCount;
 	}
+	if (fixedUpdateCount == MaximumFixedUpdatesPerIdle && g_Accumulator >= FixedStep)
+		g_Accumulator = 0.0f;
 	const std::chrono::steady_clock::time_point updateEnd = std::chrono::steady_clock::now();
 	if (g_Renderer != NULL)
 	{
 		double updateTimeMs =
 			std::chrono::duration<double, std::milli>(updateEnd - updateStart).count();
 		g_Renderer->SetUpdateTimeMs(updateTimeMs);
+		g_Renderer->SetFixedUpdateCount(fixedUpdateCount);
 	}
 	glutPostRedisplay();
 }

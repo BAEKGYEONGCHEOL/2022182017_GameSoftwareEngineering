@@ -24,6 +24,15 @@ class PrototypeRenderer
 	int Height() const;
 	unsigned int DrawCallCount() const;
 	void SetUpdateTimeMs(double updateTimeMs);
+	void SetFixedUpdateCount(unsigned int fixedUpdateCount);
+	void SetGameUpdateMetrics(double enemyAiMs,
+		double survivorAiMs,
+		double projectileCollisionMs,
+		double monitoringJsonMs,
+		unsigned int monitoringPayloadBytes,
+		unsigned int activeProjectiles,
+		unsigned int activeEnemies,
+		unsigned int activeSurvivors);
 	void SetSwapTimeMs(double swapTimeMs);
 	void SetSceneMetrics(unsigned int visibleActors,
 		unsigned int culledActors,
@@ -112,6 +121,15 @@ class PrototypeRenderer
 	unsigned long long m_FrameNumber;
 	unsigned long long m_LastLogFrame;
 	double m_UpdateTimeMs;
+	double m_EnemyAiTimeMs;
+	double m_SurvivorAiTimeMs;
+	double m_ProjectileCollisionTimeMs;
+	double m_MonitoringJsonTimeMs;
+	unsigned int m_FixedUpdateCount;
+	unsigned int m_MonitoringPayloadBytes;
+	unsigned int m_ActiveProjectiles;
+	unsigned int m_ActiveEnemies;
+	unsigned int m_ActiveSurvivors;
 	double m_SwapTimeMs;
 	double m_LastGpuTimeMs;
 	double m_SceneTransformTimeMs;

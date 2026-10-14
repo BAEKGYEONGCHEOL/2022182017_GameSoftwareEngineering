@@ -199,6 +199,8 @@ class Game
 	std::vector<std::wstring> ObjectiveLines() const;
 	std::wstring InteractionText() const;
 	std::string BuildMonitoringJson() const;
+	std::string BuildMonitoringMapJson() const;
+	void RebuildMonitoringMapCache();
 	void PublishMonitoringState(float deltaSeconds, bool force = false);
 	Actor* CreateSceneActor(const std::string& name,
 		float x,
@@ -226,6 +228,13 @@ class Game
 	LocalMonitoringServer* m_MonitoringServer;
 	float m_MonitoringPublishTimer;
 	unsigned int m_MonitoringSequence;
+	unsigned int m_MonitoringMapRevision;
+	std::string m_MonitoringMapJson;
+	double m_EnemyAiTimeMs;
+	double m_SurvivorAiTimeMs;
+	double m_ProjectileCollisionTimeMs;
+	double m_MonitoringJsonTimeMs;
+	unsigned int m_MonitoringPayloadBytes;
 	GameMode m_Mode;
 	QuestStage m_Quest;
 	bool m_Paused;

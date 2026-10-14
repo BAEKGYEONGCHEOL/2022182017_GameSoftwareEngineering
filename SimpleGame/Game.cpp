@@ -2,6 +2,7 @@
 #include "Game.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 #include <ctime>
@@ -327,11 +328,20 @@ Game::Game(PrototypeRenderer* renderer)
 	: m_Renderer(renderer),
 	  m_MonitoringServer(new LocalMonitoringServer()),
 	  m_MonitoringPublishTimer(0.0f),
-	  m_MonitoringSequence(0)
+	  m_MonitoringSequence(0),
+	  m_MonitoringMapRevision(0),
+	  m_EnemyAiTimeMs(0.0),
+	  m_SurvivorAiTimeMs(0.0),
+	  m_ProjectileCollisionTimeMs(0.0),
+	  m_MonitoringJsonTimeMs(0.0),
+	  m_MonitoringPayloadBytes(0)
 {
 	Reset();
 	if (m_MonitoringServer->Start(8787))
+	{
+		m_MonitoringServer->SetMapJson(m_MonitoringMapJson);
 		PublishMonitoringState(0.0f, true);
+	}
 }
 
 Game::~Game()
@@ -457,6 +467,7 @@ void Game::Reset()
 	m_Asteroids.push_back({{-175.0f, 355.0f}, {43.0f, -11.0f}, 22.0f, 2.2f, 0.60f});
 	m_Asteroids.push_back({{145.0f, 455.0f}, {-34.0f, -7.0f}, 28.0f, 0.7f, -0.48f});
 	m_Asteroids.push_back({{-120.0f, 565.0f}, {29.0f, -13.0f}, 20.0f, 1.8f, 0.72f});
+	RebuildMonitoringMapCache();
 }
 
 void Game::Resize(int width, int height)
@@ -502,6 +513,11 @@ void Game::MouseButton(int button, int state)
 
 void Game::Update(float deltaSeconds)
 {
+	m_EnemyAiTimeMs = 0.0;
+	m_SurvivorAiTimeMs = 0.0;
+	m_ProjectileCollisionTimeMs = 0.0;
+	m_MonitoringJsonTimeMs = 0.0;
+	m_MonitoringPayloadBytes = 0;
 	deltaSeconds = Clamp(deltaSeconds, 0.0f, 0.05f);
 	if (m_KeyPressed[27])
 		m_Paused = !m_Paused;
@@ -594,6 +610,24 @@ void Game::Update(float deltaSeconds)
 	}
 
 	PublishMonitoringState(deltaSeconds);
+	unsigned int activeEnemyCount = 0;
+	for (size_t index = 0; index < m_Enemies.size(); ++index)
+		if (m_Enemies[index].active && m_Enemies[index].health > 0)
+			++activeEnemyCount;
+	const std::vector<LevelSurvivor>& activeSurvivorSet =
+		m_Mode == FirstLevel ? m_LevelSurvivors : m_TutorialSurvivors;
+	unsigned int activeSurvivorCount = 0;
+	for (size_t index = 0; index < activeSurvivorSet.size(); ++index)
+		if (activeSurvivorSet[index].health > 0.0f)
+			++activeSurvivorCount;
+	m_Renderer->SetGameUpdateMetrics(m_EnemyAiTimeMs,
+		m_SurvivorAiTimeMs,
+		m_ProjectileCollisionTimeMs,
+		m_MonitoringJsonTimeMs,
+		m_MonitoringPayloadBytes,
+		static_cast<unsigned int>(m_Projectiles.size()),
+		activeEnemyCount,
+		activeSurvivorCount);
 
 	std::memset(m_KeyPressed, 0, sizeof(m_KeyPressed));
 	m_MousePressed = false;
@@ -646,9 +680,18 @@ void Game::UpdateOnFoot(float deltaSeconds)
 
 	if (m_MousePressed)
 		HandleAttack();
+	const std::chrono::steady_clock::time_point enemyStart = std::chrono::steady_clock::now();
 	UpdateEnemies(deltaSeconds);
+	const std::chrono::steady_clock::time_point survivorStart = std::chrono::steady_clock::now();
 	UpdateLevelSurvivors(deltaSeconds);
+	const std::chrono::steady_clock::time_point projectileStart = std::chrono::steady_clock::now();
 	UpdateProjectiles(deltaSeconds);
+	const std::chrono::steady_clock::time_point projectileEnd = std::chrono::steady_clock::now();
+	m_EnemyAiTimeMs = std::chrono::duration<double, std::milli>(survivorStart - enemyStart).count();
+	m_SurvivorAiTimeMs =
+		std::chrono::duration<double, std::milli>(projectileStart - survivorStart).count();
+	m_ProjectileCollisionTimeMs =
+		std::chrono::duration<double, std::milli>(projectileEnd - projectileStart).count();
 	if (m_KeyPressed['e'] || m_KeyPressed['E'])
 		HandleInteraction();
 	if ((m_KeyPressed['r'] || m_KeyPressed['R']) && m_Quest != InspectTerminal &&
@@ -814,9 +857,18 @@ void Game::UpdateFirstLevel(float deltaSeconds)
 	if (m_MousePressed)
 		HandleAttack();
 
+	const std::chrono::steady_clock::time_point enemyStart = std::chrono::steady_clock::now();
 	UpdateEnemies(deltaSeconds);
+	const std::chrono::steady_clock::time_point survivorStart = std::chrono::steady_clock::now();
 	UpdateLevelSurvivors(deltaSeconds);
+	const std::chrono::steady_clock::time_point projectileStart = std::chrono::steady_clock::now();
 	UpdateProjectiles(deltaSeconds);
+	const std::chrono::steady_clock::time_point projectileEnd = std::chrono::steady_clock::now();
+	m_EnemyAiTimeMs = std::chrono::duration<double, std::milli>(survivorStart - enemyStart).count();
+	m_SurvivorAiTimeMs =
+		std::chrono::duration<double, std::milli>(projectileStart - survivorStart).count();
+	m_ProjectileCollisionTimeMs =
+		std::chrono::duration<double, std::milli>(projectileEnd - projectileStart).count();
 	ApplyStatInput();
 
 	if ((m_KeyPressed['r'] || m_KeyPressed['R']) && m_LevelWeaponCollected && m_ReloadTimer <= 0.0f)
@@ -1092,6 +1144,7 @@ void Game::GenerateFirstLevel()
 			0.0f,
 			corridorPatrols[patrolIndex],
 			static_cast<float>(patrolIndex) * 0.73f});
+	RebuildMonitoringMapCache();
 }
 
 bool Game::IsFirstLevelConnected(const std::vector<int>& tiles) const
@@ -2323,7 +2376,8 @@ std::string Game::BuildMonitoringJson() const
 
 	std::ostringstream json;
 	json << std::fixed << std::setprecision(2);
-	json << "{\"schemaVersion\":2,\"sequence\":" << m_MonitoringSequence
+	json << "{\"schemaVersion\":3,\"sequence\":" << m_MonitoringSequence
+		 << ",\"mapRevision\":" << m_MonitoringMapRevision
 		 << ",\"gameMode\":" << JsonString(modeName)
 		 << ",\"currentRegion\":" << JsonString(currentRegion)
 		 << ",\"regions\":[";
@@ -2374,7 +2428,9 @@ std::string Game::BuildMonitoringJson() const
 	for (size_t index = 0; index < m_TutorialSurvivors.size(); ++index)
 	{
 		const LevelSurvivor& npc = m_TutorialSurvivors[index];
-		const char* state = npc.health <= 0.0f ? "dead" : (npc.confused ? "panic" : (npc.fear >= 60.0f ? "frightened" : "stable"));
+		const char* state = npc.health <= 0.0f
+			? "dead"
+			: (npc.confused ? "panic" : (npc.fear >= 0.60f ? "frightened" : "stable"));
 		appendNpc("noctis_survivor_" + std::to_string(index),
 			SurvivorRoleName(npc.pattern), "noctis", state, npc.health, 3.0f, npc.fear, npc.armed, npc.squadId, npc.position);
 	}
@@ -2389,7 +2445,9 @@ std::string Game::BuildMonitoringJson() const
 	for (size_t index = 0; index < m_LevelSurvivors.size(); ++index)
 	{
 		const LevelSurvivor& npc = m_LevelSurvivors[index];
-		const char* state = npc.health <= 0.0f ? "dead" : (npc.confused ? "panic" : (npc.fear >= 60.0f ? "frightened" : "stable"));
+		const char* state = npc.health <= 0.0f
+			? "dead"
+			: (npc.confused ? "panic" : (npc.fear >= 0.60f ? "frightened" : "stable"));
 		appendNpc("erebus_survivor_" + std::to_string(index),
 			SurvivorRoleName(npc.pattern), "erebus", state, npc.health, 3.0f, npc.fear, npc.armed, npc.squadId, npc.position);
 	}
@@ -2405,7 +2463,7 @@ std::string Game::BuildMonitoringJson() const
 		firstMob = false;
 		json << "{\"id\":" << JsonString(std::string(erebusGenerated ? "erebus_void_" : "noctis_void_") + std::to_string(index))
 			 << ",\"region\":" << JsonString(erebusGenerated ? "erebus" : "noctis")
-			 << ",\"health\":" << enemy.health << ",\"maxHealth\":2"
+			 << ",\"health\":" << enemy.health << ",\"maxHealth\":" << (erebusGenerated ? 3 : 2)
 			 << ",\"position\":{\"x\":" << enemy.position.x << ",\"y\":" << enemy.position.y << "}}";
 	}
 	json << "],\"objects\":[";
@@ -2448,7 +2506,16 @@ std::string Game::BuildMonitoringJson() const
 			if (!m_MagazinePickups[index].collected)
 				appendObject("erebus_magazine_" + std::to_string(index), L"예비 탄창", "erebus", "pickup", m_MagazinePickups[index].position);
 	}
-	json << "],\"terrain\":{\"noctis\":[";
+	json << "]}";
+	return json.str();
+}
+
+std::string Game::BuildMonitoringMapJson() const
+{
+	std::ostringstream json;
+	json << std::fixed << std::setprecision(2);
+	json << "{\"schemaVersion\":3,\"mapRevision\":" << m_MonitoringMapRevision
+		 << ",\"terrain\":{\"noctis\":[";
 	bool firstTerrainTile = true;
 	for (int tileY = -22; tileY <= 22; ++tileY)
 	{
@@ -2482,6 +2549,14 @@ std::string Game::BuildMonitoringJson() const
 	return json.str();
 }
 
+void Game::RebuildMonitoringMapCache()
+{
+	++m_MonitoringMapRevision;
+	m_MonitoringMapJson = BuildMonitoringMapJson();
+	if (m_MonitoringServer != NULL && m_MonitoringServer->IsRunning())
+		m_MonitoringServer->SetMapJson(m_MonitoringMapJson);
+}
+
 void Game::PublishMonitoringState(float deltaSeconds, bool force)
 {
 	if (m_MonitoringServer == NULL || !m_MonitoringServer->IsRunning())
@@ -2491,7 +2566,13 @@ void Game::PublishMonitoringState(float deltaSeconds, bool force)
 		return;
 	m_MonitoringPublishTimer = 0.0f;
 	++m_MonitoringSequence;
-	m_MonitoringServer->SetStateJson(BuildMonitoringJson());
+	const std::chrono::steady_clock::time_point buildStart = std::chrono::steady_clock::now();
+	const std::string stateJson = BuildMonitoringJson();
+	const std::chrono::steady_clock::time_point buildEnd = std::chrono::steady_clock::now();
+	m_MonitoringJsonTimeMs =
+		std::chrono::duration<double, std::milli>(buildEnd - buildStart).count();
+	m_MonitoringPayloadBytes = static_cast<unsigned int>(stateJson.size());
+	m_MonitoringServer->SetStateJson(stateJson);
 }
 
 std::wstring Game::InteractionText() const

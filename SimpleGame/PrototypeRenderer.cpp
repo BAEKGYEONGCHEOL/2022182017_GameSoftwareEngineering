@@ -54,6 +54,15 @@ PrototypeRenderer::PrototypeRenderer(int width, int height)
 	, m_FrameNumber(0)
 	, m_LastLogFrame(0)
 	, m_UpdateTimeMs(0.0)
+	, m_EnemyAiTimeMs(0.0)
+	, m_SurvivorAiTimeMs(0.0)
+	, m_ProjectileCollisionTimeMs(0.0)
+	, m_MonitoringJsonTimeMs(0.0)
+	, m_FixedUpdateCount(0)
+	, m_MonitoringPayloadBytes(0)
+	, m_ActiveProjectiles(0)
+	, m_ActiveEnemies(0)
+	, m_ActiveSurvivors(0)
 	, m_SwapTimeMs(0.0)
 	, m_LastGpuTimeMs(0.0)
 	, m_SceneTransformTimeMs(0.0)
@@ -69,8 +78,11 @@ PrototypeRenderer::PrototypeRenderer(int width, int height)
 	m_ProfileLog.open("PerformanceProfile.log", std::ios::out | std::ios::trunc);
 	if (m_ProfileLog.is_open())
 	{
-		m_ProfileLog << "PERF_SCHEMA version=1 units=time_ms,count,bytes "
-						"keys=frame,fps,frame_ms,cpu_update_ms,cpu_render_build_ms,cpu_swap_ms,"
+		m_ProfileLog << "PERF_SCHEMA version=2 units=time_ms,count,bytes "
+						"keys=frame,fps,frame_ms,cpu_update_ms,fixed_updates,enemy_ai_ms,"
+						"survivor_ai_ms,projectile_collision_ms,monitoring_json_ms,"
+						"monitoring_payload_bytes,active_projectiles,active_enemies,"
+						"active_survivors,cpu_render_build_ms,cpu_swap_ms,"
 						"scene_transform_ms,scene_sort_ms,actor_render_ms,cpu_gpu_submit_ms,"
 						"gpu_frame_ms,draw_calls,batches,primitives,vertices,"
 						"text_batches,buffer_upload_bytes,visible_actors,culled_actors,"
@@ -152,7 +164,38 @@ unsigned int PrototypeRenderer::DrawCallCount() const
 
 void PrototypeRenderer::SetUpdateTimeMs(double updateTimeMs)
 {
-	m_UpdateTimeMs = updateTimeMs;
+	if (updateTimeMs > m_UpdateTimeMs)
+		m_UpdateTimeMs = updateTimeMs;
+}
+
+void PrototypeRenderer::SetFixedUpdateCount(unsigned int fixedUpdateCount)
+{
+	if (fixedUpdateCount > m_FixedUpdateCount)
+		m_FixedUpdateCount = fixedUpdateCount;
+}
+
+void PrototypeRenderer::SetGameUpdateMetrics(double enemyAiMs,
+	double survivorAiMs,
+	double projectileCollisionMs,
+	double monitoringJsonMs,
+	unsigned int monitoringPayloadBytes,
+	unsigned int activeProjectiles,
+	unsigned int activeEnemies,
+	unsigned int activeSurvivors)
+{
+	if (enemyAiMs > m_EnemyAiTimeMs)
+		m_EnemyAiTimeMs = enemyAiMs;
+	if (survivorAiMs > m_SurvivorAiTimeMs)
+		m_SurvivorAiTimeMs = survivorAiMs;
+	if (projectileCollisionMs > m_ProjectileCollisionTimeMs)
+		m_ProjectileCollisionTimeMs = projectileCollisionMs;
+	if (monitoringJsonMs > m_MonitoringJsonTimeMs)
+		m_MonitoringJsonTimeMs = monitoringJsonMs;
+	if (monitoringPayloadBytes > m_MonitoringPayloadBytes)
+		m_MonitoringPayloadBytes = monitoringPayloadBytes;
+	m_ActiveProjectiles = activeProjectiles;
+	m_ActiveEnemies = activeEnemies;
+	m_ActiveSurvivors = activeSurvivors;
 }
 
 void PrototypeRenderer::SetSwapTimeMs(double swapTimeMs)
@@ -611,6 +654,15 @@ void PrototypeRenderer::LogPerformance(
 	logLine << std::fixed << std::setprecision(2) << "PERF_FRAME"
 			<< " frame=" << m_FrameNumber << " fps=" << framesPerSecond
 			<< " frame_ms=" << frameTimeMs << " cpu_update_ms=" << m_UpdateTimeMs
+			<< " fixed_updates=" << m_FixedUpdateCount
+			<< " enemy_ai_ms=" << m_EnemyAiTimeMs
+			<< " survivor_ai_ms=" << m_SurvivorAiTimeMs
+			<< " projectile_collision_ms=" << m_ProjectileCollisionTimeMs
+			<< " monitoring_json_ms=" << m_MonitoringJsonTimeMs
+			<< " monitoring_payload_bytes=" << m_MonitoringPayloadBytes
+			<< " active_projectiles=" << m_ActiveProjectiles
+			<< " active_enemies=" << m_ActiveEnemies
+			<< " active_survivors=" << m_ActiveSurvivors
 			<< " cpu_render_build_ms=" << renderBuildMs << " cpu_swap_ms=" << m_SwapTimeMs
 			<< " scene_transform_ms=" << m_SceneTransformTimeMs
 			<< " scene_sort_ms=" << m_SceneSortTimeMs << " actor_render_ms=" << m_ActorRenderTimeMs
@@ -628,6 +680,13 @@ void PrototypeRenderer::LogPerformance(
 		m_ProfileLog.flush();
 	}
 	m_LastLogFrame = m_FrameNumber;
+	m_EnemyAiTimeMs = 0.0;
+	m_SurvivorAiTimeMs = 0.0;
+	m_ProjectileCollisionTimeMs = 0.0;
+	m_MonitoringJsonTimeMs = 0.0;
+	m_FixedUpdateCount = 0;
+	m_MonitoringPayloadBytes = 0;
+	m_UpdateTimeMs = 0.0;
 	m_LastLogTicks = currentTicks;
 }
 

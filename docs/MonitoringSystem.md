@@ -24,8 +24,9 @@ UTF-8 `application/json` 형식의 최신 게임 상태 스냅샷을 반환한�
 
 ```json
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "sequence": 42,
+  "mapRevision": 2,
   "gameMode": "erebus_level_1",
   "currentRegion": "erebus",
   "regions": [
@@ -54,7 +55,7 @@ UTF-8 `application/json` 형식의 최신 게임 상태 스냅샷을 반환한�
       "state": "panic",
       "health": 2.0,
       "maxHealth": 3.0,
-      "fear": 85.0,
+      "fear": 0.85,
       "armed": true,
       "squad": 1,
       "position": { "x": 4.5, "y": -8.0 }
@@ -65,7 +66,7 @@ UTF-8 `application/json` 형식의 최신 게임 상태 스냅샷을 반환한�
       "id": "erebus_void_0",
       "region": "erebus",
       "health": 2,
-      "maxHealth": 2,
+      "maxHealth": 3,
       "position": { "x": 10.0, "y": 4.0 }
     }
   ],
@@ -77,7 +78,18 @@ UTF-8 `application/json` 형식의 최신 게임 상태 스냅샷을 반환한�
       "type": "engine",
       "position": { "x": -32.0, "y": 18.0 }
     }
-  ],
+  ]
+}
+```
+
+### `GET /api/map`
+
+맵 생성 시 캐시한 정적 지형을 반환한다. 대시보드는 `/api/state`의 `mapRevision`이 변경된 경우에만 다시 요청한다.
+
+```json
+{
+  "schemaVersion": 3,
+  "mapRevision": 2,
   "terrain": {
     "noctis": [[-21, -21, 2], [-20, -21, 2]],
     "erebus": [[0, 0, 2], [1, 0, 1]]
@@ -132,7 +144,8 @@ UTF-8 `application/json` 형식의 최신 게임 상태 스냅샷을 반환한�
 
 ## 업데이트와 스레드 규칙
 
-- 게임 스레드는 0.1초마다 JSON 스냅샷을 생성한다.
+- 게임 스레드는 0.1초마다 지형을 제외한 동적 상태 JSON 스냅샷을 생성한다.
+- 정적 지형 JSON은 맵 생성 시 한 번 캐시하고 `mapRevision`이 변경될 때만 대시보드가 다시 가져간다.
 - HTTP 서버 스레드는 게임 객체를 직접 읽지 않고 뮤텍스로 보호된 JSON 복사본만 읽는다.
 - 브라우저 요청 처리 때문에 NPC AI, 입력 또는 렌더링 업데이트가 정지하지 않게 한다.
 - `schemaVersion`은 JSON 필드의 호환되지 않는 변경이 있을 때 증가시킨다.

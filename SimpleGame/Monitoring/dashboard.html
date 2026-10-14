@@ -60,8 +60,8 @@
     const escapeText = value => String(value ?? '');
     const statusNames = {current_secured:'현재 지역 · 안정',current_emergency:'현재 지역 · 비상',secured:'안정',emergency:'비상',unvisited:'미방문',current_contested:'현재 지역 · 교전 중',contested:'교전 중',current_reached:'현재 지역 · 도착'};
     const stateNames = {dead:'사망',panic:'공황',frightened:'공포',stable:'안정'};
-    let previousSnapshot=null, currentSnapshot=null, transitionStarted=0, minimapLayoutKey='', updateInFlight=false;
-    const minimapViews=new Map(), transitionDuration=120;
+    let previousSnapshot=null, currentSnapshot=null, mapSnapshot=null, transitionStarted=0, minimapLayoutKey='', updateInFlight=false;
+    const minimapViews=new Map(), transitionDuration=90;
     function appendHealthCell(row, current, maximum) {
       const cell = document.createElement('td');
       const max = Number(maximum) > 0 ? Number(maximum) : 1;
@@ -114,7 +114,14 @@
     }
     function renderMinimaps(data) {
       const regions=(data.regions || []).filter(region => region.mapAvailable && region.bounds);
-      const layoutKey=regions.map(region => { const tiles=(data.terrain && data.terrain[region.id]) || []; const first=tiles[0] || []; const last=tiles[tiles.length-1] || []; return `${region.id}:${tiles.length}:${first.join(',')}:${last.join(',')}`; }).join('|');
+      const terrainByRegion=(mapSnapshot && mapSnapshot.terrain) || {};
+      const stateMapRevision=Number(data.mapRevision) || 0;
+      const loadedMapRevision=Number(mapSnapshot && mapSnapshot.mapRevision) || 0;
+      if (loadedMapRevision !== stateMapRevision) return;
+      const layoutKey=`${stateMapRevision}:${loadedMapRevision}:`+regions.map(region => {
+        const tiles=terrainByRegion[region.id] || [];
+        return `${region.id}:${tiles.length}`;
+      }).join('|');
       if (layoutKey === minimapLayoutKey) return;
       minimapLayoutKey=layoutKey;
       const host=document.querySelector('#minimaps'); host.replaceChildren(); minimapViews.clear();
@@ -123,7 +130,7 @@
         const title=document.createElement('h3'); title.textContent=region.name;
         const canvas=document.createElement('canvas'); canvas.width=720; canvas.height=420;
         const background=document.createElement('canvas'); background.width=canvas.width; background.height=canvas.height;
-        const context=background.getContext('2d'); const bounds=region.bounds; const terrain=(data.terrain && data.terrain[region.id]) || [];
+        const context=background.getContext('2d'); const bounds=region.bounds; const terrain=terrainByRegion[region.id] || [];
         const projector=createIsometricProjector(terrain,bounds,canvas.width,canvas.height);
         context.fillStyle='#040b10'; context.fillRect(0,0,canvas.width,canvas.height);
         const orderedTerrain=[...terrain].sort((left,right)=>(left[0]+left[1])-(right[0]+right[1]));
@@ -169,7 +176,23 @@
     async function update() {
       if (updateInFlight) return;
       updateInFlight=true;
-      try { const response = await fetch('/api/state', {cache:'no-store'}); if (!response.ok) throw new Error(response.status); const next=await response.json(); previousSnapshot=currentSnapshot; currentSnapshot=next; transitionStarted=performance.now(); render(next); }
+      try {
+        const response=await fetch('/api/state',{cache:'no-store'});
+        if (!response.ok) throw new Error(response.status);
+        const next=await response.json();
+        if (!mapSnapshot || Number(mapSnapshot.mapRevision) !== Number(next.mapRevision)) {
+          const mapResponse=await fetch('/api/map',{cache:'no-store'});
+          if (!mapResponse.ok) throw new Error(mapResponse.status);
+          const nextMap=await mapResponse.json();
+          if (Number(nextMap.mapRevision) !== Number(next.mapRevision)) {
+            mapSnapshot=null;
+            throw new Error('map_revision_mismatch');
+          }
+          mapSnapshot=nextMap;
+          minimapLayoutKey='';
+        }
+        previousSnapshot=currentSnapshot; currentSnapshot=next; transitionStarted=performance.now(); render(next);
+      }
       catch (error) { const connection=document.querySelector('#connection'); connection.textContent='연결 끊김 · 재시도 중'; connection.className='connection'; }
       finally { updateInFlight=false; }
     }

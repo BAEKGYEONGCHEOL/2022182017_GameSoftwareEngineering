@@ -83,6 +83,7 @@ class LocalMonitoringServer::Implementation
 		: running(false), listenSocket(INVALID_SOCKET), winsockStarted(false), dashboardHtml(LoadDashboardHtml())
 	{
 		stateJson = "{\"schemaVersion\":1,\"status\":\"starting\",\"regions\":[],\"npcs\":[]}";
+		mapJson = "{\"schemaVersion\":1,\"mapRevision\":0,\"terrain\":{}}";
 	}
 
 	~Implementation()
@@ -187,6 +188,16 @@ class LocalMonitoringServer::Implementation
 			SendAll(client, HttpResponse("200 OK", "application/json; charset=utf-8", json, true));
 			return;
 		}
+		if (request.find("GET /api/map ") == 0)
+		{
+			std::string json;
+			{
+				std::lock_guard<std::mutex> lock(stateMutex);
+				json = mapJson;
+			}
+			SendAll(client, HttpResponse("200 OK", "application/json; charset=utf-8", json, true));
+			return;
+		}
 		if (request.find("GET / ") == 0 || request.find("GET /index.html ") == 0)
 		{
 			SendAll(client, HttpResponse("200 OK", "text/html; charset=utf-8", dashboardHtml, true));
@@ -202,6 +213,7 @@ class LocalMonitoringServer::Implementation
 	std::thread serverThread;
 	std::mutex stateMutex;
 	std::string stateJson;
+	std::string mapJson;
 	std::string dashboardHtml;
 };
 
@@ -229,6 +241,12 @@ void LocalMonitoringServer::SetStateJson(const std::string& stateJson)
 {
 	std::lock_guard<std::mutex> lock(m_Implementation->stateMutex);
 	m_Implementation->stateJson = stateJson;
+}
+
+void LocalMonitoringServer::SetMapJson(const std::string& mapJson)
+{
+	std::lock_guard<std::mutex> lock(m_Implementation->stateMutex);
+	m_Implementation->mapJson = mapJson;
 }
 
 bool LocalMonitoringServer::IsRunning() const
