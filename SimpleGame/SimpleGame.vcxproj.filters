@@ -16,6 +16,9 @@
     <Filter Include="소스 파일\Shaders">
       <UniqueIdentifier>{aa86e47f-445f-4440-9a76-173363b46c4e}</UniqueIdentifier>
     </Filter>
+	<Filter Include="소스 파일\Levels">
+	  <UniqueIdentifier>{f9b3d0d4-4b69-4c18-9e48-379e54eb63c1}</UniqueIdentifier>
+	</Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -61,6 +64,12 @@
     </ClCompile>
 	<ClCompile Include="Game.cpp">
 	  <Filter>소스 파일</Filter>
+	</ClCompile>
+	<ClCompile Include="Levels\GameFirstLevel.cpp">
+	  <Filter>소스 파일\Levels</Filter>
+	</ClCompile>
+	<ClCompile Include="Levels\GameTutorial.cpp">
+	  <Filter>소스 파일\Levels</Filter>
 	</ClCompile>
 	<ClCompile Include="LocalMonitoringServer.cpp">
 	  <Filter>소스 파일</Filter>

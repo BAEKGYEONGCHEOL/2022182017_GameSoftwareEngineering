@@ -173,6 +173,8 @@
 	<ItemGroup>
 	<ClCompile Include="Actor.cpp" />
 	<ClCompile Include="Game.cpp" />
+	<ClCompile Include="Levels\GameFirstLevel.cpp" />
+	<ClCompile Include="Levels\GameTutorial.cpp" />
 	<ClCompile Include="LocalMonitoringServer.cpp" />
 	<ClCompile Include="ModelLibrary.cpp" />
 	<ClCompile Include="PrototypeRenderer.cpp" />
