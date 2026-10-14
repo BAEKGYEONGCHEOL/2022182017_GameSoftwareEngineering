@@ -404,6 +404,12 @@ void Game::Reset()
 	m_FirstLevelSize = 127;
 	m_LevelSeed = static_cast<unsigned int>(std::time(NULL));
 	m_FirstLevelTiles.clear();
+	m_FirstLevelFloorVisuals.clear();
+	m_FirstLevelWallVisuals.clear();
+	m_LevelCorpses.clear();
+	m_StoryDocuments.clear();
+	m_LevelSurvivors.clear();
+	m_MagazinePickups.clear();
 	if (!m_ModelLibrary.IsLoaded())
 		m_ModelLibrary.Load();
 	m_ShipPosition = {0.0f, 0.0f};
@@ -1882,8 +1888,62 @@ void Game::RebuildMonitoringMapCache()
 {
 	++m_MonitoringMapRevision;
 	m_MonitoringMapJson = BuildMonitoringMapJson();
+	RebuildGameplayMinimapCache();
 	if (m_MonitoringServer != NULL && m_MonitoringServer->IsRunning())
 		m_MonitoringServer->SetMapJson(m_MonitoringMapJson);
+}
+
+void Game::RebuildGameplayMinimapCache()
+{
+	m_TutorialMinimapTiles.clear();
+	for (int cellY = -22; cellY <= 22; cellY += 2)
+	{
+		for (int cellX = -22; cellX <= 22; cellX += 2)
+		{
+			bool walkable = false;
+			for (int offsetY = 0; offsetY < 2 && !walkable; ++offsetY)
+				for (int offsetX = 0; offsetX < 2 && !walkable; ++offsetX)
+					walkable = IsTutorialFloor(
+						static_cast<float>(cellX + offsetX), static_cast<float>(cellY + offsetY));
+			if (walkable)
+				m_TutorialMinimapTiles.push_back(
+					{{static_cast<float>(cellX) + 0.5f, static_cast<float>(cellY) + 0.5f}, 1, 0.0f});
+		}
+	}
+
+	m_FirstLevelMinimapTiles.clear();
+	const int cellSize = 5;
+	const int halfSize = m_FirstLevelSize / 2;
+	const int cellCount = (m_FirstLevelSize + cellSize - 1) / cellSize;
+	std::vector<int> occupiedCells(static_cast<size_t>(cellCount * cellCount), 0);
+	std::vector<int> roomCells(static_cast<size_t>(cellCount * cellCount), 0);
+	for (size_t index = 0; index < m_FirstLevelFloorVisuals.size(); ++index)
+	{
+		const MapVisualTile& tile = m_FirstLevelFloorVisuals[index];
+		const int tileX = static_cast<int>(tile.position.x) + halfSize;
+		const int tileY = static_cast<int>(tile.position.y) + halfSize;
+		const int cellX = tileX / cellSize;
+		const int cellY = tileY / cellSize;
+		if (cellX < 0 || cellX >= cellCount || cellY < 0 || cellY >= cellCount)
+			continue;
+		const size_t cellIndex = static_cast<size_t>(cellY * cellCount + cellX);
+		occupiedCells[cellIndex] = 1;
+		if (tile.type == 2)
+			roomCells[cellIndex] = 1;
+	}
+	for (int cellY = 0; cellY < cellCount; ++cellY)
+	{
+		for (int cellX = 0; cellX < cellCount; ++cellX)
+		{
+			const size_t cellIndex = static_cast<size_t>(cellY * cellCount + cellX);
+			if (occupiedCells[cellIndex] == 0)
+				continue;
+			const float worldX = static_cast<float>(cellX * cellSize - halfSize) + 2.0f;
+			const float worldY = static_cast<float>(cellY * cellSize - halfSize) + 2.0f;
+			m_FirstLevelMinimapTiles.push_back(
+				{{worldX, worldY}, roomCells[cellIndex] != 0 ? 2 : 1, 0.0f});
+		}
+	}
 }
 
 void Game::PublishMonitoringState(float deltaSeconds, bool force)
@@ -3610,6 +3670,8 @@ void Game::RenderInterface()
 			optional ? 0.76f : 0.94f,
 			1.0f);
 	}
+	if (m_Mode == OnFoot || m_Mode == FirstLevel)
+		RenderGameplayMinimap();
 
 	if (m_Mode == OnFoot || m_Mode == FirstLevel)
 	{
@@ -3934,4 +3996,144 @@ void Game::RenderInterface()
 		m_Renderer->DrawString(
 			-72.0f, height * 0.27f - 34.0f, L"R 키로 다시 시작", 0.48f, 0.65f, 0.70f, 1.0f);
 	}
+}
+
+void Game::RenderGameplayMinimap()
+{
+	const int screenWidth = m_Renderer->Width();
+	const int screenHeight = m_Renderer->Height();
+	const float centerX = screenWidth * 0.5f - 145.0f;
+	const float centerY = screenHeight * 0.5f - 124.0f;
+	const float panelWidth = 258.0f;
+	const float panelHeight = 190.0f;
+	const float mapHalfWidth = 111.0f;
+	const float mapHalfHeight = 72.0f;
+	const float worldHalfSize = m_Mode == FirstLevel ? 64.0f : 22.0f;
+
+	m_Renderer->DrawDiamond(
+		centerX, centerY, panelWidth + 8.0f, panelHeight + 8.0f, 0.10f, 0.42f, 0.50f, 0.78f);
+	m_Renderer->DrawDiamond(
+		centerX, centerY, panelWidth, panelHeight, 0.012f, 0.028f, 0.040f, 0.95f);
+	m_Renderer->DrawString(centerX - 118.0f,
+		centerY + 91.0f,
+		m_Mode == FirstLevel ? L"에레보스 전술 지도" : L"노크티스 전술 지도",
+		0.52f,
+		0.88f,
+		0.94f,
+		1.0f);
+
+	auto project = [centerX, centerY, mapHalfWidth, mapHalfHeight, worldHalfSize](
+		const WorldPoint& point)
+	{
+		const float isoX = point.x - point.y;
+		const float isoY = (point.x + point.y) * 0.5f;
+		return ScreenPoint{centerX + isoX / (worldHalfSize * 2.0f) * mapHalfWidth,
+			centerY + isoY / worldHalfSize * mapHalfHeight};
+	};
+	auto drawMarker = [this, &project](
+		const WorldPoint& point, float size, float red, float green, float blue, float alpha)
+	{
+		const ScreenPoint marker = project(point);
+		m_Renderer->DrawDiamond(marker.x, marker.y, size, size * 0.68f, red, green, blue, alpha);
+	};
+
+	const std::vector<MapVisualTile>& terrain =
+		m_Mode == FirstLevel ? m_FirstLevelMinimapTiles : m_TutorialMinimapTiles;
+	const float terrainWidth = m_Mode == FirstLevel ? 7.5f : 10.0f;
+	const float terrainHeight = m_Mode == FirstLevel ? 3.8f : 5.0f;
+	for (size_t index = 0; index < terrain.size(); ++index)
+	{
+		const MapVisualTile& tile = terrain[index];
+		const ScreenPoint position = project(tile.position);
+		m_Renderer->DrawDiamond(position.x,
+			position.y,
+			terrainWidth,
+			terrainHeight,
+			tile.type == 2 ? 0.13f : 0.08f,
+			tile.type == 2 ? 0.30f : 0.22f,
+			tile.type == 2 ? 0.36f : 0.28f,
+			0.92f);
+	}
+
+	const std::vector<LevelSurvivor>& survivors =
+		m_Mode == FirstLevel ? m_LevelSurvivors : m_TutorialSurvivors;
+	for (size_t index = 0; index < survivors.size(); ++index)
+	{
+		const LevelSurvivor& survivor = survivors[index];
+		if (survivor.health <= 0.0f)
+			drawMarker(survivor.position, 6.0f, 0.34f, 0.38f, 0.40f, 0.88f);
+		else if (survivor.confused)
+			drawMarker(survivor.position, 7.0f, 1.0f, 0.48f, 0.18f, 1.0f);
+		else
+			drawMarker(survivor.position, 6.5f, 0.34f, 0.90f, 0.58f, 1.0f);
+	}
+	if (m_Mode == OnFoot)
+	{
+		for (size_t index = 0; index < m_NeutralNpcs.size(); ++index)
+		{
+			const NeutralNpc& npc = m_NeutralNpcs[index];
+			drawMarker(npc.position,
+				6.0f,
+				0.34f,
+				npc.dead ? 0.38f : 0.90f,
+				npc.dead ? 0.40f : 0.58f,
+				0.90f);
+		}
+	}
+
+	for (size_t index = 0; index < m_Enemies.size(); ++index)
+	{
+		const Enemy& enemy = m_Enemies[index];
+		if (enemy.active && enemy.health > 0)
+			drawMarker(enemy.position, 7.5f, 0.78f, 0.28f, 1.0f, 1.0f);
+	}
+
+	if (m_Mode == OnFoot)
+	{
+		for (size_t index = 0; index < 3; ++index)
+			drawMarker(TutorialRecordPositions[index],
+				6.0f,
+				m_TutorialRecordsRead[index] ? 0.38f : 1.0f,
+				m_TutorialRecordsRead[index] ? 0.42f : 0.78f,
+				0.18f,
+				0.95f);
+		if (m_Quest == InspectTerminal)
+			drawMarker(TerminalPosition, 8.0f, 0.20f, 0.72f, 0.92f, 1.0f);
+		if (m_Quest == CollectTutorialWeapon)
+			drawMarker(TutorialWeaponPosition, 8.0f, 1.0f, 0.78f, 0.18f, 1.0f);
+		if (!m_CoreRecovered)
+			drawMarker(CorePosition, 9.0f, 1.0f, 0.36f, 0.18f, 1.0f);
+		if (m_CoreRecovered && !m_SignalChecked)
+			drawMarker(SignalPosition, 8.0f, 0.86f, 0.34f, 0.94f, 1.0f);
+		if (m_Quest == ReturnToCockpit)
+			drawMarker(CockpitPosition, 9.0f, 0.20f, 0.82f, 0.94f, 1.0f);
+	}
+	else
+	{
+		for (size_t index = 0; index < m_StoryDocuments.size(); ++index)
+			drawMarker(m_StoryDocuments[index].position,
+				6.0f,
+				m_StoryDocuments[index].read ? 0.38f : 1.0f,
+				m_StoryDocuments[index].read ? 0.42f : 0.78f,
+				0.18f,
+				0.95f);
+		for (size_t index = 0; index < m_MagazinePickups.size(); ++index)
+			if (!m_MagazinePickups[index].collected)
+				drawMarker(m_MagazinePickups[index].position, 6.5f, 0.20f, 0.76f, 0.94f, 1.0f);
+		for (int engineIndex = 0; engineIndex < 4; ++engineIndex)
+			if (!m_LevelEngineActive[engineIndex])
+				drawMarker(m_LevelEnginePositions[engineIndex], 8.0f, 1.0f, 0.58f, 0.16f, 1.0f);
+		drawMarker(m_LevelControlPosition, 9.0f, 0.22f, 0.84f, 0.94f, 1.0f);
+		if (!m_LevelWeaponCollected)
+			drawMarker(FirstLevelWeaponPosition, 8.0f, 1.0f, 0.78f, 0.18f, 1.0f);
+	}
+
+	drawMarker(m_Player, 10.0f, 0.22f, 0.92f, 1.0f, 1.0f);
+	m_Renderer->DrawString(centerX - 118.0f,
+		centerY - 97.0f,
+		L"청록:플레이어  녹색:NPC  보라:공허종  노랑:목표",
+		0.58f,
+		0.70f,
+		0.76f,
+		0.90f);
 }

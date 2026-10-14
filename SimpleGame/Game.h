@@ -202,6 +202,7 @@ class Game
 	std::string BuildMonitoringMapJson() const;
 	void RebuildMonitoringMapCache();
 	void PublishMonitoringState(float deltaSeconds, bool force = false);
+	void RebuildGameplayMinimapCache();
 	Actor* CreateSceneActor(const std::string& name,
 		float x,
 		float y,
@@ -216,6 +217,7 @@ class Game
 	void RenderDestination();
 	void RenderFirstLevel();
 	void RenderInterface();
+	void RenderGameplayMinimap();
 	void DrawWorldBlock(const Obstacle& obstacle);
 	void DrawCharacter(const WorldPoint& point, float r, float g, float b, bool enemy);
 	void DrawNeutralNpc(const NeutralNpc& npc);
@@ -283,6 +285,8 @@ class Game
 	std::vector<int> m_FirstLevelTiles;
 	std::vector<MapVisualTile> m_FirstLevelFloorVisuals;
 	std::vector<WorldPoint> m_FirstLevelWallVisuals;
+	std::vector<MapVisualTile> m_TutorialMinimapTiles;
+	std::vector<MapVisualTile> m_FirstLevelMinimapTiles;
 	std::vector<WorldPoint> m_LevelCorpses;
 	std::vector<StoryDocument> m_StoryDocuments;
 	std::vector<LevelSurvivor> m_LevelSurvivors;
