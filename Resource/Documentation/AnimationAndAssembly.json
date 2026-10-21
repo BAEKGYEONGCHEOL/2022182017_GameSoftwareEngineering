@@ -1,0 +1,84 @@
+{
+  "pack": "DarkSciFi_Modular_v1_1",
+  "units": "meters",
+  "fps": 30,
+  "forward_axis": "-Y",
+  "up_axis": "+Z",
+  "humanoid": {
+    "rig": "RIG_Humanoid_7Head",
+    "height_m": 1.82,
+    "socket_standard": "HUM_v1",
+    "animations": {
+      "walk": {
+        "action": "HUM_Walk_Loop",
+        "loop": true,
+        "blend_in_frames": 5,
+        "blend_out_frames": 5
+      },
+      "run": {
+        "action": "HUM_Run_Loop",
+        "loop": true,
+        "blend_in_frames": 5,
+        "blend_out_frames": 5
+      },
+      "turn_left": "HUM_Turn_Left_90",
+      "turn_right": "HUM_Turn_Right_90",
+      "attack": "HUM_Attack_Melee",
+      "jump": "HUM_Jump",
+      "walk_to_run": {
+        "action": "HUM_Walk_To_Run",
+        "then": "HUM_Run_Loop"
+      },
+      "run_to_walk": {
+        "action": "HUM_Run_To_Walk",
+        "then": "HUM_Walk_Loop"
+      },
+      "directional_pose_blend": [
+        "HUM_Pose_Turn_Neg45",
+        "HUM_Pose_Turn_Zero",
+        "HUM_Pose_Turn_Pos45"
+      ]
+    },
+    "recommended_layers": [
+      "locomotion base",
+      "directional pose additive",
+      "upper-body attack override"
+    ]
+  },
+  "void_quadruped": {
+    "rig": "RIG_Void_Quadruped",
+    "socket_standard": "VOID_v1",
+    "animations": {
+      "walk": {
+        "action": "VOID_Walk_Loop",
+        "loop": true
+      },
+      "run": {
+        "action": "VOID_Run_Loop",
+        "loop": true
+      },
+      "turn_left": "VOID_Turn_Left_90",
+      "turn_right": "VOID_Turn_Right_90",
+      "attack": "VOID_Attack_Pounce",
+      "jump": "VOID_Jump",
+      "walk_to_run": "VOID_Walk_To_Run",
+      "run_to_walk": "VOID_Run_To_Walk",
+      "directional_pose_blend": [
+        "VOID_Pose_Turn_Neg45",
+        "VOID_Pose_Turn_Zero",
+        "VOID_Pose_Turn_Pos45"
+      ]
+    }
+  },
+  "modular_rules": {
+    "human": "Enable exactly one base head; face, helmet, chest armor and equipment are optional overlays. All HUM_v1 parts share the same skeleton and origin.",
+    "void": "Base body stays enabled; horn, eye cluster, heavy carapace and tail blade are swappable VOID_v1 overlays.",
+    "ship": "2 m wall modules and 2 m floor tiles snap on a 0.25 m grid."
+  },
+  "export_notes": [
+    "Apply no transforms to armatures before export.",
+    "Export deform bones only when supported.",
+    "Keep action names unchanged so the animation state map remains valid.",
+    "Procedural materials should be baked or replaced with engine PBR textures during integration."
+  ]
+}

@@ -1,0 +1,121 @@
+{
+  "status": "PASS",
+  "files": {
+    "DarkSciFi_ModularAssetPack.blend": {
+      "size_bytes": 265896,
+      "objects": 230,
+      "meshes": 224,
+      "armatures": 2,
+      "materials": 22,
+      "actions": 26,
+      "action_names": [
+        "HUM_Attack_Melee",
+        "HUM_Jump",
+        "HUM_Pose_Turn_Neg45",
+        "HUM_Pose_Turn_Pos45",
+        "HUM_Pose_Turn_Zero",
+        "HUM_Run_Loop",
+        "HUM_Run_To_Walk",
+        "HUM_Turn_Left_90",
+        "HUM_Turn_Right_90",
+        "HUM_Walk_Loop",
+        "HUM_Walk_To_Run",
+        "SPACE_Asteroid_A_DriftSpin",
+        "SPACE_Asteroid_B_DriftSpin",
+        "SPACE_Asteroid_C_DriftSpin",
+        "SPACE_Asteroid_D_DriftSpin",
+        "VOID_Attack_Pounce",
+        "VOID_Jump",
+        "VOID_Pose_Turn_Neg45",
+        "VOID_Pose_Turn_Pos45",
+        "VOID_Pose_Turn_Zero",
+        "VOID_Run_Loop",
+        "VOID_Run_To_Walk",
+        "VOID_Turn_Left_90",
+        "VOID_Turn_Right_90",
+        "VOID_Walk_Loop",
+        "VOID_Walk_To_Run"
+      ],
+      "skeletal_mesh_parts": 107,
+      "missing_required_actions": [],
+      "status": "PASS"
+    },
+    "Libraries/Humanoid_Modular.blend": {
+      "size_bytes": 125152,
+      "objects": 59,
+      "meshes": 58,
+      "armatures": 1,
+      "materials": 11,
+      "actions": 11,
+      "action_names": [
+        "HUM_Attack_Melee",
+        "HUM_Jump",
+        "HUM_Pose_Turn_Neg45",
+        "HUM_Pose_Turn_Pos45",
+        "HUM_Pose_Turn_Zero",
+        "HUM_Run_Loop",
+        "HUM_Run_To_Walk",
+        "HUM_Turn_Left_90",
+        "HUM_Turn_Right_90",
+        "HUM_Walk_Loop",
+        "HUM_Walk_To_Run"
+      ],
+      "skeletal_mesh_parts": 58,
+      "missing_required_actions": [],
+      "status": "PASS"
+    },
+    "Libraries/Void_Quadruped.blend": {
+      "size_bytes": 111655,
+      "objects": 50,
+      "meshes": 49,
+      "armatures": 1,
+      "materials": 5,
+      "actions": 11,
+      "action_names": [
+        "VOID_Attack_Pounce",
+        "VOID_Jump",
+        "VOID_Pose_Turn_Neg45",
+        "VOID_Pose_Turn_Pos45",
+        "VOID_Pose_Turn_Zero",
+        "VOID_Run_Loop",
+        "VOID_Run_To_Walk",
+        "VOID_Turn_Left_90",
+        "VOID_Turn_Right_90",
+        "VOID_Walk_Loop",
+        "VOID_Walk_To_Run"
+      ],
+      "skeletal_mesh_parts": 49,
+      "missing_required_actions": [],
+      "status": "PASS"
+    },
+    "Libraries/Ship_ModularKit.blend": {
+      "size_bytes": 120362,
+      "objects": 101,
+      "meshes": 101,
+      "armatures": 0,
+      "materials": 13,
+      "actions": 0,
+      "action_names": [],
+      "skeletal_mesh_parts": 0,
+      "missing_required_actions": [],
+      "status": "PASS"
+    },
+    "Libraries/Space_Asteroids.blend": {
+      "size_bytes": 77550,
+      "objects": 16,
+      "meshes": 16,
+      "armatures": 0,
+      "materials": 2,
+      "actions": 4,
+      "action_names": [
+        "SPACE_Asteroid_A_DriftSpin",
+        "SPACE_Asteroid_B_DriftSpin",
+        "SPACE_Asteroid_C_DriftSpin",
+        "SPACE_Asteroid_D_DriftSpin"
+      ],
+      "skeletal_mesh_parts": 0,
+      "missing_required_actions": [],
+      "status": "PASS"
+    }
+  }
+}
