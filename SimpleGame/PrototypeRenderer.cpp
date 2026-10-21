@@ -348,6 +348,18 @@ void PrototypeRenderer::DrawQuad(const ScreenPoint& a,
 	DrawVertices(vertices, 6, r, g, bColor, alpha);
 }
 
+void PrototypeRenderer::DrawTriangle(const ScreenPoint& a,
+	const ScreenPoint& b,
+	const ScreenPoint& c,
+	float r,
+	float g,
+	float bColor,
+	float alpha)
+{
+	const float vertices[] = {a.x, a.y, b.x, b.y, c.x, c.y};
+	DrawVertices(vertices, 3, r, g, bColor, alpha);
+}
+
 void PrototypeRenderer::DrawRect(
 	float x, float y, float width, float height, float r, float g, float b, float a)
 {

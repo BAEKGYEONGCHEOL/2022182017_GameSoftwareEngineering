@@ -26,6 +26,14 @@ struct ModelPrimitive
 	float alpha;
 };
 
+struct MeshTriangle
+{
+	float positions[9];
+	float red;
+	float green;
+	float blue;
+};
+
 class ModelLibrary
 {
   public:
@@ -36,8 +44,16 @@ class ModelLibrary
 		float x,
 		float y,
 		float scale = 1.0f) const;
+	void DrawMesh(PrototypeRenderer* renderer,
+		const std::string& meshName,
+		float x,
+		float y,
+		float scale = 1.0f,
+		float rotation = 0.0f) const;
 
   private:
 	bool LoadFile(const char* path);
+	bool LoadMeshFile(const char* path);
 	std::unordered_map<std::string, std::vector<ModelPrimitive>> m_Models;
+	std::unordered_map<std::string, std::vector<MeshTriangle>> m_Meshes;
 };

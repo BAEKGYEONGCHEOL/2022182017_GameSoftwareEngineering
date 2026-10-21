@@ -50,6 +50,13 @@ class PrototypeRenderer
 		float g,
 		float bColor,
 		float alpha);
+	void DrawTriangle(const ScreenPoint& a,
+		const ScreenPoint& b,
+		const ScreenPoint& c,
+		float r,
+		float g,
+		float bColor,
+		float alpha);
 	void DrawRect(float x, float y, float width, float height, float r, float g, float b, float a);
 	void DrawDiamond(
 		float x, float y, float width, float height, float r, float g, float b, float a);

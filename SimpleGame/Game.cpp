@@ -2421,8 +2421,8 @@ void Game::RenderInterior()
 		{
 			ScreenPoint weapon = WorldToScreen(TutorialWeaponPosition.x, TutorialWeaponPosition.y, 11.0f);
 			m_Renderer->DrawSoftShadow(weapon.x, weapon.y - 10.0f, 60.0f, 16.0f, 0.65f);
-			m_ModelLibrary.Draw(m_Renderer, "pulse_rifle_pickup", weapon.x, weapon.y,
-				1.0f + std::sin(m_TotalTime * 4.0f) * 0.08f);
+			m_ModelLibrary.DrawMesh(m_Renderer, "pulse_rifle_mesh", weapon.x, weapon.y,
+				18.0f * (1.0f + std::sin(m_TotalTime * 4.0f) * 0.08f));
 		}
 		for (int recordIndex = 0; recordIndex < 3; ++recordIndex)
 		{
@@ -2481,6 +2481,14 @@ void Game::SetDialogue(
 
 void Game::DrawFlightControlConsole(float x, float y, bool powered, bool infected)
 {
+	m_Renderer->DrawSoftShadow(x, y - 9.0f, 118.0f, 28.0f, 0.86f);
+	m_ModelLibrary.DrawMesh(m_Renderer, "ship_pilot_seat", x, y, 21.0f);
+	m_ModelLibrary.DrawMesh(m_Renderer, "ship_console", x, y + 10.0f, 21.0f);
+	if (infected)
+		m_Renderer->DrawDiamond(x, y + 26.0f, 112.0f, 45.0f, 0.46f, 0.03f, 0.62f, 0.22f);
+	else if (powered)
+		m_Renderer->DrawDiamond(x, y + 31.0f, 36.0f, 15.0f, 0.08f, 0.72f, 0.86f, 0.30f);
+	return;
 	const float pulse = 0.76f + std::sin(m_TotalTime * 5.0f) * 0.16f;
 	const float signalRed = infected ? 0.72f : (powered ? 0.10f : 0.34f);
 	const float signalGreen = infected ? 0.08f : (powered ? 0.72f : 0.22f);
@@ -2575,6 +2583,21 @@ void Game::DrawFlightControlConsole(float x, float y, bool powered, bool infecte
 void Game::DrawWorldBlock(const Obstacle& obstacle)
 {
 	ScreenPoint foot = WorldToScreen(obstacle.x, obstacle.y);
+	const char* resourceMesh = NULL;
+	if (obstacle.type == HullWall)
+		resourceMesh = "ship_wall";
+	else if (obstacle.type == ControlConsole)
+		resourceMesh = "ship_console";
+	else if (obstacle.type == MedicalPod)
+		resourceMesh = "ship_medbed";
+	else if (obstacle.type == PowerRelay || obstacle.type == EngineModule)
+		resourceMesh = "ship_power";
+	if (resourceMesh != NULL)
+	{
+		m_Renderer->DrawSoftShadow(foot.x + 8.0f, foot.y - 4.0f, 62.0f, 18.0f, 0.82f);
+		m_ModelLibrary.DrawMesh(m_Renderer, resourceMesh, foot.x, foot.y, 19.0f);
+		return;
+	}
 	float width = (obstacle.halfWidth + obstacle.halfHeight) * TileWidth;
 	float topY = foot.y + obstacle.visualHeight;
 	m_Renderer->DrawSoftShadow(foot.x + 10.0f, foot.y - 5.0f, width * 0.90f, 18.0f, 0.85f);
@@ -2757,6 +2780,14 @@ void Game::DrawWorldBlock(const Obstacle& obstacle)
 void Game::DrawCharacter(const WorldPoint& point, float r, float g, float b, bool enemy)
 {
 	ScreenPoint foot = WorldToScreen(point.x, point.y);
+	m_Renderer->DrawSoftShadow(foot.x + 5.0f, foot.y, enemy ? 46.0f : 34.0f, 14.0f, 0.92f);
+	m_ModelLibrary.DrawMesh(m_Renderer,
+		enemy ? "void_quadruped" : "humanoid_soldier",
+		foot.x,
+		foot.y,
+		enemy ? 17.0f : 18.0f,
+		enemy ? m_TotalTime * 0.35f : 0.0f);
+	return;
 	float phase = std::sin(m_TotalTime * (enemy ? 7.0f : 10.0f) + point.x * 0.7f);
 	if (!enemy && !m_PlayerMoving)
 		phase = std::sin(m_TotalTime * 2.2f) * 0.12f;
@@ -2894,6 +2925,14 @@ void Game::DrawCharacter(const WorldPoint& point, float r, float g, float b, boo
 void Game::DrawNeutralNpc(const NeutralNpc& npc)
 {
 	ScreenPoint foot = WorldToScreen(npc.position.x, npc.position.y);
+	m_Renderer->DrawSoftShadow(foot.x, foot.y, npc.dead ? 54.0f : 34.0f, 13.0f, 0.88f);
+	m_ModelLibrary.DrawMesh(m_Renderer,
+		"humanoid_soldier",
+		foot.x,
+		foot.y,
+		18.0f,
+		npc.dead ? 1.57f : 0.0f);
+	return;
 	if (npc.dead)
 	{
 		m_Renderer->DrawSoftShadow(foot.x, foot.y, 55.0f, 15.0f, 0.95f);
@@ -3202,11 +3241,11 @@ void Game::RenderSpace()
 
 void Game::DrawLevelSurvivor(const LevelSurvivor& survivor, size_t survivorIndex)
 {
-	ScreenPoint screen = WorldToScreen(survivor.position.x, survivor.position.y);
+	const ScreenPoint screen = WorldToScreen(survivor.position.x, survivor.position.y);
 	if (survivor.health <= 0)
 	{
 		m_Renderer->DrawSoftShadow(screen.x, screen.y - 3.0f, 54.0f, 12.0f, 0.84f);
-		m_ModelLibrary.Draw(m_Renderer, "fallen_soldier", screen.x, screen.y, 0.92f);
+		m_ModelLibrary.DrawMesh(m_Renderer, "humanoid_soldier", screen.x, screen.y, 17.0f, 1.57f);
 		return;
 	}
 
@@ -3216,7 +3255,7 @@ void Game::DrawLevelSurvivor(const LevelSurvivor& survivor, size_t survivorIndex
 	const float tremble =
 		std::sin(m_TotalTime * (18.0f + survivor.fear * 12.0f) + survivorIndex) * trembleStrength;
 	m_Renderer->DrawSoftShadow(screen.x, screen.y, 34.0f, 12.0f, 0.82f);
-	m_ModelLibrary.Draw(m_Renderer, "wounded_survivor", screen.x + tremble, screen.y, 1.0f);
+	m_ModelLibrary.DrawMesh(m_Renderer, "humanoid_soldier", screen.x + tremble, screen.y, 18.0f);
 
 	if (survivor.armed)
 	{
@@ -3354,6 +3393,12 @@ void Game::DrawAsteroid(const Asteroid& asteroid)
 {
 	float x = (asteroid.position.x - m_ShipPosition.x) * 0.72f;
 	float y = (asteroid.position.y - m_ShipPosition.y) * 0.72f;
+	const int variant = static_cast<int>(std::fabs(asteroid.radius)) % 4;
+	const char* meshes[] = {"asteroid_a", "asteroid_b", "asteroid_c", "asteroid_d"};
+	m_Renderer->DrawSoftShadow(x + 12.0f, y - 12.0f, asteroid.radius * 2.5f, asteroid.radius, 0.92f);
+	m_ModelLibrary.DrawMesh(
+		m_Renderer, meshes[variant], x, y, asteroid.radius * 0.85f, asteroid.rotation);
+	return;
 	float radius = asteroid.radius * 1.45f;
 	ScreenPoint p0 = Rotate(radius, 0.0f, asteroid.rotation, x, y);
 	ScreenPoint p1 = Rotate(radius * 0.25f, radius * 0.78f, asteroid.rotation, x, y);
@@ -3507,7 +3552,7 @@ void Game::RenderFirstLevel()
 			{
 				ScreenPoint wall = WorldToScreen(transform.x, transform.y, transform.height);
 				m_Renderer->DrawSoftShadow(wall.x, wall.y, 52.0f, 16.0f, 0.76f);
-				m_ModelLibrary.Draw(m_Renderer, "corridor_wall", wall.x, wall.y, 0.92f);
+				m_ModelLibrary.DrawMesh(m_Renderer, "ship_wall", wall.x, wall.y, 20.0f);
 			});
 	}
 	CreatePersonalShipInteriorActors(FirstLevelPersonalShipDockPosition);
@@ -3525,7 +3570,7 @@ void Game::RenderFirstLevel()
 				ScreenPoint weapon = WorldToScreen(transform.x, transform.y, transform.height);
 				float pulse = 1.0f + std::sin(m_TotalTime * 4.0f) * 0.08f;
 				m_Renderer->DrawSoftShadow(weapon.x, weapon.y - 10.0f, 60.0f, 16.0f, 0.65f);
-				m_ModelLibrary.Draw(m_Renderer, "pulse_rifle_pickup", weapon.x, weapon.y, pulse);
+				m_ModelLibrary.DrawMesh(m_Renderer, "pulse_rifle_mesh", weapon.x, weapon.y, 18.0f * pulse);
 			});
 	}
 
@@ -3664,7 +3709,7 @@ void Game::RenderFirstLevel()
 			{
 				ScreenPoint corpse = WorldToScreen(transform.x, transform.y, transform.height);
 				m_Renderer->DrawSoftShadow(corpse.x, corpse.y - 3.0f, 58.0f, 13.0f, 0.82f);
-				m_ModelLibrary.Draw(m_Renderer, "fallen_soldier", corpse.x, corpse.y, 1.0f);
+				m_ModelLibrary.DrawMesh(m_Renderer, "humanoid_soldier", corpse.x, corpse.y, 18.0f, 1.57f);
 			});
 	}
 
@@ -3763,7 +3808,7 @@ void Game::RenderFirstLevel()
 			{
 				ScreenPoint enemy = WorldToScreen(transform.x, transform.y, transform.height);
 				m_Renderer->DrawSoftShadow(enemy.x, enemy.y, 39.0f, 14.0f, 0.88f);
-				m_ModelLibrary.Draw(m_Renderer, "void_scout", enemy.x, enemy.y, 1.0f);
+				m_ModelLibrary.DrawMesh(m_Renderer, "void_quadruped", enemy.x, enemy.y, 17.0f);
 			});
 	}
 

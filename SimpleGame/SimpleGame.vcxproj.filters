@@ -127,6 +127,9 @@
 	<None Include="Data\Models.txt">
 	  <Filter>리소스 파일</Filter>
 	</None>
+	<None Include="Data\RuntimeMeshes.txt">
+	  <Filter>리소스 파일</Filter>
+	</None>
 	<None Include="Monitoring\dashboard.html">
 	  <Filter>리소스 파일</Filter>
 	</None>
