@@ -698,6 +698,7 @@ void Game::UpdateEnemies(float deltaSeconds)
 		Enemy& enemy = m_Enemies[i];
 		if (!enemy.active || enemy.health <= 0)
 			continue;
+		enemy.moving = false;
 		enemy.attackCooldown = std::max(0.0f, enemy.attackCooldown - deltaSeconds);
 
 		WorldPoint target = m_Player;
@@ -755,6 +756,8 @@ void Game::UpdateEnemies(float deltaSeconds)
 		float distance = Length(dx, dy);
 		if (distance > 0.65f)
 		{
+			enemy.facingDirection = {dx / distance, dy / distance};
+			enemy.moving = true;
 			float nextX = enemy.position.x + dx / distance * movementSpeed * deltaSeconds;
 			float nextY = enemy.position.y + dy / distance * movementSpeed * deltaSeconds;
 			if ((m_Mode == FirstLevel && IsFirstLevelWalkable(nextX, enemy.position.y)) ||
@@ -2335,23 +2338,36 @@ void Game::RenderInterior()
 		[this](const ActorTransform& transform)
 		{
 			WorldPoint position = {transform.x, transform.y};
-			DrawCharacter(position, 0.20f, 0.72f, 0.86f, false);
+			DrawCharacter(position,
+				0.20f,
+				0.72f,
+				0.86f,
+				false,
+				m_LastMoveDirection,
+				m_PlayerMoving);
 		});
 	for (size_t i = 0; i < m_Enemies.size(); ++i)
 	{
 		if (m_Enemies[i].health > 0 && m_Enemies[i].active)
 		{
-			const WorldPoint position = m_Enemies[i].position;
+			const Enemy enemy = m_Enemies[i];
+			const WorldPoint position = enemy.position;
 			CreateSceneActor("Enemy",
 				position.x,
 				position.y,
 				0.0f,
 				1,
 				position.x + position.y,
-				[this](const ActorTransform& transform)
+				[this, enemy](const ActorTransform& transform)
 				{
 					WorldPoint placedPosition = {transform.x, transform.y};
-					DrawCharacter(placedPosition, 0.62f, 0.08f, 0.72f, true);
+					DrawCharacter(placedPosition,
+						0.62f,
+						0.08f,
+						0.72f,
+						true,
+						enemy.facingDirection,
+						enemy.moving);
 				});
 		}
 	}
@@ -2422,7 +2438,7 @@ void Game::RenderInterior()
 			ScreenPoint weapon = WorldToScreen(TutorialWeaponPosition.x, TutorialWeaponPosition.y, 11.0f);
 			m_Renderer->DrawSoftShadow(weapon.x, weapon.y - 10.0f, 60.0f, 16.0f, 0.65f);
 			m_ModelLibrary.DrawMesh(m_Renderer, "pulse_rifle_mesh", weapon.x, weapon.y,
-				18.0f * (1.0f + std::sin(m_TotalTime * 4.0f) * 0.08f));
+				38.0f * (1.0f + std::sin(m_TotalTime * 4.0f) * 0.08f));
 		}
 		for (int recordIndex = 0; recordIndex < 3; ++recordIndex)
 		{
@@ -2777,161 +2793,88 @@ void Game::DrawWorldBlock(const Obstacle& obstacle)
 		1.0f);
 }
 
-void Game::DrawCharacter(const WorldPoint& point, float r, float g, float b, bool enemy)
+void Game::DrawCharacter(const WorldPoint& point,
+	float r,
+	float g,
+	float b,
+	bool enemy,
+	const WorldPoint& facingDirection,
+	bool moving)
 {
-	ScreenPoint foot = WorldToScreen(point.x, point.y);
-	m_Renderer->DrawSoftShadow(foot.x + 5.0f, foot.y, enemy ? 46.0f : 34.0f, 14.0f, 0.92f);
+	const ScreenPoint foot = WorldToScreen(point.x, point.y);
+	const float directionLength = Length(facingDirection.x, facingDirection.y);
+	const float facingAngle = directionLength > 0.001f
+		? std::atan2(facingDirection.y, facingDirection.x)
+		: 0.0f;
+	const float movementPhase =
+		std::sin(m_TotalTime * (enemy ? 9.0f : 11.0f) + point.x * 0.37f + point.y * 0.21f);
+	const float idlePhase = std::sin(m_TotalTime * 2.2f + point.x * 0.13f) * 0.25f;
+	const float animationPhase = moving ? movementPhase : idlePhase;
+	const float bob = moving ? std::fabs(animationPhase) * 2.8f : animationPhase * 0.8f;
+	const float bodySway = animationPhase * (moving ? 0.055f : 0.015f);
+
+	m_Renderer->DrawSoftShadow(
+		foot.x + 5.0f, foot.y, enemy ? 46.0f : 34.0f, 14.0f, 0.92f);
 	m_ModelLibrary.DrawMesh(m_Renderer,
 		enemy ? "void_quadruped" : "humanoid_soldier",
 		foot.x,
-		foot.y,
+		foot.y + bob,
 		enemy ? 17.0f : 18.0f,
-		enemy ? m_TotalTime * 0.35f : 0.0f);
-	return;
-	float phase = std::sin(m_TotalTime * (enemy ? 7.0f : 10.0f) + point.x * 0.7f);
-	if (!enemy && !m_PlayerMoving)
-		phase = std::sin(m_TotalTime * 2.2f) * 0.12f;
-	float bob = std::fabs(phase) * (enemy || m_PlayerMoving ? 2.5f : 1.0f);
-	m_Renderer->DrawSoftShadow(
-		foot.x + 5.0f, foot.y, enemy ? 38.0f : 32.0f, enemy ? 15.0f : 12.0f, 1.0f);
+		facingAngle + bodySway);
+
 	if (enemy)
+		return;
+
+	const bool hasWeapon = m_Mode == FirstLevel
+		? m_LevelWeaponCollected
+		: m_Quest != InspectTerminal && m_Quest != CollectTutorialWeapon;
+	if (!hasWeapon)
+		return;
+
+	float aimScreenX = static_cast<float>(m_MouseX - m_Renderer->Width() / 2);
+	float aimScreenY = static_cast<float>(m_Renderer->Height() / 2 - m_MouseY + 30);
+	float aimLength = Length(aimScreenX, aimScreenY);
+	if (aimLength < 1.0f)
 	{
-		DrawRotatedRect(m_Renderer,
-			foot.x - 13.0f,
-			foot.y + 14.0f,
-			9.0f,
-			28.0f,
-			phase * 0.28f,
-			r * 0.65f,
-			g,
-			b * 0.75f,
-			1.0f);
-		DrawRotatedRect(m_Renderer,
-			foot.x + 13.0f,
-			foot.y + 14.0f,
-			9.0f,
-			28.0f,
-			-phase * 0.28f,
-			r * 0.65f,
-			g,
-			b * 0.75f,
-			1.0f);
-		m_Renderer->DrawDiamond(foot.x, foot.y + 30.0f + bob, 38.0f, 50.0f, r, g, b, 1.0f);
-		m_Renderer->DrawDiamond(
-			foot.x, foot.y + 55.0f + bob, 25.0f, 19.0f, r * 0.82f, g * 0.65f, b, 1.0f);
-		m_Renderer->DrawRect(
-			foot.x - 5.0f, foot.y + 57.0f + bob, 5.0f, 5.0f, 0.20f, 0.95f, 0.82f, 1.0f);
-		m_Renderer->DrawRect(
-			foot.x + 5.0f, foot.y + 57.0f + bob, 5.0f, 5.0f, 0.20f, 0.95f, 0.82f, 1.0f);
+		aimScreenX = 1.0f;
+		aimScreenY = 0.0f;
+		aimLength = 1.0f;
 	}
-	else
+	aimScreenX /= aimLength;
+	aimScreenY /= aimLength;
+
+	const WorldPoint aimDirection = {
+		aimScreenX / 64.0f - aimScreenY / 32.0f,
+		-aimScreenX / 64.0f - aimScreenY / 32.0f};
+	const float aimAngle = std::atan2(aimDirection.y, aimDirection.x);
+	const float recoil = m_AttackFlash > 0.0f ? -4.0f : 0.0f;
+	const float weaponX = foot.x + aimScreenX * (22.0f + recoil);
+	const float weaponY = foot.y + 34.0f + bob + aimScreenY * 11.0f;
+	m_ModelLibrary.DrawMesh(
+		m_Renderer, "pulse_rifle_mesh", weaponX, weaponY, 38.0f, aimAngle);
+
+	if (m_AttackFlash > 0.0f)
 	{
-		float stride = m_PlayerMoving ? phase : 0.0f;
-		// Boots and articulated pressure-suit legs.
-		DrawRotatedRect(m_Renderer,
-			foot.x - 7.0f + stride * 2.0f,
-			foot.y + 10.0f,
-			8.0f,
-			23.0f,
-			stride * 0.22f,
-			0.09f,
-			0.24f,
-			0.31f,
-			1.0f);
-		DrawRotatedRect(m_Renderer,
-			foot.x + 7.0f - stride * 2.0f,
-			foot.y + 10.0f,
-			8.0f,
-			23.0f,
-			-stride * 0.22f,
-			0.09f,
-			0.24f,
-			0.31f,
-			1.0f);
-		m_Renderer->DrawRect(
-			foot.x - 8.0f + stride * 3.0f, foot.y + 1.0f, 13.0f, 7.0f, 0.05f, 0.12f, 0.17f, 1.0f);
-		m_Renderer->DrawRect(
-			foot.x + 8.0f - stride * 3.0f, foot.y + 1.0f, 13.0f, 7.0f, 0.05f, 0.12f, 0.17f, 1.0f);
-		// Backpack, torso shell and chest life-support light.
-		m_Renderer->DrawRect(
-			foot.x - 4.0f, foot.y + 36.0f + bob, 31.0f, 37.0f, 0.04f, 0.11f, 0.16f, 1.0f);
-		m_Renderer->DrawRect(foot.x, foot.y + 34.0f + bob, 25.0f, 35.0f, r, g, b, 1.0f);
-		m_Renderer->DrawRect(foot.x, foot.y + 36.0f + bob, 17.0f, 27.0f, 0.08f, 0.23f, 0.30f, 1.0f);
+		const float muzzleX = foot.x + aimScreenX * 43.0f;
+		const float muzzleY = foot.y + 34.0f + bob + aimScreenY * 21.0f;
 		m_Renderer->DrawDiamond(
-			foot.x, foot.y + 39.0f + bob, 8.0f, 6.0f, 0.20f, 0.95f, 0.88f, 1.0f);
-		m_Renderer->DrawDiamond(
-			foot.x - 16.0f, foot.y + 48.0f + bob, 13.0f, 11.0f, r * 0.85f, g * 0.85f, b, 1.0f);
-		m_Renderer->DrawDiamond(
-			foot.x + 16.0f, foot.y + 48.0f + bob, 13.0f, 11.0f, r * 0.85f, g * 0.85f, b, 1.0f);
-		DrawRotatedRect(m_Renderer,
-			foot.x - 17.0f,
-			foot.y + 36.0f + bob,
-			7.0f,
-			25.0f,
-			-stride * 0.30f,
-			r * 0.75f,
-			g * 0.78f,
-			b * 0.82f,
-			1.0f);
-		DrawRotatedRect(m_Renderer,
-			foot.x + 17.0f,
-			foot.y + 36.0f + bob,
-			7.0f,
-			25.0f,
-			stride * 0.30f,
-			r * 0.75f,
-			g * 0.78f,
-			b * 0.82f,
-			1.0f);
-		// Helmet shell, dark visor and oxygen valve.
-		m_Renderer->DrawDiamond(
-			foot.x, foot.y + 61.0f + bob, 27.0f, 23.0f, 0.72f, 0.78f, 0.80f, 1.0f);
-		m_Renderer->DrawRect(foot.x, foot.y + 62.0f + bob, 17.0f, 8.0f, 0.025f, 0.11f, 0.17f, 1.0f);
-		m_Renderer->DrawRect(foot.x, foot.y + 63.0f + bob, 11.0f, 3.0f, 0.15f, 0.82f, 0.92f, 1.0f);
-		m_Renderer->DrawDiamond(
-			foot.x - 15.0f, foot.y + 58.0f + bob, 7.0f, 7.0f, 0.20f, 0.75f, 0.82f, 1.0f);
-		float aimAngle = std::atan2(static_cast<float>(m_Renderer->Height() / 2 - m_MouseY + 30),
-			static_cast<float>(m_MouseX - m_Renderer->Width() / 2));
-		DrawRotatedRect(m_Renderer,
-			foot.x + std::cos(aimAngle) * 18.0f,
-			foot.y + 36.0f + bob + std::sin(aimAngle) * 8.0f,
-			30.0f,
-			6.0f,
-			aimAngle,
-			0.08f,
-			0.16f,
-			0.20f,
-			1.0f);
-		DrawRotatedRect(m_Renderer,
-			foot.x + std::cos(aimAngle) * 29.0f,
-			foot.y + 36.0f + bob + std::sin(aimAngle) * 13.0f,
-			8.0f,
-			3.0f,
-			aimAngle,
-			0.18f,
-			0.82f,
-			0.92f,
-			1.0f);
-		if (m_AttackFlash > 0.0f)
-		{
-			float muzzleX = foot.x + std::cos(aimAngle) * 36.0f;
-			float muzzleY = foot.y + 36.0f + bob + std::sin(aimAngle) * 17.0f;
-			m_Renderer->DrawSoftShadow(muzzleX, muzzleY - 25.0f, 36.0f, 10.0f, 0.28f);
-			m_Renderer->DrawDiamond(muzzleX, muzzleY, 36.0f, 12.0f, 0.20f, 0.88f, 1.0f, 0.90f);
-		}
+			muzzleX, muzzleY, 30.0f, 10.0f, 0.20f, 0.88f, 1.0f, 0.88f);
 	}
 }
 
 void Game::DrawNeutralNpc(const NeutralNpc& npc)
 {
-	ScreenPoint foot = WorldToScreen(npc.position.x, npc.position.y);
+	const ScreenPoint foot = WorldToScreen(npc.position.x, npc.position.y);
+	const float idlePhase = std::sin(m_TotalTime * 2.4f + npc.animationOffset) * 0.35f;
+	const float verticalOffset = npc.dead ? 0.0f : idlePhase;
+	const float bodySway = npc.dead ? 1.57f : idlePhase * 0.04f;
 	m_Renderer->DrawSoftShadow(foot.x, foot.y, npc.dead ? 54.0f : 34.0f, 13.0f, 0.88f);
 	m_ModelLibrary.DrawMesh(m_Renderer,
 		"humanoid_soldier",
 		foot.x,
-		foot.y,
+		foot.y + verticalOffset,
 		18.0f,
-		npc.dead ? 1.57f : 0.0f);
+		bodySway);
 	return;
 	if (npc.dead)
 	{
@@ -3254,8 +3197,14 @@ void Game::DrawLevelSurvivor(const LevelSurvivor& survivor, size_t survivorIndex
 		: 0.25f;
 	const float tremble =
 		std::sin(m_TotalTime * (18.0f + survivor.fear * 12.0f) + survivorIndex) * trembleStrength;
+	const float breathing = std::sin(m_TotalTime * 2.1f + survivorIndex) * 0.45f;
 	m_Renderer->DrawSoftShadow(screen.x, screen.y, 34.0f, 12.0f, 0.82f);
-	m_ModelLibrary.DrawMesh(m_Renderer, "humanoid_soldier", screen.x + tremble, screen.y, 18.0f);
+	m_ModelLibrary.DrawMesh(m_Renderer,
+		"humanoid_soldier",
+		screen.x + tremble,
+		screen.y + breathing,
+		18.0f,
+		tremble * 0.012f);
 
 	if (survivor.armed)
 	{
@@ -3269,17 +3218,24 @@ void Game::DrawLevelSurvivor(const LevelSurvivor& survivor, size_t survivorIndex
 			aimScreenX /= aimScreenLength;
 			aimScreenY /= aimScreenLength;
 		}
-		const float aimAngle = std::atan2(aimScreenY, aimScreenX);
-		DrawRotatedRect(m_Renderer,
-			screen.x + tremble + aimScreenX * 15.0f,
-			screen.y + 32.0f + aimScreenY * 15.0f,
-			25.0f,
-			5.0f,
-			aimAngle,
+		const WorldPoint weaponDirection = {
+			aimScreenX / 64.0f - aimScreenY / 32.0f,
+			-aimScreenX / 64.0f - aimScreenY / 32.0f};
+		const float weaponAngle = std::atan2(weaponDirection.y, weaponDirection.x);
+		m_ModelLibrary.DrawMesh(m_Renderer,
+			"pulse_rifle_mesh",
+			screen.x + tremble + aimScreenX * 18.0f,
+			screen.y + 32.0f + breathing + aimScreenY * 10.0f,
+			34.0f,
+			weaponAngle);
+		m_Renderer->DrawDiamond(screen.x + tremble + aimScreenX * 29.0f,
+			screen.y + 32.0f + breathing + aimScreenY * 16.0f,
+			7.0f,
+			4.0f,
 			warning,
 			survivor.confused ? 0.12f : 0.52f,
 			0.10f,
-			1.0f);
+			0.85f);
 	}
 
 	std::wstring label = SurvivorRoleName(survivor.pattern);
@@ -3570,7 +3526,7 @@ void Game::RenderFirstLevel()
 				ScreenPoint weapon = WorldToScreen(transform.x, transform.y, transform.height);
 				float pulse = 1.0f + std::sin(m_TotalTime * 4.0f) * 0.08f;
 				m_Renderer->DrawSoftShadow(weapon.x, weapon.y - 10.0f, 60.0f, 16.0f, 0.65f);
-				m_ModelLibrary.DrawMesh(m_Renderer, "pulse_rifle_mesh", weapon.x, weapon.y, 18.0f * pulse);
+				m_ModelLibrary.DrawMesh(m_Renderer, "pulse_rifle_mesh", weapon.x, weapon.y, 38.0f * pulse);
 			});
 	}
 
@@ -3791,7 +3747,8 @@ void Game::RenderFirstLevel()
 		if (!m_Enemies[index].active || m_Enemies[index].health <= 0)
 			continue;
 
-		const WorldPoint position = m_Enemies[index].position;
+		const Enemy enemyState = m_Enemies[index];
+		const WorldPoint position = enemyState.position;
 		const ScreenPoint enemyScreen = WorldToScreen(position.x, position.y);
 		if (std::fabs(enemyScreen.x) > screenWidth * 0.5f + 100.0f ||
 			std::fabs(enemyScreen.y) > screenHeight * 0.5f + 100.0f)
@@ -3804,11 +3761,16 @@ void Game::RenderFirstLevel()
 			0.0f,
 			3,
 			position.x + position.y,
-			[this](const ActorTransform& transform)
+			[this, enemyState](const ActorTransform& transform)
 			{
-				ScreenPoint enemy = WorldToScreen(transform.x, transform.y, transform.height);
-				m_Renderer->DrawSoftShadow(enemy.x, enemy.y, 39.0f, 14.0f, 0.88f);
-				m_ModelLibrary.DrawMesh(m_Renderer, "void_quadruped", enemy.x, enemy.y, 17.0f);
+				WorldPoint position = {transform.x, transform.y};
+				DrawCharacter(position,
+					0.62f,
+					0.08f,
+					0.72f,
+					true,
+					enemyState.facingDirection,
+					enemyState.moving);
 			});
 	}
 
@@ -3821,7 +3783,13 @@ void Game::RenderFirstLevel()
 		[this](const ActorTransform& transform)
 		{
 			WorldPoint position = {transform.x, transform.y};
-			DrawCharacter(position, 0.20f, 0.72f, 0.86f, false);
+			DrawCharacter(position,
+				0.20f,
+				0.72f,
+				0.86f,
+				false,
+				m_LastMoveDirection,
+				m_PlayerMoving);
 		});
 
 	for (size_t index = 0; index < m_Projectiles.size(); ++index)

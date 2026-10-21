@@ -64,6 +64,8 @@ struct Enemy
 	float attackCooldown;
 	WorldPoint homePosition;
 	float wanderPhase;
+	WorldPoint facingDirection;
+	bool moving;
 };
 
 struct Projectile
@@ -245,7 +247,13 @@ class Game
 	void RenderInterface();
 	void RenderGameplayMinimap();
 	void DrawWorldBlock(const Obstacle& obstacle);
-	void DrawCharacter(const WorldPoint& point, float r, float g, float b, bool enemy);
+	void DrawCharacter(const WorldPoint& point,
+		float r,
+		float g,
+		float b,
+		bool enemy,
+		const WorldPoint& facingDirection,
+		bool moving);
 	void DrawNeutralNpc(const NeutralNpc& npc);
 	void DrawLevelSurvivor(const LevelSurvivor& survivor, size_t survivorIndex);
 	void DrawFlightControlConsole(float x, float y, bool powered, bool infected);
