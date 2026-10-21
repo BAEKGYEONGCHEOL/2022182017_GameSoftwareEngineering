@@ -29,7 +29,13 @@ const WorldPoint TutorialRecordPositions[] = {
 const WorldPoint SignalPosition = {-9.0f, 13.0f};
 const WorldPoint CorePosition = {16.0f, 15.0f};
 const WorldPoint CockpitPosition = {-16.0f, 15.0f};
-const WorldPoint DestinationPosition = {0.0f, 650.0f};
+const WorldPoint TutorialPersonalShipDockPosition = {-28.0f, -28.0f};
+const WorldPoint FirstLevelPersonalShipDockPosition = {-57.0f, -57.0f};
+const WorldPoint TutorialPersonalShipCockpitPosition = {-28.0f, -25.0f};
+const WorldPoint FirstLevelPersonalShipCockpitPosition = {-57.0f, -54.0f};
+const WorldPoint NoctisSpacePosition = {0.0f, 0.0f};
+const WorldPoint ErebusSpacePosition = {0.0f, 650.0f};
+const WorldPoint StationSpacePosition = {420.0f, 340.0f};
 const WorldPoint FirstLevelWeaponPosition = {-1.5f, 0.0f};
 const WorldPoint SpaceBoundaryCenter = {0.0f, 325.0f};
 const float SpaceBoundaryHalfWidth = 620.0f;
@@ -360,6 +366,8 @@ void Game::Reset()
 	m_Quest = InspectTerminal;
 	m_Paused = false;
 	m_CoreRecovered = false;
+	m_NoctisSystemsOnline = false;
+	m_ErebusSystemsOnline = false;
 	for (int recordIndex = 0; recordIndex < 3; ++recordIndex)
 		m_TutorialRecordsRead[recordIndex] = false;
 	m_SignalChecked = false;
@@ -370,7 +378,7 @@ void Game::Reset()
 	m_MousePressed = false;
 	m_MouseX = m_Renderer->Width() / 2;
 	m_MouseY = m_Renderer->Height() / 2;
-	m_Player = {-17.0f, -17.0f};
+	m_Player = {-23.0f, -28.0f};
 	m_LastMoveDirection = {1.0f, 0.0f};
 	m_PlayerHealth = 100.0f;
 	m_AttackCooldown = 0.0f;
@@ -577,7 +585,7 @@ void Game::Update(float deltaSeconds)
 			if (m_TransitionTimer >= 1.4f)
 			{
 				m_CurrentShip = m_TravelDestinationShip;
-				m_ShipPosition = {0.0f, 0.0f};
+				m_ShipPosition = FixedShipPosition(m_CurrentShip);
 				m_PreviousShipPosition = m_ShipPosition;
 				m_ShipVelocity = {0.0f, 0.0f};
 
@@ -592,9 +600,9 @@ void Game::Update(float deltaSeconds)
 				else if (m_CurrentShip == 0 && m_Quest == ReturnToNoctis)
 				{
 					m_Mode = OnFoot;
-					m_Quest = FlyToStation;
-					m_Player = {-9.0f, 8.0f};
-					SetMessage(L"노크티스로 귀환했습니다. 확보한 자료를 가지고 거대 우주 정거장으로 이동할 수 있습니다.", 5.0f);
+					m_Quest = BoardPersonalShipToStation;
+					m_Player = {-23.0f, -28.0f};
+					SetMessage(L"노크티스 도킹 구역으로 귀환했습니다. 개인 우주선으로 정거장 항로를 선택하십시오.", 5.0f);
 				}
 				else if (m_CurrentShip == 2 && m_Quest == FlyToStation)
 				{
@@ -604,7 +612,7 @@ void Game::Update(float deltaSeconds)
 				else
 				{
 					m_Mode = OnFoot;
-					m_Player = {-9.0f, 8.0f};
+					m_Player = {-23.0f, -28.0f};
 					SetMessage(m_CurrentShip == 1 ? L"난민 수송선 에레보스에 도킹했습니다."
 												  : L"연구선 노크티스로 귀환했습니다.",
 						3.0f);
@@ -637,6 +645,27 @@ void Game::Update(float deltaSeconds)
 
 	std::memset(m_KeyPressed, 0, sizeof(m_KeyPressed));
 	m_MousePressed = false;
+}
+
+WorldPoint Game::FixedShipPosition(int shipIndex) const
+{
+	if (shipIndex == 1)
+		return ErebusSpacePosition;
+	if (shipIndex == 2)
+		return StationSpacePosition;
+	return NoctisSpacePosition;
+}
+
+void Game::BeginPersonalShipTravel(int destinationShip)
+{
+	m_TravelDestinationShip = destinationShip;
+	m_ShipPosition = FixedShipPosition(m_CurrentShip);
+	m_PreviousShipPosition = m_ShipPosition;
+	m_ShipVelocity = {0.0f, 0.0f};
+	const WorldPoint destination = FixedShipPosition(destinationShip);
+	m_ShipAngle = std::atan2(destination.y - m_ShipPosition.y, destination.x - m_ShipPosition.x);
+	m_Mode = ShipControl;
+	SetMessage(L"개인 우주선 출항. 방향키로 조종하고 목적지 근처에서 E를 누르십시오.", 5.0f);
 }
 
 void Game::UpdateEnemies(float deltaSeconds)
@@ -758,13 +787,13 @@ void Game::UpdateEnemies(float deltaSeconds)
 	{
 		if (m_Mode == FirstLevel)
 		{
-			m_Player = {0.0f, 0.0f};
+			m_Player = {-52.0f, -57.0f};
 			m_PlayerHealth = m_PlayerMaxHealth;
 			SetMessage(L"훈련 구역의 의료 비콘이 시작 지점에서 전투복을 복구했습니다.", 2.5f);
 		}
 		else
 		{
-			m_Player = {-17.0f, -17.0f};
+			m_Player = {-23.0f, -28.0f};
 			m_PlayerHealth = 100.0f;
 			for (size_t i = 0; i < m_Enemies.size(); ++i)
 			{
@@ -1337,8 +1366,8 @@ void Game::HandleInteraction()
 	if (m_Quest == FindCore && AllEnemiesDefeated() && IsNear(CorePosition, 1.2f))
 	{
 		m_CoreRecovered = true;
-		m_Quest = ReturnToCockpit;
-		SetMessage(L"항법 코어를 회수했습니다. 조종석의 항법 제어 장치를 사용할 수 있습니다.", 4.0f);
+		m_Quest = ActivateNoctisSystems;
+		SetMessage(L"항법 코어를 회수했습니다. 함교 제어 장치에서 노크티스의 시스템을 복구하십시오.", 4.0f);
 		return;
 	}
 	if (m_CurrentShip == 0 && !m_CoreRecovered && IsNear(CockpitPosition, 1.25f))
@@ -1346,22 +1375,25 @@ void Game::HandleInteraction()
 		SetMessage(L"항법 제어 장치가 응답하지 않습니다. 기관실에서 항법 코어를 먼저 회수하십시오.", 4.0f);
 		return;
 	}
-	if (m_Quest == ReturnToCockpit && IsNear(CockpitPosition, 1.25f))
+	if (m_Quest == ActivateNoctisSystems && IsNear(CockpitPosition, 1.25f))
 	{
-		m_Mode = ShipControl;
-		m_Quest = FlyToSignal;
-		m_TravelDestinationShip = 1;
-		SetMessage(L"방향키: 회전/추진    왼쪽 Shift: 독립 부스터    E: 신호 진입", 5.0f);
+		m_NoctisSystemsOnline = true;
+		m_Quest = BoardPersonalShipToErebus;
+		SetMessage(L"노크티스 시스템 복구 완료. 도킹 통로를 따라 개인 우주선으로 복귀하십시오.", 5.0f);
 		return;
 	}
-	if (m_Quest == FlyToStation && m_CurrentShip == 0 && IsNear(CockpitPosition, 1.25f))
+	if (m_Quest == BoardPersonalShipToErebus &&
+		IsNear(TutorialPersonalShipCockpitPosition, 1.6f))
 	{
-		m_TravelDestinationShip = 2;
-		m_Mode = ShipControl;
-		m_ShipPosition = {0.0f, 0.0f};
-		m_PreviousShipPosition = m_ShipPosition;
-		m_ShipVelocity = {0.0f, 0.0f};
-		SetMessage(L"항로: 거대 우주 정거장", 3.0f);
+		m_Quest = FlyToSignal;
+		BeginPersonalShipTravel(1);
+		return;
+	}
+	if (m_Quest == BoardPersonalShipToStation &&
+		IsNear(TutorialPersonalShipCockpitPosition, 1.6f))
+	{
+		m_Quest = FlyToStation;
+		BeginPersonalShipTravel(2);
 	}
 }
 
@@ -1423,8 +1455,9 @@ void Game::UpdateShip(float deltaSeconds)
 			SetMessage(L"선체가 충돌했습니다. 항로를 수정하십시오.", 1.5f);
 		}
 	}
+	const WorldPoint destination = FixedShipPosition(m_TravelDestinationShip);
 	float destinationDistance =
-		Length(m_ShipPosition.x - DestinationPosition.x, m_ShipPosition.y - DestinationPosition.y);
+		Length(m_ShipPosition.x - destination.x, m_ShipPosition.y - destination.y);
 	if ((m_KeyPressed['e'] || m_KeyPressed['E']) && destinationDistance < 85.0f)
 	{
 		m_Mode = Transition;
@@ -1580,11 +1613,13 @@ std::wstring Game::ObjectiveText() const
 		return L"거대 우주 정거장 도착: 다음 장으로 이어지는 항로를 확보했습니다";
 	if (m_Mode == FirstLevel)
 	{
+		if (m_Quest == BoardPersonalShipToNoctis)
+			return L"에레보스: 도킹 구역의 개인 우주선으로 복귀하십시오 [E]";
 		if (!AreLevelEnginesActive())
 			return L"에레보스: 보조 엔진 네 개를 가동하십시오";
 		if (!AreLevelHostilesCleared())
 			return L"에레보스: 공격하는 생존자와 공허종을 처치하십시오";
-		return L"에레보스: 중앙 이탈 제어 장치로 함선을 빠져나오십시오 [E]";
+		return L"에레보스: 중앙 시스템 제어 장치에서 함선을 복구하십시오 [E]";
 	}
 
 	if ((m_Mode == ShipControl || m_Mode == Transition) && m_Quest == ReturnToNoctis)
@@ -1599,12 +1634,14 @@ std::wstring Game::ObjectiveText() const
 		return L"목표: 기관실로 이동하여 침입체를 제거하십시오";
 	if (m_Quest == FindCore)
 		return L"목표: 항법 코어를 회수하십시오 [E]";
-	if (m_Quest == ReturnToCockpit)
-		return L"목표: 조종석으로 돌아가 항법 코어를 설치하십시오 [E]";
+	if (m_Quest == ActivateNoctisSystems)
+		return L"목표: 함교에서 노크티스 시스템을 복구하십시오 [E]";
+	if (m_Quest == BoardPersonalShipToErebus)
+		return L"목표: 도킹 구역의 개인 우주선으로 복귀하십시오 [E]";
 	if (m_Quest == FlyToSignal)
-		return L"목표: 노크티스를 조종하여 구조 신호로 이동하십시오";
-	if (m_Quest == FlyToStation)
-		return L"목표: 노크티스 조종석에서 거대 우주 정거장 항로를 설정하십시오";
+		return L"목표: 개인 우주선으로 에레보스에 도킹하십시오";
+	if (m_Quest == BoardPersonalShipToStation)
+		return L"목표: 개인 우주선으로 복귀하여 정거장 항로를 선택하십시오 [E]";
 	return L"현재 위치: 연구선 노크티스";
 }
 
@@ -1613,6 +1650,12 @@ std::vector<std::wstring> Game::ObjectiveLines() const
 	std::vector<std::wstring> objectives;
 	if (m_Mode == FirstLevel)
 	{
+		if (m_Quest == BoardPersonalShipToNoctis)
+		{
+			objectives.push_back(L"[완료] 에레보스 시스템 복구");
+			objectives.push_back(L"[진행] 도킹 구역의 개인 우주선으로 복귀");
+			return objectives;
+		}
 		int activeEngineCount = 0;
 		for (int engineIndex = 0; engineIndex < 4; ++engineIndex)
 			if (m_LevelEngineActive[engineIndex])
@@ -1653,8 +1696,8 @@ std::vector<std::wstring> Game::ObjectiveLines() const
 			L"전쟁 자료 열람  [" + std::to_wstring(readDocumentCount) + L"/" +
 			std::to_wstring(m_StoryDocuments.size()) + L"]");
 		objectives.push_back(AreLevelEnginesActive() && AreLevelHostilesCleared()
-			? L"[가능] 중앙 이탈 제어 장치 사용"
-			: L"[잠김] 중앙 이탈 제어 장치 사용");
+			? L"[가능] 중앙 시스템 제어 장치 사용"
+			: L"[잠김] 중앙 시스템 제어 장치 사용");
 		return objectives;
 	}
 	objectives.push_back(ObjectiveText());
@@ -1720,7 +1763,7 @@ std::string Game::BuildMonitoringJson() const
 		 << ",\"status\":" << JsonString(noctisStatus)
 		 << ",\"npcAlive\":" << noctisNpcAlive << ",\"npcTotal\":" << noctisNpcTotal
 		 << ",\"mobAlive\":" << noctisMobAlive << ",\"mobTotal\":" << noctisMobTotal
-		 << ",\"mapAvailable\":true,\"bounds\":{\"minX\":-22,\"maxX\":22,\"minY\":-22,\"maxY\":22}},";
+		 << ",\"mapAvailable\":true,\"bounds\":{\"minX\":-34,\"maxX\":22,\"minY\":-34,\"maxY\":22}},";
 	json << "{\"id\":\"erebus\",\"name\":" << JsonString(L"수송선 에레보스")
 		 << ",\"status\":" << JsonString(erebusStatus)
 		 << ",\"npcAlive\":" << erebusNpcAlive << ",\"npcTotal\":" << erebusNpcTotal
@@ -1827,14 +1870,16 @@ std::string Game::BuildMonitoringJson() const
 	if (m_CoreRecovered && !m_SignalChecked)
 		appendObject("noctis_signal", L"구조 신호 단말", "noctis", "terminal", SignalPosition);
 	appendObject("noctis_cockpit", L"조종 장치", "noctis", "console", CockpitPosition);
+	appendObject("noctis_personal_ship", L"개인 우주선", "noctis", "ship", TutorialPersonalShipDockPosition);
 	if (erebusGenerated)
 	{
+		appendObject("erebus_personal_ship", L"개인 우주선", "erebus", "ship", FirstLevelPersonalShipDockPosition);
 		if (!m_LevelWeaponCollected)
 			appendObject("erebus_weapon", L"펄스 소총", "erebus", "pickup", FirstLevelWeaponPosition);
 		for (int index = 0; index < 4; ++index)
 			if (!m_LevelEngineActive[index])
 				appendObject("erebus_engine_" + std::to_string(index), L"보조 엔진", "erebus", "engine", m_LevelEnginePositions[index]);
-		appendObject("erebus_control", L"이탈 제어 장치", "erebus", "console", m_LevelControlPosition);
+		appendObject("erebus_control", L"시스템 제어 장치", "erebus", "console", m_LevelControlPosition);
 		for (size_t index = 0; index < m_StoryDocuments.size(); ++index)
 			appendObject("erebus_document_" + std::to_string(index), L"현장 문서", "erebus", "document", m_StoryDocuments[index].position);
 		for (size_t index = 0; index < m_MagazinePickups.size(); ++index)
@@ -1852,9 +1897,9 @@ std::string Game::BuildMonitoringMapJson() const
 	json << "{\"schemaVersion\":3,\"mapRevision\":" << m_MonitoringMapRevision
 		 << ",\"terrain\":{\"noctis\":[";
 	bool firstTerrainTile = true;
-	for (int tileY = -22; tileY <= 22; ++tileY)
+	for (int tileY = -34; tileY <= 22; ++tileY)
 	{
-		for (int tileX = -22; tileX <= 22; ++tileX)
+		for (int tileX = -34; tileX <= 22; ++tileX)
 		{
 			if (!IsTutorialFloor(static_cast<float>(tileX), static_cast<float>(tileY)))
 				continue;
@@ -1896,9 +1941,9 @@ void Game::RebuildMonitoringMapCache()
 void Game::RebuildGameplayMinimapCache()
 {
 	m_TutorialMinimapTiles.clear();
-	for (int cellY = -22; cellY <= 22; cellY += 2)
+	for (int cellY = -34; cellY <= 22; cellY += 2)
 	{
-		for (int cellX = -22; cellX <= 22; cellX += 2)
+		for (int cellX = -34; cellX <= 22; cellX += 2)
 		{
 			bool walkable = false;
 			for (int offsetY = 0; offsetY < 2 && !walkable; ++offsetY)
@@ -1968,8 +2013,9 @@ std::wstring Game::InteractionText() const
 {
 	if (m_Mode == ShipControl)
 	{
+		const WorldPoint destination = FixedShipPosition(m_TravelDestinationShip);
 		float distance = Length(
-			m_ShipPosition.x - DestinationPosition.x, m_ShipPosition.y - DestinationPosition.y);
+			m_ShipPosition.x - destination.x, m_ShipPosition.y - destination.y);
 		if (distance >= 85.0f)
 			return L"";
 		if (m_Quest == FlyToSignal)
@@ -1984,6 +2030,9 @@ std::wstring Game::InteractionText() const
 		return L"[E] 훈련용 펄스 소총 회수";
 	if (m_Mode == FirstLevel)
 	{
+		if (m_Quest == BoardPersonalShipToNoctis &&
+			IsNear(FirstLevelPersonalShipCockpitPosition, 1.6f))
+			return L"[E] 개인 우주선으로 노크티스에 귀환";
 		for (int engineIndex = 0; engineIndex < 4; ++engineIndex)
 		{
 			if (IsNear(m_LevelEnginePositions[engineIndex], 1.45f))
@@ -1993,10 +2042,11 @@ std::wstring Game::InteractionText() const
 		if (IsNear(m_LevelControlPosition, 1.5f))
 		{
 			if (!AreLevelEnginesActive())
-				return L"[E] 감염된 이탈 제어 장치 - 엔진 복구 필요";
+				return L"[E] 감염된 시스템 제어 장치 - 엔진 복구 필요";
 			if (!AreLevelHostilesCleared())
 				return L"[E] 조종 장치 확인 - 적대 개체 제거 필요";
-			return L"[E] 에레보스에서 이탈하여 노크티스로 귀환";
+			return m_ErebusSystemsOnline ? L"에레보스 시스템 가동 중"
+									 : L"[E] 에레보스 시스템 복구";
 		}
 		for (size_t index = 0; index < m_MagazinePickups.size(); ++index)
 		{
@@ -2023,9 +2073,13 @@ std::wstring Game::InteractionText() const
 	{
 		if (!m_CoreRecovered)
 			return L"[E] 노크티스 항법 제어 장치 - 항법 코어 필요";
-		if (m_Quest == ReturnToCockpit)
-			return L"[E] 노크티스 조종석 사용";
+		if (m_Quest == ActivateNoctisSystems)
+			return L"[E] 노크티스 시스템 복구";
 	}
+	if ((m_Quest == BoardPersonalShipToErebus || m_Quest == BoardPersonalShipToStation) &&
+		IsNear(TutorialPersonalShipCockpitPosition, 1.6f))
+		return m_Quest == BoardPersonalShipToErebus ? L"[E] 개인 우주선으로 에레보스 출항"
+												 : L"[E] 개인 우주선으로 정거장 출항";
 	for (size_t index = 0; index < m_TutorialSurvivors.size(); ++index)
 	{
 		if (m_TutorialSurvivors[index].health > 0 &&
@@ -2049,10 +2103,8 @@ std::wstring Game::InteractionText() const
 		return L"[E] 구조 신호 조사";
 	if (m_Quest == FindCore && AllEnemiesDefeated() && IsNear(CorePosition, 1.2f))
 		return L"[E] 항법 코어 회수";
-	if (m_Quest == ReturnToCockpit && IsNear(CockpitPosition, 1.25f))
-		return L"[E] 코어 설치 및 우주선 조종";
-	if (m_Quest == FlyToStation && m_CurrentShip == 0 && IsNear(CockpitPosition, 1.25f))
-		return L"[E] 거대 우주 정거장으로 이동";
+	if (m_Quest == ActivateNoctisSystems && IsNear(CockpitPosition, 1.25f))
+		return L"[E] 항법 코어 설치 및 노크티스 시스템 복구";
 	return L"";
 }
 
@@ -2106,9 +2158,9 @@ void Game::RenderInterior()
 	int width = m_Renderer->Width();
 	int height = m_Renderer->Height();
 
-	for (int x = -22; x <= 22; ++x)
+	for (int x = -34; x <= 22; ++x)
 	{
-		for (int y = -22; y <= 22; ++y)
+		for (int y = -34; y <= 22; ++y)
 		{
 			if (!IsTutorialFloor(static_cast<float>(x), static_cast<float>(y)))
 				continue;
@@ -2118,20 +2170,41 @@ void Game::RenderInterior()
 				continue;
 			float checker = ((x + y) & 1) ? 0.015f : 0.0f;
 			float restored = m_CoreRecovered ? 0.035f : 0.0f;
+			const bool personalShipInterior =
+				std::fabs(static_cast<float>(x) + 28.0f) <= 4.5f &&
+				std::fabs(static_cast<float>(y) + 28.0f) <= 4.5f;
+			const bool dockingPassage = !personalShipInterior &&
+				((y >= -30 && y <= -26 && x >= -28 && x <= -20) ||
+					(x >= -22 && x <= -18 && y >= -28 && y <= -13));
+			float floorRed = 0.075f + checker;
+			float floorGreen = 0.105f + restored;
+			float floorBlue = 0.13f + restored;
+			if (dockingPassage)
+			{
+				floorRed = 0.10f + checker;
+				floorGreen = 0.145f;
+				floorBlue = 0.16f;
+			}
+			if (personalShipInterior)
+			{
+				floorRed = 0.055f + checker;
+				floorGreen = 0.17f;
+				floorBlue = 0.205f;
+			}
 			m_Renderer->DrawDiamond(p.x,
 				p.y,
 				TileWidth - 2.0f,
 				TileHeight - 1.0f,
-				0.075f + checker + (m_CurrentShip == 1 ? 0.025f : 0.0f),
-				0.105f + restored,
-				0.13f + restored + (m_CurrentShip == 1 ? 0.035f : 0.0f),
+				floorRed,
+				floorGreen,
+				floorBlue,
 				1.0f);
 		}
 	}
 
-	for (int x = -22; x <= 22; ++x)
+	for (int x = -34; x <= 22; ++x)
 	{
-		for (int y = -22; y <= 22; ++y)
+		for (int y = -34; y <= 22; ++y)
 		{
 			if (IsTutorialFloor(static_cast<float>(x), static_cast<float>(y)))
 				continue;
@@ -2185,6 +2258,7 @@ void Game::RenderInterior()
 				DrawWorldBlock(placedObstacle);
 			});
 	}
+	CreatePersonalShipInteriorActors(TutorialPersonalShipDockPosition);
 	CreateSceneActor("Player",
 		m_Player.x,
 		m_Player.y,
@@ -2308,13 +2382,13 @@ void Game::RenderInterior()
 				AllEnemiesDefeated() ? 1.0f : 0.45f);
 	}
 	ScreenPoint cockpit = WorldToScreen(CockpitPosition.x, CockpitPosition.y, 24.0f);
-	DrawFlightControlConsole(cockpit.x, cockpit.y, m_CoreRecovered, false);
+	DrawFlightControlConsole(cockpit.x, cockpit.y, m_NoctisSystemsOnline, false);
 	m_Renderer->DrawString(cockpit.x - 75.0f,
 		cockpit.y + 92.0f,
 		L"노크티스 항법 제어 장치",
-		m_CoreRecovered ? 0.28f : 0.70f,
-		m_CoreRecovered ? 0.88f : 0.36f,
-		m_CoreRecovered ? 0.92f : 0.34f,
+		m_NoctisSystemsOnline ? 0.28f : 0.70f,
+		m_NoctisSystemsOnline ? 0.88f : 0.36f,
+		m_NoctisSystemsOnline ? 0.92f : 0.34f,
 		0.95f);
 	if (m_CurrentShip == 0)
 	{
@@ -2915,45 +2989,36 @@ void Game::RenderSpace()
 		actor->LocalTransform().rotation = asteroid.rotation;
 	}
 
-	float destinationX = (DestinationPosition.x - m_ShipPosition.x) * 0.72f;
-	float destinationY = (DestinationPosition.y - m_ShipPosition.y) * 0.72f;
-	float beaconPulse = 0.55f + std::sin(m_TotalTime * 5.0f) * 0.25f;
-	m_Renderer->DrawDiamond(
-		destinationX, destinationY, 125.0f, 58.0f, 0.08f, 0.34f, 0.46f, beaconPulse);
-	m_Renderer->DrawRect(
-		destinationX, destinationY + 12.0f, 70.0f, 20.0f, 0.10f, 0.18f, 0.23f, 1.0f);
-	if (m_TravelDestinationShip == 2)
+	const wchar_t* fixedShipNames[] = {L"노크티스", L"에레보스", L"거대 우주 정거장"};
+	for (int fixedShipIndex = 0; fixedShipIndex < 3; ++fixedShipIndex)
 	{
-		m_Renderer->DrawDiamond(destinationX, destinationY + 12.0f, 270.0f, 126.0f,
-			0.08f, 0.15f, 0.22f, 1.0f);
-		m_Renderer->DrawDiamond(destinationX, destinationY + 12.0f, 180.0f, 86.0f,
-			0.12f, 0.48f, 0.58f, 0.92f);
-		m_Renderer->DrawRect(destinationX, destinationY + 55.0f, 34.0f, 150.0f,
-			0.10f, 0.24f, 0.31f, 1.0f);
-		m_Renderer->DrawString(destinationX - 78.0f, destinationY + 116.0f,
-			L"거대 우주 정거장", 0.48f, 0.90f, 0.94f, 1.0f);
-	}
-	else
-	{
-		const float destinationScale = m_TravelDestinationShip == 1 ? 2.3f : 1.6f;
-		const float destinationRed = m_TravelDestinationShip == 1 ? 0.32f : 0.20f;
-		Actor* destinationShip = CreateSceneActor("DestinationShip",
-			destinationX,
-			destinationY + 14.0f,
-			0.0f,
-			3,
-			destinationY,
-			[this, destinationScale, destinationRed](const ActorTransform& transform)
-			{
-				DrawShip(transform.x,
-					transform.y,
-					transform.rotation,
-					destinationScale * transform.scaleX,
-					destinationRed,
-					0.48f,
-					0.58f);
-			});
-		destinationShip->LocalTransform().rotation = -Pi * 0.5f;
+		const WorldPoint fixedPosition = FixedShipPosition(fixedShipIndex);
+		const float fixedX = (fixedPosition.x - m_ShipPosition.x) * 0.72f;
+		const float fixedY = (fixedPosition.y - m_ShipPosition.y) * 0.72f;
+		const bool destination = fixedShipIndex == m_TravelDestinationShip;
+		if (destination)
+		{
+			const float beaconPulse = 0.55f + std::sin(m_TotalTime * 5.0f) * 0.25f;
+			m_Renderer->DrawDiamond(
+				fixedX, fixedY, 125.0f, 58.0f, 0.08f, 0.34f, 0.46f, beaconPulse);
+		}
+		if (fixedShipIndex == 2)
+		{
+			m_Renderer->DrawDiamond(fixedX, fixedY + 12.0f, 270.0f, 126.0f,
+				0.08f, 0.15f, 0.22f, 1.0f);
+			m_Renderer->DrawDiamond(fixedX, fixedY + 12.0f, 180.0f, 86.0f,
+				0.12f, 0.48f, 0.58f, 0.92f);
+			m_Renderer->DrawRect(fixedX, fixedY + 55.0f, 34.0f, 150.0f,
+				0.10f, 0.24f, 0.31f, 1.0f);
+		}
+		else
+		{
+			const float scale = fixedShipIndex == 1 ? 2.3f : 1.8f;
+			DrawShip(fixedX, fixedY + 14.0f, -Pi * 0.5f, scale,
+				fixedShipIndex == 1 ? 0.32f : 0.20f, 0.48f, 0.58f);
+		}
+		m_Renderer->DrawString(
+			fixedX - 54.0f, fixedY + 104.0f, fixedShipNames[fixedShipIndex], 0.48f, 0.90f, 0.94f, 1.0f);
 	}
 	float impactShake = m_ShipImpactFlash > 0.0f ? std::sin(m_TotalTime * 95.0f) * 6.0f : 0.0f;
 	float shipX = impactShake;
@@ -2976,8 +3041,9 @@ void Game::RenderSpace()
 				0.82f);
 		});
 	playerShip->LocalTransform().rotation = m_ShipAngle;
-	float destinationDirectionX = DestinationPosition.x - m_ShipPosition.x;
-	float destinationDirectionY = DestinationPosition.y - m_ShipPosition.y;
+	const WorldPoint destinationPosition = FixedShipPosition(m_TravelDestinationShip);
+	float destinationDirectionX = destinationPosition.x - m_ShipPosition.x;
+	float destinationDirectionY = destinationPosition.y - m_ShipPosition.y;
 	const float destinationDirectionLength = Length(destinationDirectionX, destinationDirectionY);
 	if (destinationDirectionLength > 0.001f)
 	{
@@ -3128,6 +3194,95 @@ void Game::DrawLevelSurvivor(const LevelSurvivor& survivor, size_t survivorIndex
 		0.92f);
 }
 
+void Game::CreatePersonalShipInteriorActors(const WorldPoint& dockPosition)
+{
+	const Obstacle fixtures[] = {
+		{dockPosition.x,
+			dockPosition.y,
+			0.70f,
+			0.45f,
+			38.0f,
+			0.08f,
+			0.36f,
+			0.46f,
+			ControlConsole},
+		{dockPosition.x - 2.6f,
+			dockPosition.y + 1.8f,
+			0.55f,
+			0.65f,
+			42.0f,
+			0.10f,
+			0.29f,
+			0.38f,
+			PowerRelay},
+		{dockPosition.x + 2.6f,
+			dockPosition.y + 1.8f,
+			0.55f,
+			0.65f,
+			42.0f,
+			0.10f,
+			0.29f,
+			0.38f,
+			PowerRelay},
+		{dockPosition.x - 2.4f,
+			dockPosition.y - 2.2f,
+			0.62f,
+			0.52f,
+			47.0f,
+			0.12f,
+			0.34f,
+			0.42f,
+			EngineModule},
+		{dockPosition.x + 2.4f,
+			dockPosition.y - 2.2f,
+			0.62f,
+			0.52f,
+			47.0f,
+			0.12f,
+			0.34f,
+			0.42f,
+			EngineModule},
+	};
+
+	const size_t fixtureCount = sizeof(fixtures) / sizeof(fixtures[0]);
+	for (size_t fixtureIndex = 0; fixtureIndex < fixtureCount; ++fixtureIndex)
+	{
+		const Obstacle fixture = fixtures[fixtureIndex];
+		CreateSceneActor("PersonalShipFixture",
+			fixture.x,
+			fixture.y,
+			0.0f,
+			2,
+			fixture.x + fixture.y,
+			[this, fixture](const ActorTransform& transform)
+			{
+				Obstacle placedFixture = fixture;
+				placedFixture.x = transform.x;
+				placedFixture.y = transform.y;
+				DrawWorldBlock(placedFixture);
+			});
+	}
+
+	CreateSceneActor("PersonalShipCockpit",
+		dockPosition.x,
+		dockPosition.y + 3.0f,
+		0.0f,
+		3,
+		dockPosition.x + dockPosition.y + 3.0f,
+		[this](const ActorTransform& transform)
+		{
+			const ScreenPoint cockpit = WorldToScreen(transform.x, transform.y, 17.0f);
+			DrawFlightControlConsole(cockpit.x, cockpit.y, true, false);
+			m_Renderer->DrawString(cockpit.x - 61.0f,
+				cockpit.y + 78.0f,
+				L"개인 우주선 조종석",
+				0.30f,
+				0.86f,
+				0.96f,
+				0.95f);
+		});
+}
+
 void Game::DrawAsteroid(const Asteroid& asteroid)
 {
 	float x = (asteroid.position.x - m_ShipPosition.x) * 0.72f;
@@ -3233,13 +3388,33 @@ void Game::RenderFirstLevel()
 			continue;
 
 		float roomLight = tile.type == 2 ? 0.018f : 0.0f;
+		const bool personalShipInterior =
+			std::fabs(tile.position.x + 57.0f) <= 4.5f &&
+			std::fabs(tile.position.y + 57.0f) <= 4.5f;
+		const bool dockingPassage = !personalShipInterior && tile.type == 1 &&
+			tile.position.x < -31.0f && tile.position.y < -43.0f;
+		float floorRed = 0.050f + tile.variation + roomLight;
+		float floorGreen = 0.078f + tile.variation + roomLight;
+		float floorBlue = 0.098f + tile.variation + roomLight;
+		if (dockingPassage)
+		{
+			floorRed = 0.105f + tile.variation;
+			floorGreen = 0.135f + tile.variation;
+			floorBlue = 0.145f + tile.variation;
+		}
+		if (personalShipInterior)
+		{
+			floorRed = 0.050f + tile.variation;
+			floorGreen = 0.175f + tile.variation;
+			floorBlue = 0.215f + tile.variation;
+		}
 		m_Renderer->DrawDiamond(screen.x,
 			screen.y,
 			TileWidth - 2.0f,
 			TileHeight - 1.0f,
-			0.050f + tile.variation + roomLight,
-			0.078f + tile.variation + roomLight,
-			0.098f + tile.variation + roomLight,
+			floorRed,
+			floorGreen,
+			floorBlue,
 			1.0f);
 		if (tile.type == 1 && (static_cast<int>(tile.position.x + tile.position.y) & 3) == 0)
 			m_Renderer->DrawDiamond(
@@ -3268,6 +3443,7 @@ void Game::RenderFirstLevel()
 				m_ModelLibrary.Draw(m_Renderer, "corridor_wall", wall.x, wall.y, 0.92f);
 			});
 	}
+	CreatePersonalShipInteriorActors(FirstLevelPersonalShipDockPosition);
 
 	if (!m_LevelWeaponCollected)
 	{
@@ -3393,9 +3569,9 @@ void Game::RenderFirstLevel()
 			DrawFlightControlConsole(control.x, control.y, enginesActive, !enginesActive);
 			m_Renderer->DrawString(control.x - 75.0f,
 				control.y + 92.0f,
-				!enginesActive ? L"감염된 이탈 제어 장치"
-							   : (departureReady ? L"에레보스 이탈 제어 장치 [E]"
-											 : L"이탈 잠금: 적대 개체 제거 필요"),
+				!enginesActive ? L"감염된 시스템 제어 장치"
+							   : (departureReady ? L"에레보스 시스템 제어 장치 [E]"
+											 : L"시스템 잠금: 적대 개체 제거 필요"),
 				enginesActive ? 0.34f : 0.90f,
 				enginesActive ? 0.90f : 0.24f,
 				enginesActive ? 0.92f : 0.96f,
@@ -4008,7 +4184,7 @@ void Game::RenderGameplayMinimap()
 	const float panelHeight = 190.0f;
 	const float mapHalfWidth = 111.0f;
 	const float mapHalfHeight = 72.0f;
-	const float worldHalfSize = m_Mode == FirstLevel ? 64.0f : 22.0f;
+	const float worldHalfSize = m_Mode == FirstLevel ? 64.0f : 34.0f;
 
 	m_Renderer->DrawDiamond(
 		centerX, centerY, panelWidth + 8.0f, panelHeight + 8.0f, 0.10f, 0.42f, 0.50f, 0.78f);
@@ -4026,7 +4202,7 @@ void Game::RenderGameplayMinimap()
 		const WorldPoint& point)
 	{
 		const float isoX = point.x - point.y;
-		const float isoY = (point.x + point.y) * 0.5f;
+		const float isoY = -(point.x + point.y) * 0.5f;
 		return ScreenPoint{centerX + isoX / (worldHalfSize * 2.0f) * mapHalfWidth,
 			centerY + isoY / worldHalfSize * mapHalfHeight};
 	};
@@ -4105,11 +4281,13 @@ void Game::RenderGameplayMinimap()
 			drawMarker(CorePosition, 9.0f, 1.0f, 0.36f, 0.18f, 1.0f);
 		if (m_CoreRecovered && !m_SignalChecked)
 			drawMarker(SignalPosition, 8.0f, 0.86f, 0.34f, 0.94f, 1.0f);
-		if (m_Quest == ReturnToCockpit)
+		if (m_Quest == ActivateNoctisSystems)
 			drawMarker(CockpitPosition, 9.0f, 0.20f, 0.82f, 0.94f, 1.0f);
+		drawMarker(TutorialPersonalShipDockPosition, 9.0f, 0.22f, 0.76f, 1.0f, 1.0f);
 	}
 	else
 	{
+		drawMarker(FirstLevelPersonalShipDockPosition, 9.0f, 0.22f, 0.76f, 1.0f, 1.0f);
 		for (size_t index = 0; index < m_StoryDocuments.size(); ++index)
 			drawMarker(m_StoryDocuments[index].position,
 				6.0f,

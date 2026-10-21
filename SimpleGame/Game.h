@@ -156,7 +156,8 @@ class Game
 		InspectTerminal,
 		CollectTutorialWeapon,
 		FindCore,
-		ReturnToCockpit,
+		ActivateNoctisSystems,
+		BoardPersonalShipToErebus,
 		FlyToSignal,
 		QuestComplete,
 		CollectLevelWeapon,
@@ -164,7 +165,9 @@ class Game
 		AllocateStats,
 		FirstLevelComplete,
 		ExploreErebus,
+		BoardPersonalShipToNoctis,
 		ReturnToNoctis,
+		BoardPersonalShipToStation,
 		FlyToStation
 	};
 
@@ -193,6 +196,8 @@ class Game
 	bool AllStoryDocumentsRead() const;
 	bool AreLevelEnginesActive() const;
 	bool AreLevelHostilesCleared() const;
+	WorldPoint FixedShipPosition(int shipIndex) const;
+	void BeginPersonalShipTravel(int destinationShip);
 	bool IsInsideSpaceBoundary(const WorldPoint& point) const;
 	ScreenPoint WorldToScreen(float x, float y, float height = 0.0f) const;
 	std::wstring ObjectiveText() const;
@@ -223,6 +228,7 @@ class Game
 	void DrawNeutralNpc(const NeutralNpc& npc);
 	void DrawLevelSurvivor(const LevelSurvivor& survivor, size_t survivorIndex);
 	void DrawFlightControlConsole(float x, float y, bool powered, bool infected);
+	void CreatePersonalShipInteriorActors(const WorldPoint& dockPosition);
 	void DrawAsteroid(const Asteroid& asteroid);
 	void DrawShip(float x, float y, float angle, float scale, float r, float g, float b);
 
@@ -241,6 +247,8 @@ class Game
 	QuestStage m_Quest;
 	bool m_Paused;
 	bool m_CoreRecovered;
+	bool m_NoctisSystemsOnline;
+	bool m_ErebusSystemsOnline;
 	bool m_TutorialRecordsRead[3];
 	bool m_SignalChecked;
 	bool m_MedicalDroneUsed;

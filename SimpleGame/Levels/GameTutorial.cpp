@@ -118,5 +118,11 @@ bool Game::IsTutorialFloor(float x, float y) const
 	const bool verticalCorridor = std::fabs(y) <= 5.0f &&
 		(std::fabs(x + 13.0f) <= corridorHalfWidth ||
 			std::fabs(x - 13.0f) <= corridorHalfWidth);
-	return horizontalCorridor || verticalCorridor;
+	const bool dockingBay =
+		std::fabs(x + 28.0f) <= 4.5f && std::fabs(y + 28.0f) <= 4.5f;
+	const bool dockingHorizontal =
+		y >= -29.75f && y <= -26.25f && x >= -28.0f && x <= -20.0f;
+	const bool dockingVertical =
+		x >= -21.75f && x <= -18.25f && y >= -28.0f && y <= -13.0f;
+	return horizontalCorridor || verticalCorridor || dockingBay || dockingHorizontal || dockingVertical;
 }

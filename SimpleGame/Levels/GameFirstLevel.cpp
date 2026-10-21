@@ -10,7 +10,6 @@
 
 namespace
 {
-const float Pi = 3.1415926535f;
 const WorldPoint FirstLevelWeaponPosition = {-1.5f, 0.0f};
 
 enum SurvivorPattern
@@ -141,7 +140,7 @@ void Game::UpdateFirstLevel(float deltaSeconds)
 				if (m_LevelEngineActive[countIndex])
 					++activeCount;
 			if (activeCount == 4)
-				SetMessage(L"네 개의 보조 엔진이 모두 가동되었습니다. 조종석의 감염막이 약해집니다.", 4.0f);
+				SetMessage(L"네 개의 보조 엔진이 모두 가동되었습니다. 중앙 시스템 제어 장치의 감염막이 약해집니다.", 4.0f);
 			else
 				SetMessage(L"보조 엔진 가동: " + std::to_wstring(activeCount) + L" / 4", 2.5f);
 			break;
@@ -151,21 +150,23 @@ void Game::UpdateFirstLevel(float deltaSeconds)
 		{
 			interactionHandled = true;
 			if (!AreLevelEnginesActive())
-				SetMessage(L"이탈 제어 장치가 감염막에 잠겨 있습니다. 보조 엔진 네 개를 모두 가동하십시오.", 4.0f);
+				SetMessage(L"시스템 제어 장치가 감염막에 잠겨 있습니다. 보조 엔진 네 개를 모두 가동하십시오.", 4.0f);
 			else if (!AreLevelHostilesCleared())
 				SetMessage(L"항로 안전 확보 실패: 모든 공허종과 공황 분대를 처치해야 합니다.", 4.0f);
 			else
 			{
-				m_Quest = ReturnToNoctis;
-				m_TravelDestinationShip = 0;
-				m_ShipPosition = {0.0f, 0.0f};
-				m_PreviousShipPosition = m_ShipPosition;
-				m_ShipVelocity = {0.0f, 0.0f};
-				m_ShipAngle = Pi * 0.5f;
-				m_Mode = ShipControl;
-				SetMessage(L"자료 전송 완료. 에레보스에서 이탈해 노크티스로 귀환하십시오.", 4.5f);
+				m_ErebusSystemsOnline = true;
+				m_Quest = BoardPersonalShipToNoctis;
+				SetMessage(L"에레보스 시스템 복구 완료. 도킹 통로를 따라 개인 우주선으로 복귀하십시오.", 4.5f);
 				return;
 			}
+		}
+		if (!interactionHandled && m_Quest == BoardPersonalShipToNoctis &&
+			IsNear(WorldPoint{-57.0f, -54.0f}, 1.6f))
+		{
+			m_Quest = ReturnToNoctis;
+			BeginPersonalShipTravel(0);
+			return;
 		}
 		for (size_t index = 0; index < m_MagazinePickups.size(); ++index)
 		{
@@ -416,6 +417,31 @@ void Game::GenerateFirstLevel()
 	for (int connectionIndex = 0; connectionIndex < connectionCount; ++connectionIndex)
 		connectRooms(connections[connectionIndex][0], connections[connectionIndex][1]);
 
+	// A fixed docking bay in the south-west corner connects the personal ship to Erebus.
+	const int dockX = halfSize - 57;
+	const int dockY = halfSize - 57;
+	for (int y = dockY - 4; y <= dockY + 4; ++y)
+	{
+		for (int x = dockX - 4; x <= dockX + 4; ++x)
+		{
+			if (x > 0 && y > 0 && x < m_FirstLevelSize - 1 && y < m_FirstLevelSize - 1)
+				m_FirstLevelTiles[y * m_FirstLevelSize + x] = 2;
+		}
+	}
+	int dockCorridorX = dockX;
+	int dockCorridorY = dockY;
+	while (dockCorridorX != rooms[15].centerX)
+	{
+		carveTile(dockCorridorX, dockCorridorY);
+		dockCorridorX += dockCorridorX < rooms[15].centerX ? 1 : -1;
+	}
+	while (dockCorridorY != rooms[15].centerY)
+	{
+		carveTile(dockCorridorX, dockCorridorY);
+		dockCorridorY += dockCorridorY < rooms[15].centerY ? 1 : -1;
+	}
+	carveTile(rooms[15].centerX, rooms[15].centerY);
+
 	m_FirstLevelFloorVisuals.clear();
 	m_FirstLevelWallVisuals.clear();
 	for (int tileY = 0; tileY < m_FirstLevelSize; ++tileY)
@@ -458,7 +484,7 @@ void Game::GenerateFirstLevel()
 		m_LevelEngineActive[engineIndex] = false;
 	m_LevelControlPosition = toWorld(rooms[0], 2.5f, 0.0f);
 
-	m_Player = toWorld(rooms[0], 0.0f, 0.0f);
+	m_Player = {-52.0f, -57.0f};
 	m_LevelCorpses.clear();
 	for (int roomIndex = 1; roomIndex < roomCount; roomIndex += 2)
 	{
