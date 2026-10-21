@@ -58,7 +58,8 @@
   </section>
   <script>
     const escapeText = value => String(value ?? '');
-    const statusNames = {current_secured:'현재 지역 · 안정',current_emergency:'현재 지역 · 비상',secured:'안정',emergency:'비상',unvisited:'미방문',current_contested:'현재 지역 · 교전 중',contested:'교전 중',current_reached:'현재 지역 · 도착'};
+    const statusNames = {current_secured:'현재 지역 · 안정',current_emergency:'현재 지역 · 비상',secured:'안정',emergency:'비상',unvisited:'미방문',current_contested:'현재 지역 · 교전 중',contested:'교전 중',current_reached:'현재 지역 · 도착',remote_distress:'원격 조난 신호',remote_contested:'원격 교전 중',remote_lockdown:'원격 봉쇄 중'};
+    const atmosphereNames = {emergency_recovery:'비상 복구',contested_refugee_ship:'난민선 교전',quarantine_silence:'격리 구역의 정적',industrial_panic:'산업 구역의 공황',military_lockdown:'군사 봉쇄',unknown:'정보 없음'};
     const stateNames = {dead:'사망',panic:'공황',frightened:'공포',stable:'안정'};
     let previousSnapshot=null, currentSnapshot=null, mapSnapshot=null, transitionStarted=0, minimapLayoutKey='', updateInFlight=false;
     const minimapViews=new Map(), transitionDuration=90;
@@ -75,11 +76,11 @@
     function createIsometricProjector(terrain, bounds, width, height) {
       const samples=terrain.length ? terrain : [[bounds.minX,bounds.minY],[bounds.maxX,bounds.minY],[bounds.minX,bounds.maxY],[bounds.maxX,bounds.maxY]];
       let minU=Infinity,maxU=-Infinity,minV=Infinity,maxV=-Infinity;
-      for (const tile of samples) { const x=Number(tile[0]),y=Number(tile[1]),u=x-y,v=(x+y)*.5; minU=Math.min(minU,u-1); maxU=Math.max(maxU,u+1); minV=Math.min(minV,v-.5); maxV=Math.max(maxV,v+.5); }
+      for (const tile of samples) { const x=Number(tile[0]),y=Number(tile[1]),u=x-y,v=-(x+y)*.5; minU=Math.min(minU,u-1); maxU=Math.max(maxU,u+1); minV=Math.min(minV,v-.5); maxV=Math.max(maxV,v+.5); }
       const padding=24, scale=Math.min((width-padding*2)/(maxU-minU),(height-padding*2)/(maxV-minV));
       const usedWidth=(maxU-minU)*scale,usedHeight=(maxV-minV)*scale;
       const offsetX=(width-usedWidth)*.5-minU*scale,offsetY=(height-usedHeight)*.5-minV*scale;
-      return point => ({x:(Number(point.x)-Number(point.y))*scale+offsetX,y:(Number(point.x)+Number(point.y))*.5*scale+offsetY,scale});
+      return point => ({x:(Number(point.x)-Number(point.y))*scale+offsetX,y:-(Number(point.x)+Number(point.y))*.5*scale+offsetY,scale});
     }
     function drawDot(context, point, projector, color, radius) {
       if (!point || !Number.isFinite(Number(point.x)) || !Number.isFinite(Number(point.y))) return;
@@ -157,7 +158,10 @@
         const status = document.createElement('div'); status.className = 'status'; status.textContent = statusNames[region.status] || region.status;
         const counts = document.createElement('div'); counts.className = 'counts';
         counts.textContent = `NPC ${region.npcAlive}/${region.npcTotal} · 몹 ${region.mobAlive}/${region.mobTotal}`;
-        card.append(title, status, counts); regions.append(card);
+        const atmosphere = document.createElement('div'); atmosphere.className = 'counts';
+        const mood = region.atmosphere || {};
+        atmosphere.textContent = `분위기 ${atmosphereNames[mood.profile] || mood.profile || '정보 없음'} · 공포 ${mood.fear ?? 0}% · 오염 ${mood.contamination ?? 0}% · 전력 ${mood.power ?? 0}%`;
+        card.append(title, status, counts, atmosphere); regions.append(card);
       }
       const body = document.querySelector('#npcs'); body.replaceChildren();
       for (const npc of data.npcs || []) {

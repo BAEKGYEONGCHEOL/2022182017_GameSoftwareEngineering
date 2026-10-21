@@ -653,7 +653,28 @@ WorldPoint Game::FixedShipPosition(int shipIndex) const
 		return ErebusSpacePosition;
 	if (shipIndex == 2)
 		return StationSpacePosition;
+	if (shipIndex == 3)
+		return Level02AsterionProfile().spacePosition;
+	if (shipIndex == 4)
+		return Level03VesperProfile().spacePosition;
+	if (shipIndex == 5)
+		return Level04HeliosProfile().spacePosition;
 	return NoctisSpacePosition;
+}
+
+const wchar_t* Game::FixedShipName(int shipIndex) const
+{
+	if (shipIndex == 1)
+		return L"에레보스";
+	if (shipIndex == 2)
+		return L"거대 우주 정거장";
+	if (shipIndex == 3)
+		return Level02AsterionProfile().name;
+	if (shipIndex == 4)
+		return Level03VesperProfile().name;
+	if (shipIndex == 5)
+		return Level04HeliosProfile().name;
+	return L"노크티스";
 }
 
 void Game::BeginPersonalShipTravel(int destinationShip)
@@ -1754,8 +1775,9 @@ std::string Game::BuildMonitoringJson() const
 
 	std::ostringstream json;
 	json << std::fixed << std::setprecision(2);
-	json << "{\"schemaVersion\":3,\"sequence\":" << m_MonitoringSequence
+	json << "{\"schemaVersion\":4,\"sequence\":" << m_MonitoringSequence
 		 << ",\"mapRevision\":" << m_MonitoringMapRevision
+		 << ",\"shipCount\":5"
 		 << ",\"gameMode\":" << JsonString(modeName)
 		 << ",\"currentRegion\":" << JsonString(currentRegion)
 		 << ",\"regions\":[";
@@ -1763,16 +1785,35 @@ std::string Game::BuildMonitoringJson() const
 		 << ",\"status\":" << JsonString(noctisStatus)
 		 << ",\"npcAlive\":" << noctisNpcAlive << ",\"npcTotal\":" << noctisNpcTotal
 		 << ",\"mobAlive\":" << noctisMobAlive << ",\"mobTotal\":" << noctisMobTotal
+		 << ",\"atmosphere\":{\"profile\":\"emergency_recovery\",\"fear\":64,\"contamination\":18,\"power\":"
+		 << (m_NoctisSystemsOnline ? 82 : 24) << "}"
 		 << ",\"mapAvailable\":true,\"bounds\":{\"minX\":-34,\"maxX\":22,\"minY\":-34,\"maxY\":22}},";
 	json << "{\"id\":\"erebus\",\"name\":" << JsonString(L"수송선 에레보스")
 		 << ",\"status\":" << JsonString(erebusStatus)
 		 << ",\"npcAlive\":" << erebusNpcAlive << ",\"npcTotal\":" << erebusNpcTotal
 		 << ",\"mobAlive\":" << erebusMobAlive << ",\"mobTotal\":" << erebusMobTotal
+		 << ",\"atmosphere\":{\"profile\":\"contested_refugee_ship\",\"fear\":88,\"contamination\":73,\"power\":"
+		 << (m_ErebusSystemsOnline ? 68 : 19) << "}"
 		 << ",\"mapAvailable\":" << (erebusGenerated ? "true" : "false")
 		 << ",\"bounds\":{\"minX\":-64,\"maxX\":64,\"minY\":-64,\"maxY\":64}},";
+	const ShipLevelProfile remoteShipProfiles[] = {
+		Level02AsterionProfile(), Level03VesperProfile(), Level04HeliosProfile()};
+	for (int profileIndex = 0; profileIndex < 3; ++profileIndex)
+	{
+		const ShipLevelProfile& profile = remoteShipProfiles[profileIndex];
+		json << "{\"id\":" << JsonString(profile.id) << ",\"name\":" << JsonString(profile.name)
+			 << ",\"status\":" << JsonString(profile.status)
+			 << ",\"npcAlive\":" << profile.npcAlive << ",\"npcTotal\":" << profile.npcTotal
+			 << ",\"mobAlive\":" << profile.voidAlive << ",\"mobTotal\":" << profile.voidTotal
+			 << ",\"atmosphere\":{\"profile\":" << JsonString(profile.atmosphereProfile)
+			 << ",\"fear\":" << profile.fear << ",\"contamination\":" << profile.contamination
+			 << ",\"power\":" << profile.power << "}"
+			 << ",\"mapAvailable\":false,\"bounds\":{\"minX\":-64,\"maxX\":64,\"minY\":-64,\"maxY\":64}},";
+	}
 	json << "{\"id\":\"station\",\"name\":" << JsonString(L"거대 우주 정거장")
 		 << ",\"status\":" << JsonString(stationStatus)
 		 << ",\"npcAlive\":0,\"npcTotal\":0,\"mobAlive\":0,\"mobTotal\":0"
+		 << ",\"atmosphere\":{\"profile\":\"unknown\",\"fear\":0,\"contamination\":0,\"power\":0}"
 		 << ",\"mapAvailable\":false,\"bounds\":{\"minX\":-1,\"maxX\":1,\"minY\":-1,\"maxY\":1}}],";
 	const bool playerVisible = m_Mode == OnFoot || m_Mode == FirstLevel;
 	json << "\"player\":{\"visible\":" << (playerVisible ? "true" : "false")
@@ -1828,6 +1869,32 @@ std::string Game::BuildMonitoringJson() const
 			: (npc.confused ? "panic" : (npc.fear >= 0.60f ? "frightened" : "stable"));
 		appendNpc("erebus_survivor_" + std::to_string(index),
 			SurvivorRoleName(npc.pattern), "erebus", state, npc.health, 3.0f, npc.fear, npc.armed, npc.squadId, npc.position);
+	}
+	for (int shipIndex = 0; shipIndex < 3; ++shipIndex)
+	{
+		const ShipLevelProfile& profile = remoteShipProfiles[shipIndex];
+		for (int npcIndex = 0; npcIndex < 20; ++npcIndex)
+		{
+			const bool alive = npcIndex < profile.npcAlive;
+			const float fear = alive
+				? 0.38f + static_cast<float>((npcIndex * 13 + shipIndex * 19) % 57) / 100.0f
+				: 1.0f;
+			const char* state = !alive ? "dead" : (fear >= 0.78f ? "panic" : "frightened");
+			const WorldPoint position = {
+				-48.0f + static_cast<float>((npcIndex % 5) * 21),
+				-46.0f + static_cast<float>((npcIndex / 5) * 27)};
+			appendNpc(std::string(profile.id) + "_survivor_" +
+					std::to_string(npcIndex),
+				L"원격 생존 신호 " + std::to_wstring(npcIndex + 1),
+				profile.id,
+				state,
+				alive ? 3.0f : 0.0f,
+				3.0f,
+				fear,
+				npcIndex % 3 == 0,
+				-1,
+				position);
+		}
 	}
 	json << "],\"mobs\":[";
 	bool firstMob = true;
@@ -2989,8 +3056,7 @@ void Game::RenderSpace()
 		actor->LocalTransform().rotation = asteroid.rotation;
 	}
 
-	const wchar_t* fixedShipNames[] = {L"노크티스", L"에레보스", L"거대 우주 정거장"};
-	for (int fixedShipIndex = 0; fixedShipIndex < 3; ++fixedShipIndex)
+	for (int fixedShipIndex = 0; fixedShipIndex < 6; ++fixedShipIndex)
 	{
 		const WorldPoint fixedPosition = FixedShipPosition(fixedShipIndex);
 		const float fixedX = (fixedPosition.x - m_ShipPosition.x) * 0.72f;
@@ -3013,12 +3079,13 @@ void Game::RenderSpace()
 		}
 		else
 		{
-			const float scale = fixedShipIndex == 1 ? 2.3f : 1.8f;
-			DrawShip(fixedX, fixedY + 14.0f, -Pi * 0.5f, scale,
-				fixedShipIndex == 1 ? 0.32f : 0.20f, 0.48f, 0.58f);
+			const float scale = fixedShipIndex == 1 ? 2.3f : (fixedShipIndex >= 3 ? 1.65f : 1.8f);
+			const float red = fixedShipIndex == 1 ? 0.32f : (fixedShipIndex == 4 ? 0.34f : 0.20f);
+			const float green = fixedShipIndex == 3 ? 0.62f : (fixedShipIndex == 5 ? 0.38f : 0.48f);
+			DrawShip(fixedX, fixedY + 14.0f, -Pi * 0.5f, scale, red, green, 0.58f);
 		}
 		m_Renderer->DrawString(
-			fixedX - 54.0f, fixedY + 104.0f, fixedShipNames[fixedShipIndex], 0.48f, 0.90f, 0.94f, 1.0f);
+			fixedX - 54.0f, fixedY + 104.0f, FixedShipName(fixedShipIndex), 0.48f, 0.90f, 0.94f, 1.0f);
 	}
 	float impactShake = m_ShipImpactFlash > 0.0f ? std::sin(m_TotalTime * 95.0f) * 6.0f : 0.0f;
 	float shipX = impactShake;

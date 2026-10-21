@@ -72,6 +72,7 @@
   <PropertyGroup Label="UserMacros" />
 	<ItemDefinitionGroup>
 	  <ClCompile>
+		<AdditionalIncludeDirectories>$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 		<AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
 	  </ClCompile>
 	</ItemDefinitionGroup>
@@ -173,8 +174,11 @@
 	<ItemGroup>
 	<ClCompile Include="Actor.cpp" />
 	<ClCompile Include="Game.cpp" />
-	<ClCompile Include="Levels\GameFirstLevel.cpp" />
-	<ClCompile Include="Levels\GameTutorial.cpp" />
+	<ClCompile Include="Levels\GameLevel00NoctisTutorial.cpp" />
+	<ClCompile Include="Levels\GameLevel01Erebus.cpp" />
+	<ClCompile Include="Levels\GameLevel02Asterion.cpp" />
+	<ClCompile Include="Levels\GameLevel03Vesper.cpp" />
+	<ClCompile Include="Levels\GameLevel04Helios.cpp" />
 	<ClCompile Include="LocalMonitoringServer.cpp" />
 	<ClCompile Include="ModelLibrary.cpp" />
 	<ClCompile Include="PrototypeRenderer.cpp" />

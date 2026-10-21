@@ -15,6 +15,23 @@ struct WorldPoint
 	float y;
 };
 
+struct ShipLevelProfile
+{
+	int shipIndex;
+	const char* id;
+	const wchar_t* name;
+	WorldPoint spacePosition;
+	int npcAlive;
+	int npcTotal;
+	int voidAlive;
+	int voidTotal;
+	const char* status;
+	const char* atmosphereProfile;
+	int fear;
+	int contamination;
+	int power;
+};
+
 enum InteriorObjectType
 {
 	CargoCrate,
@@ -197,6 +214,10 @@ class Game
 	bool AreLevelEnginesActive() const;
 	bool AreLevelHostilesCleared() const;
 	WorldPoint FixedShipPosition(int shipIndex) const;
+	const wchar_t* FixedShipName(int shipIndex) const;
+	ShipLevelProfile Level02AsterionProfile() const;
+	ShipLevelProfile Level03VesperProfile() const;
+	ShipLevelProfile Level04HeliosProfile() const;
 	void BeginPersonalShipTravel(int destinationShip);
 	bool IsInsideSpaceBoundary(const WorldPoint& point) const;
 	ScreenPoint WorldToScreen(float x, float y, float height = 0.0f) const;
