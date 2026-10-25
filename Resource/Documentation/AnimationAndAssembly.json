@@ -25,6 +25,13 @@
       "turn_right": "HUM_Turn_Right_90",
       "attack": "HUM_Attack_Melee",
       "jump": "HUM_Jump",
+      "aim_enter": "HUM_Aim_Rifle_Enter",
+      "aim_idle": {
+        "action": "HUM_Aim_Rifle_Idle",
+        "loop": true
+      },
+      "aim_fire": "HUM_Aim_Rifle_Fire",
+      "death": "HUM_Death_Fall",
       "walk_to_run": {
         "action": "HUM_Walk_To_Run",
         "then": "HUM_Run_Loop"
@@ -42,7 +49,8 @@
     "recommended_layers": [
       "locomotion base",
       "directional pose additive",
-      "upper-body attack override"
+      "upper-body rifle aim override",
+      "attack or fire override"
     ]
   },
   "void_quadruped": {
@@ -59,8 +67,10 @@
       },
       "turn_left": "VOID_Turn_Left_90",
       "turn_right": "VOID_Turn_Right_90",
-      "attack": "VOID_Attack_Pounce",
+      "attack": "VOID_Attack_Claw",
+      "pounce": "VOID_Attack_Pounce",
       "jump": "VOID_Jump",
+      "death": "VOID_Death_Collapse",
       "walk_to_run": "VOID_Walk_To_Run",
       "run_to_walk": "VOID_Run_To_Walk",
       "directional_pose_blend": [

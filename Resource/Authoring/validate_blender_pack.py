@@ -13,8 +13,8 @@ FILES = [
 ]
 
 EXPECTED = {
-    'Humanoid_Modular.blend': ['HUM_Walk_Loop', 'HUM_Run_Loop', 'HUM_Turn_Left_90', 'HUM_Turn_Right_90', 'HUM_Attack_Melee', 'HUM_Jump', 'HUM_Walk_To_Run', 'HUM_Run_To_Walk', 'HUM_Pose_Turn_Neg45', 'HUM_Pose_Turn_Zero', 'HUM_Pose_Turn_Pos45'],
-    'Void_Quadruped.blend': ['VOID_Walk_Loop', 'VOID_Run_Loop', 'VOID_Turn_Left_90', 'VOID_Turn_Right_90', 'VOID_Attack_Pounce', 'VOID_Jump', 'VOID_Walk_To_Run', 'VOID_Run_To_Walk', 'VOID_Pose_Turn_Neg45', 'VOID_Pose_Turn_Zero', 'VOID_Pose_Turn_Pos45'],
+    'Humanoid_Modular.blend': ['HUM_Walk_Loop', 'HUM_Run_Loop', 'HUM_Turn_Left_90', 'HUM_Turn_Right_90', 'HUM_Attack_Melee', 'HUM_Jump', 'HUM_Walk_To_Run', 'HUM_Run_To_Walk', 'HUM_Pose_Turn_Neg45', 'HUM_Pose_Turn_Zero', 'HUM_Pose_Turn_Pos45', 'HUM_Aim_Rifle_Enter', 'HUM_Aim_Rifle_Idle', 'HUM_Aim_Rifle_Fire', 'HUM_Death_Fall'],
+    'Void_Quadruped.blend': ['VOID_Walk_Loop', 'VOID_Run_Loop', 'VOID_Turn_Left_90', 'VOID_Turn_Right_90', 'VOID_Attack_Pounce', 'VOID_Attack_Claw', 'VOID_Jump', 'VOID_Walk_To_Run', 'VOID_Run_To_Walk', 'VOID_Pose_Turn_Neg45', 'VOID_Pose_Turn_Zero', 'VOID_Pose_Turn_Pos45', 'VOID_Death_Collapse'],
 }
 
 

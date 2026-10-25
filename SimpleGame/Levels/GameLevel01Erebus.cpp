@@ -112,9 +112,9 @@ void Game::UpdateFirstLevel(float deltaSeconds)
 		float nextX = m_Player.x + direction.x * speed * deltaSeconds;
 		float nextY = m_Player.y + direction.y * speed * deltaSeconds;
 
-		if (IsFirstLevelWalkable(nextX, m_Player.y))
+		if (IsFirstLevelAreaWalkable(nextX, m_Player.y, 0.28f))
 			m_Player.x = nextX;
-		if (IsFirstLevelWalkable(m_Player.x, nextY))
+		if (IsFirstLevelAreaWalkable(m_Player.x, nextY, 0.28f))
 			m_Player.y = nextY;
 	}
 
@@ -123,7 +123,7 @@ void Game::UpdateFirstLevel(float deltaSeconds)
 	{
 		m_LevelWeaponCollected = true;
 		m_Quest = EarnExperience;
-		SetMessage(L"훈련용 펄스 소총 획득: 12발 탄창, 예비 탄창 3개. 마우스로 사격합니다.", 4.0f);
+		SetMessage(L"훈련용 펄스 소총 획득: 12발 탄창, 예비 탄창 3개. 마우스 방향으로 사격합니다.", 4.0f);
 	}
 	else if (m_KeyPressed['e'] || m_KeyPressed['E'])
 	{
@@ -607,6 +607,29 @@ bool Game::IsFirstLevelWalkable(float x, float y) const
 		return false;
 
 	return m_FirstLevelTiles[tileY * m_FirstLevelSize + tileX] > 0;
+}
+
+bool Game::IsFirstLevelAreaWalkable(float x, float y, float radius) const
+{
+	const float diagonal = radius * 0.70710678f;
+	const float sampleOffsets[9][2] = {{0.0f, 0.0f},
+		{radius, 0.0f},
+		{-radius, 0.0f},
+		{0.0f, radius},
+		{0.0f, -radius},
+		{diagonal, diagonal},
+		{diagonal, -diagonal},
+		{-diagonal, diagonal},
+		{-diagonal, -diagonal}};
+	for (int sample = 0; sample < 9; ++sample)
+	{
+		if (!IsFirstLevelWalkable(x + sampleOffsets[sample][0],
+				y + sampleOffsets[sample][1]))
+		{
+			return false;
+		}
+	}
+	return true;
 }
 
 void Game::AwardExperience(int amount, const WorldPoint& position)

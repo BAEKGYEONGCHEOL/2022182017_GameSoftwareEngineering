@@ -5,8 +5,10 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 OUTPUT = os.path.join(ROOT, "SimpleGame", "Data", "RuntimeMeshes.txt")
 
 GROUPS = {
-    "humanoid_soldier": lambda name: name.startswith("HUM_") and "Base_B" not in name and "Scavenger" not in name,
-    "void_quadruped": lambda name: name.startswith("VOID_"),
+    "humanoid_soldier": lambda name: name.startswith("HUM_") and not name.startswith("HUM_Weapon_") and "Base_B" not in name and "Scavenger" not in name,
+    "void_quadruped": lambda name: name.startswith("VOID_") and not name.startswith("VOID_Blade_Fore_") and not name.startswith("VOID_Scythe_"),
+    "void_claw_left": lambda name: (name.startswith("VOID_Blade_Fore_") or name.startswith("VOID_Scythe_")) and name.endswith("_L"),
+    "void_claw_right": lambda name: (name.startswith("VOID_Blade_Fore_") or name.startswith("VOID_Scythe_")) and name.endswith("_R"),
     "ship_wall": lambda name: name.startswith("SHIP_Wall_Ribbed") or name.startswith("SHIP_Wall_Rib_"),
     "ship_console": lambda name: name.startswith("SHIP_Console_"),
     "ship_medbed": lambda name: name.startswith("SHIP_MedBed_") or name.startswith("SHIP_MedScanner_"),
@@ -16,7 +18,7 @@ GROUPS = {
     "asteroid_b": lambda name: name.startswith("SPACE_Asteroid_B"),
     "asteroid_c": lambda name: name.startswith("SPACE_Asteroid_C"),
     "asteroid_d": lambda name: name.startswith("SPACE_Asteroid_D"),
-    "pulse_rifle_mesh": lambda name: name == "HUM_Equipment_PulseRifle",
+    "pulse_rifle_mesh": lambda name: name.startswith("HUM_Weapon_PulseRifle_"),
 }
 
 

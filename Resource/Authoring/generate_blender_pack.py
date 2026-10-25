@@ -247,6 +247,31 @@ def humanoid_actions(arm):
     action(arm, 'HUM_Jump', {1:{'root':{'loc':(0,0,0)},'thigh.L':{'rot':(-15,0,0)},'thigh.R':{'rot':(-15,0,0)}}, 8:{'root':{'loc':(0,0,0.55)},'thigh.L':{'rot':(22,0,0)},'thigh.R':{'rot':(22,0,0)}}, 16:{'root':{'loc':(0,0,0.95)}}, 24:{'root':{'loc':(0,0,0.45)},'thigh.L':{'rot':(-25,0,0)},'thigh.R':{'rot':(-25,0,0)}}, 30:{'root':{'loc':(0,0,0)}}})
     action(arm, 'HUM_Walk_To_Run', {1:{'chest':{'rot':(0,0,0)}}, 10:{'chest':{'rot':(12,0,0)},'upper_arm.L':{'rot':(35,0,0)},'upper_arm.R':{'rot':(-35,0,0)}}, 16:{'chest':{'rot':(12,0,0)},'upper_arm.L':{'rot':(55,0,0)},'upper_arm.R':{'rot':(-55,0,0)}}}, transition='HUM_Walk_Loop -> HUM_Run_Loop')
     action(arm, 'HUM_Run_To_Walk', {1:{'chest':{'rot':(12,0,0)},'upper_arm.L':{'rot':(55,0,0)},'upper_arm.R':{'rot':(-55,0,0)}}, 10:{'chest':{'rot':(5,0,0)},'upper_arm.L':{'rot':(35,0,0)},'upper_arm.R':{'rot':(-35,0,0)}}, 16:{'chest':{'rot':(0,0,0)},'upper_arm.L':{'rot':(28,0,0)},'upper_arm.R':{'rot':(-28,0,0)}}}, transition='HUM_Run_Loop -> HUM_Walk_Loop')
+    # Rifle actions are upper-body clips. The support hand closes on the foregrip while
+    # the firing hand seats the stock against the shoulder. These are intended to layer
+    # over locomotion after the pulse rifle has been acquired.
+    rifle_pose = {
+        'chest': {'rot': (4, 0, -7)},
+        'upper_arm.R': {'rot': (-67, 13, -21)},
+        'lower_arm.R': {'rot': (-82, 2, 8)},
+        'hand.R': {'rot': (0, -8, 0)},
+        'upper_arm.L': {'rot': (-51, -18, 29)},
+        'lower_arm.L': {'rot': (-91, 4, -12)},
+        'hand.L': {'rot': (0, 12, 0)},
+        'head': {'rot': (2, 0, 5)}}
+    action(arm, 'HUM_Aim_Rifle_Enter', {1: {}, 7: rifle_pose}, transition='locomotion -> HUM_Aim_Rifle_Idle')
+    action(arm, 'HUM_Aim_Rifle_Idle', {
+        1: rifle_pose,
+        16: {**rifle_pose, 'chest': {'rot': (5, 0, -7)}, 'lower_arm.L': {'rot': (-89, 4, -12)}},
+        31: rifle_pose}, True)
+    action(arm, 'HUM_Aim_Rifle_Fire', {
+        1: rifle_pose,
+        3: {**rifle_pose, 'chest': {'rot': (2, 0, -5)}, 'upper_arm.R': {'rot': (-61, 13, -18)}, 'lower_arm.R': {'rot': (-76, 2, 8)}},
+        8: rifle_pose})
+    action(arm, 'HUM_Death_Fall', {
+        1: {},
+        7: {'root': {'rot': (0, 28, 12)}, 'chest': {'rot': (18, 0, -14)}, 'upper_arm.L': {'rot': (42, 0, -25)}, 'upper_arm.R': {'rot': (-18, 0, 31)}},
+        15: {'root': {'rot': (0, 82, 18), 'loc': (0, 0, -0.42)}, 'chest': {'rot': (24, 8, -18)}, 'head': {'rot': (-14, 10, 12)}, 'upper_arm.L': {'rot': (65, -12, -38)}, 'upper_arm.R': {'rot': (-32, 10, 48)}, 'thigh.L': {'rot': (-22, 0, 14)}, 'thigh.R': {'rot': (28, 0, -18)}}})
 
 
 def build_humanoid(root):
@@ -294,7 +319,28 @@ def build_humanoid(root):
     chest = cube('HUM_Armor_Chest_Scavenger',(0,-0.10,1.34),(0.30,0.08,0.23),M['armor2'],clothc,0.04); bind_rigid(chest,arm,'chest')
     chest2 = cube('HUM_Armor_Chest_Military',(0,-0.11,1.34),(0.32,0.075,0.25),M['armor'],clothc,0.025); bind_rigid(chest2,arm,'chest'); hide_variant(chest2)
     backpack = cube('HUM_Equipment_LifeSupportPack',(0,0.19,1.32),(0.19,0.08,0.22),M['wall'],equipc,0.03); bind_rigid(backpack,arm,'chest')
-    weapon = cube('HUM_Equipment_PulseRifle',(-0.68,-0.08,1.00),(0.07,0.34,0.08),M['armor'],equipc,0.025); bind_rigid(weapon,arm,'hand.R'); hide_variant(weapon)
+    # Modular pulse rifle. Every component shares a prefix so the runtime exporter can
+    # combine the complete weapon instead of exporting only a featureless receiver box.
+    rifle_parts = [
+        cube('HUM_Weapon_PulseRifle_Receiver',(-0.68,-0.10,1.00),(0.075,0.255,0.082),M['armor'],equipc,0.025),
+        cube('HUM_Weapon_PulseRifle_UpperHousing',(-0.68,-0.12,1.095),(0.064,0.20,0.026),M['steel'],equipc,0.012),
+        cube('HUM_Weapon_PulseRifle_Stock',(-0.68,0.245,1.015),(0.090,0.115,0.070),M['black'],equipc,0.025),
+        cube('HUM_Weapon_PulseRifle_StockPad',(-0.68,0.370,1.025),(0.105,0.030,0.085),M['armor2'],equipc,0.018),
+        cube('HUM_Weapon_PulseRifle_Grip',(-0.68,0.035,0.895),(0.050,0.060,0.115),M['black'],equipc,0.018,rot=(math.radians(-12),0,0)),
+        cube('HUM_Weapon_PulseRifle_Magazine',(-0.68,-0.105,0.865),(0.060,0.080,0.120),M['armor2'],equipc,0.018,rot=(math.radians(8),0,0)),
+        cube('HUM_Weapon_PulseRifle_Foregrip',(-0.68,-0.285,0.925),(0.045,0.045,0.085),M['black'],equipc,0.014,rot=(math.radians(-8),0,0)),
+        cube('HUM_Weapon_PulseRifle_TopRail',(-0.68,-0.10,1.135),(0.038,0.245,0.012),M['steel'],equipc,0.005),
+        cube('HUM_Weapon_PulseRifle_ScopeBody',(-0.68,-0.065,1.180),(0.055,0.105,0.040),M['black'],equipc,0.014),
+        cyl('HUM_Weapon_PulseRifle_ScopeLens',(-0.68,-0.177,1.180),0.040,0.020,M['cyan'],equipc,rot=(math.radians(90),0,0),vertices=10),
+        cyl('HUM_Weapon_PulseRifle_Barrel',(-0.68,-0.455,1.020),0.035,0.330,M['steel'],equipc,rot=(math.radians(90),0,0),vertices=10),
+        cyl('HUM_Weapon_PulseRifle_Muzzle',(-0.68,-0.635,1.020),0.052,0.085,M['black'],equipc,rot=(math.radians(90),0,0),vertices=10),
+        cyl('HUM_Weapon_PulseRifle_EnergyCoil_A',(-0.68,-0.310,1.045),0.058,0.025,M['cyan'],equipc,rot=(math.radians(90),0,0),vertices=10),
+        cyl('HUM_Weapon_PulseRifle_EnergyCoil_B',(-0.68,-0.365,1.045),0.054,0.025,M['cyan'],equipc,rot=(math.radians(90),0,0),vertices=10),
+        cube('HUM_Weapon_PulseRifle_StatusLight',(-0.757,-0.055,1.060),(0.010,0.050,0.018),M['amber'],equipc,0.004),
+    ]
+    for rifle_part in rifle_parts:
+        bind_rigid(detail_tag(rifle_part,'HUM_WeaponDetail'),arm,'hand.R')
+        hide_variant(rifle_part)
     # Layered detail pass: readable at quarter-view while retaining a low-poly silhouette.
     detail_parts=[]
     detail_parts += [(cube('HUM_Armor_ChestCenter',(0,-0.194,1.36),(0.12,0.018,0.16),M['armor'],clothc,0.012),'chest'),
@@ -337,9 +383,11 @@ def void_actions(arm):
     action(arm,'VOID_Turn_Left_90',{1:{},8:{'root':{'rot':(0,0,45)},'neck':{'rot':(0,0,-20)}},16:{'root':{'rot':(0,0,90)}}})
     action(arm,'VOID_Turn_Right_90',{1:{},8:{'root':{'rot':(0,0,-45)},'neck':{'rot':(0,0,20)}},16:{'root':{'rot':(0,0,-90)}}})
     action(arm,'VOID_Attack_Pounce',{1:{'spine':{'rot':(-8,0,0)}},8:{'root':{'loc':(0,-0.18,0.12)},'spine':{'rot':(25,0,0)},'blade.L':{'rot':(-60,0,20)},'blade.R':{'rot':(-60,0,-20)}},13:{'root':{'loc':(0,-0.65,0.30)},'head':{'rot':(-25,0,0)},'blade.L':{'rot':(35,0,-15)},'blade.R':{'rot':(35,0,15)}},24:{}})
+    action(arm,'VOID_Attack_Claw',{1:{'root':{'loc':(0,0,0)},'spine':{'rot':(-12,0,0)},'blade.L':{'rot':(-72,-8,42)},'blade.R':{'rot':(-72,8,-42)}},5:{'root':{'loc':(0,-0.12,0.08)},'spine':{'rot':(8,0,0)},'blade.L':{'rot':(-88,-14,62)},'blade.R':{'rot':(-88,14,-62)}},9:{'root':{'loc':(0,-0.42,0.14)},'spine':{'rot':(24,0,0)},'chest':{'rot':(12,0,0)},'blade.L':{'rot':(48,12,-48)},'blade.R':{'rot':(48,-12,48)},'head':{'rot':(-18,0,0)}},14:{'root':{'loc':(0,-0.18,0.04)},'spine':{'rot':(4,0,0)},'blade.L':{'rot':(12,0,-12)},'blade.R':{'rot':(12,0,12)}},18:{}})
     action(arm,'VOID_Jump',{1:{'root':{'loc':(0,0,0)},'leg_back.L':{'rot':(-25,0,0)},'leg_back.R':{'rot':(-25,0,0)}},8:{'root':{'loc':(0,-0.22,0.45)},'leg_back.L':{'rot':(30,0,0)},'leg_back.R':{'rot':(30,0,0)}},15:{'root':{'loc':(0,-0.5,0.85)}},23:{'root':{'loc':(0,-0.75,0.35)}},30:{'root':{'loc':(0,-0.85,0)}}})
     action(arm,'VOID_Walk_To_Run',{1:{'spine':{'rot':(0,0,0)}},12:{'spine':{'rot':(12,0,0)},'root':{'loc':(0,0,0.06)}}},transition='VOID_Walk_Loop -> VOID_Run_Loop')
     action(arm,'VOID_Run_To_Walk',{1:{'spine':{'rot':(12,0,0)},'root':{'loc':(0,0,0.06)}},12:{'spine':{'rot':(0,0,0)},'root':{'loc':(0,0,0)}}},transition='VOID_Run_Loop -> VOID_Walk_Loop')
+    action(arm,'VOID_Death_Collapse',{1:{},7:{'spine':{'rot':(0,24,12)},'neck':{'rot':(18,0,-16)},'leg_front.L':{'rot':(48,0,22)},'leg_back.R':{'rot':(-38,0,-18)}},16:{'root':{'loc':(0,0,-0.34),'rot':(0,68,18)},'spine':{'rot':(0,18,20)},'neck':{'rot':(34,0,-28)},'head':{'rot':(22,12,-18)},'leg_front.L':{'rot':(72,0,28)},'leg_front.R':{'rot':(-52,0,-24)},'leg_back.L':{'rot':(46,0,20)},'leg_back.R':{'rot':(-64,0,-28)}}})
 
 
 def build_void(root):
@@ -410,6 +458,32 @@ def build_ship(root):
     cube('SHIP_MedBed_Pad',(8.9,-2.0,0.67),(0.82,0.33,0.08),M['cloth'],medical,0.04)
     cube('SHIP_MedScanner_Arch',(8.9,-2.0,1.20),(0.08,0.52,0.08),M['cyan'],medical,0.03)
     cube('SHIP_MedCabinet',(10.7,-2.0,0.82),(0.55,0.25,0.82),M['medical'],medical,0.05)
+    # Rounded housings, articulated supports and exposed service hardware keep the
+    # interior kit from reading as a collection of plain cuboids.
+    for sx in [-1,1]:
+        sphere(f'SHIP_Console_SideHousing_{sx}',(3.7+sx*0.44,-2.24,0.50),(0.11,0.28,0.34),M['armor'],controls,segments=10,rings=5)
+        beam_between(f'SHIP_Console_Support_{sx}',(3.7+sx*0.34,-2.02,0.12),(3.7+sx*0.40,-2.35,0.70),0.035,M['steel'],controls,vertices=8)
+    cyl('SHIP_Console_HoloProjector',(3.7,-2.48,1.13),0.12,0.055,M['steel'],controls,vertices=12)
+    sphere('SHIP_Console_HoloEmitter',(3.7,-2.49,1.19),(0.055,0.055,0.035),M['cyan'],controls,segments=10,rings=5)
+    for i in range(5):
+        cyl(f'SHIP_Console_Dial_{i}',(3.52+i*0.09,-2.575,0.60+(i%2)*0.08),0.020,0.018,M['amber'] if i==2 else M['steel'],controls,rot=(math.radians(90),0,0),vertices=10)
+    sphere('SHIP_PilotSeat_Cushion',(5.1,-2.15,0.48),(0.29,0.34,0.12),M['cloth'],controls,segments=12,rings=6)
+    sphere('SHIP_PilotSeat_Headrest',(5.1,-1.72,1.13),(0.22,0.13,0.18),M['cloth'],controls,segments=12,rings=6)
+    for sx in [-1,1]:
+        beam_between(f'SHIP_PilotSeat_Arm_{sx}',(5.1+sx*0.27,-2.18,0.48),(5.1+sx*0.34,-2.02,0.78),0.045,M['steel'],controls,vertices=8)
+        sphere(f'SHIP_PilotSeat_ControlGrip_{sx}',(5.1+sx*0.34,-2.04,0.82),(0.055,0.075,0.075),M['black'],controls,segments=8,rings=4)
+    cyl('SHIP_Device_PowerCore',(7.4,-2.29,0.64),0.16,0.78,M['cyan'],devices,vertices=12)
+    for z in [0.30,0.50,0.70,0.90,1.08]:
+        cyl(f'SHIP_PowerJunction_CoreRing_{z}',(7.4,-2.30,z),0.205,0.045,M['steel'],devices,vertices=12)
+    for sx in [-1,1]:
+        beam_between(f'SHIP_PowerJunction_Conduit_{sx}',(7.4+sx*0.25,-2.23,0.28),(7.4+sx*0.48,-2.05,0.08),0.035,M['armor2'],devices,vertices=8)
+        sphere(f'SHIP_PowerJunction_Insulator_{sx}',(7.4+sx*0.40,-2.12,0.16),(0.070,0.070,0.090),M['black'],devices,segments=8,rings=4)
+    for sx in [-1,1]:
+        cyl(f'SHIP_MedBed_Hydraulic_{sx}',(8.9+sx*0.70,-2.0,0.32),0.055,0.44,M['steel'],medical,vertices=10)
+        beam_between(f'SHIP_MedBed_ScannerArm_{sx}',(8.9+sx*0.78,-2.0,0.70),(8.9+sx*0.48,-2.0,1.34),0.045,M['medical'],medical,vertices=10)
+        sphere(f'SHIP_MedScanner_Sensor_{sx}',(8.9+sx*0.42,-2.0,1.38),(0.095,0.12,0.075),M['cyan'],medical,segments=10,rings=5)
+    sphere('SHIP_MedBed_HeadCushion',(8.9,-1.74,0.79),(0.34,0.18,0.09),M['cloth'],medical,segments=12,rings=6)
+    cyl('SHIP_MedScanner_Rotator',(8.9,-2.0,1.47),0.13,0.10,M['steel'],medical,rot=(0,math.radians(90),0),vertices=12)
     # Architectural seams, fasteners, vents and controls break up large silhouettes.
     for wall_x in [3.6,5.8]:
         cube(f'SHIP_Wall_Inset_{wall_x}',(wall_x,-0.112,1.0),(0.72,0.012,0.70),M['black'],walls,0.018)
@@ -554,15 +628,16 @@ def write_docs():
         'walk':{'action':'HUM_Walk_Loop','loop':True,'blend_in_frames':5,'blend_out_frames':5},
         'run':{'action':'HUM_Run_Loop','loop':True,'blend_in_frames':5,'blend_out_frames':5},
         'turn_left':'HUM_Turn_Left_90','turn_right':'HUM_Turn_Right_90','attack':'HUM_Attack_Melee','jump':'HUM_Jump',
+        'aim_enter':'HUM_Aim_Rifle_Enter','aim_idle':{'action':'HUM_Aim_Rifle_Idle','loop':True},'aim_fire':'HUM_Aim_Rifle_Fire','death':'HUM_Death_Fall',
         'walk_to_run':{'action':'HUM_Walk_To_Run','then':'HUM_Run_Loop'},'run_to_walk':{'action':'HUM_Run_To_Walk','then':'HUM_Walk_Loop'},
         'directional_pose_blend':['HUM_Pose_Turn_Neg45','HUM_Pose_Turn_Zero','HUM_Pose_Turn_Pos45']},
-        'recommended_layers':['locomotion base','directional pose additive','upper-body attack override']},
+        'recommended_layers':['locomotion base','directional pose additive','upper-body rifle aim override','attack or fire override']},
       'void_quadruped':{'rig':'RIG_Void_Quadruped','socket_standard':'VOID_v1','animations':{
-        'walk':{'action':'VOID_Walk_Loop','loop':True},'run':{'action':'VOID_Run_Loop','loop':True},'turn_left':'VOID_Turn_Left_90','turn_right':'VOID_Turn_Right_90','attack':'VOID_Attack_Pounce','jump':'VOID_Jump','walk_to_run':'VOID_Walk_To_Run','run_to_walk':'VOID_Run_To_Walk','directional_pose_blend':['VOID_Pose_Turn_Neg45','VOID_Pose_Turn_Zero','VOID_Pose_Turn_Pos45']}},
+        'walk':{'action':'VOID_Walk_Loop','loop':True},'run':{'action':'VOID_Run_Loop','loop':True},'turn_left':'VOID_Turn_Left_90','turn_right':'VOID_Turn_Right_90','attack':'VOID_Attack_Claw','pounce':'VOID_Attack_Pounce','jump':'VOID_Jump','death':'VOID_Death_Collapse','walk_to_run':'VOID_Walk_To_Run','run_to_walk':'VOID_Run_To_Walk','directional_pose_blend':['VOID_Pose_Turn_Neg45','VOID_Pose_Turn_Zero','VOID_Pose_Turn_Pos45']}},
       'modular_rules':{'human':'Enable exactly one base head; face, helmet, chest armor and equipment are optional overlays. All HUM_v1 parts share the same skeleton and origin.','void':'Base body stays enabled; horn, eye cluster, heavy carapace and tail blade are swappable VOID_v1 overlays.','ship':'2 m wall modules and 2 m floor tiles snap on a 0.25 m grid.'},
       'export_notes':['Apply no transforms to armatures before export.','Export deform bones only when supported.','Keep action names unchanged so the animation state map remains valid.','Procedural materials should be baked or replaced with engine PBR textures during integration.']}
     with open(os.path.join(DOCS,'AnimationAndAssembly.json'),'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2)
-    readme='''# Dark Sci-Fi Modular Blender Asset Pack\n\n- Blender 5.2 authoring source, metric units, +Z up, -Y forward.\n- Low-poly modular humanoid uses a 7-head heroic proportion and HUM_v1 shared skeleton.\n- Void quadruped is an original low-center, four-legged assault creature with VOID_v1 modular overlays.\n- Ship walls and floor tiles use a 2 m module and 0.25 m snap grid.\n- Materials use dark gunmetal, oxidized armor, cold cyan displays, warning amber, desaturated skin and violet-red alien tissue.\n- Animation clips include walk, run, left/right turn, attack, jump, turn interpolation poses, and walk/run transitions.\n\n## Libraries\n\n- `DarkSciFi_ModularAssetPack.blend`: complete source and showcase scene.\n- `Libraries/Humanoid_Modular.blend`: human rig, body parts, clothing, equipment, actions.\n- `Libraries/Void_Quadruped.blend`: quadruped rig, modular parts, actions.\n- `Libraries/Ship_ModularKit.blend`: walls, controls, medical devices, floor tiles/materials.\n- `Libraries/Space_Asteroids.blend`: four low-poly asteroids and drift-spin actions.\n\nSee `AnimationAndAssembly.json` for clip mapping and blend recommendations.\n'''
+    readme='''# Dark Sci-Fi Modular Blender Asset Pack\n\n- Blender 5.2 authoring source, metric units, +Z up, -Y forward.\n- Low-poly modular humanoid uses a 7-head heroic proportion and HUM_v1 shared skeleton.\n- The pulse rifle is a multi-part runtime asset with receiver, barrel, muzzle, stock, grip, magazine, optic, rail, energy coils and status lighting.\n- Rifle animation clips include equip-to-aim, breathing aim idle and firing recoil poses for upper-body layering after weapon pickup.\n- Humanoid and void rigs include distinct fall and collapse death actions.\n- Void quadruped is an original low-center, four-legged assault creature with VOID_v1 modular overlays.\n- Ship controls, pilot seat, medical bed and power junction include rounded housings, articulated supports, hydraulics, conduits and emissive instruments.\n- Ship walls and floor tiles use a 2 m module and 0.25 m snap grid.\n- Materials use dark gunmetal, oxidized armor, cold cyan displays, warning amber, desaturated skin and violet-red alien tissue.\n- Animation clips include walk, run, left/right turn, attack, jump, rifle aiming, death, turn interpolation poses, and walk/run transitions.\n\n## Libraries\n\n- `DarkSciFi_ModularAssetPack.blend`: complete source and showcase scene.\n- `Libraries/Humanoid_Modular.blend`: human rig, body parts, clothing, equipment, rifle and actions.\n- `Libraries/Void_Quadruped.blend`: quadruped rig, modular parts, actions.\n- `Libraries/Ship_ModularKit.blend`: walls, controls, medical devices, floor tiles/materials.\n- `Libraries/Space_Asteroids.blend`: four low-poly asteroids and drift-spin actions.\n\nSee `AnimationAndAssembly.json` for clip mapping and blend recommendations.\n'''
     with open(os.path.join(DOCS,'README.md'),'w',encoding='utf-8') as f:f.write(readme)
 
 

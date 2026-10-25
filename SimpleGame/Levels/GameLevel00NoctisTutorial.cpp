@@ -80,11 +80,10 @@ void Game::UpdateOnFoot(float deltaSeconds)
 	}
 }
 
-bool Game::CanMoveTo(float x, float y) const
+bool Game::CanMoveTo(float x, float y, float radius) const
 {
-	if (!IsTutorialFloor(x, y))
+	if (!IsTutorialAreaWalkable(x, y, radius))
 		return false;
-	const float radius = 0.28f;
 	for (size_t i = 0; i < m_Obstacles.size(); ++i)
 	{
 		const Obstacle& obstacle = m_Obstacles[i];
@@ -92,6 +91,32 @@ bool Game::CanMoveTo(float x, float y) const
 			x - radius < obstacle.x + obstacle.halfWidth &&
 			y + radius > obstacle.y - obstacle.halfHeight &&
 			y - radius < obstacle.y + obstacle.halfHeight)
+			return false;
+	}
+	return true;
+}
+
+bool Game::IsTutorialAreaWalkable(float x, float y, float radius) const
+{
+	const float diagonal = radius * 0.70710678f;
+	const float sampleOffsets[9][2] = {{0.0f, 0.0f},
+		{radius, 0.0f},
+		{-radius, 0.0f},
+		{0.0f, radius},
+		{0.0f, -radius},
+		{diagonal, diagonal},
+		{diagonal, -diagonal},
+		{-diagonal, diagonal},
+		{-diagonal, -diagonal}};
+	for (int sample = 0; sample < 9; ++sample)
+	{
+		// Tutorial walls are generated from integer floor tiles, so collision must use
+		// the same half-tile boundary instead of the analytic room dimensions.
+		const float sampleX = x + sampleOffsets[sample][0];
+		const float sampleY = y + sampleOffsets[sample][1];
+		const float tileCenterX = std::floor(sampleX + 0.5f);
+		const float tileCenterY = std::floor(sampleY + 0.5f);
+		if (!IsTutorialFloor(tileCenterX, tileCenterY))
 			return false;
 	}
 	return true;

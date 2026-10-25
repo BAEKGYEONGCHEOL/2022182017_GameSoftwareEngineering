@@ -20,6 +20,7 @@
 namespace
 {
 const float Pi = 3.1415926535f;
+const float ModelForwardAxisCorrection = Pi * 0.5f;
 const float TileWidth = 64.0f;
 const float TileHeight = 32.0f;
 const WorldPoint TerminalPosition = {-16.0f, -15.0f};
@@ -381,6 +382,7 @@ void Game::Reset()
 	m_Player = {-23.0f, -28.0f};
 	m_LastMoveDirection = {1.0f, 0.0f};
 	m_PlayerHealth = 100.0f;
+	m_PlayerDeathTimer = 0.0f;
 	m_AttackCooldown = 0.0f;
 	m_AttackFlash = 0.0f;
 	m_DodgeCooldown = 0.0f;
@@ -575,11 +577,41 @@ void Game::Update(float deltaSeconds)
 			}
 		}
 
-		if (m_Mode == OnFoot)
+		bool waitingForPlayerRespawn = false;
+		if (m_PlayerHealth <= 0.0f && (m_Mode == OnFoot || m_Mode == FirstLevel))
+		{
+			waitingForPlayerRespawn = true;
+			if (m_PlayerDeathTimer <= 0.0f)
+			{
+				m_PlayerDeathTimer = 1.35f;
+				SetMessage(L"전투복 생체 신호 소실. 의료 비콘이 회수 중입니다.", 1.35f);
+			}
+			else
+			{
+				m_PlayerDeathTimer -= deltaSeconds;
+				if (m_PlayerDeathTimer <= 0.0f)
+				{
+					m_Player = m_Mode == FirstLevel ? WorldPoint{-52.0f, -57.0f}
+						: WorldPoint{-23.0f, -28.0f};
+					m_PlayerHealth = m_PlayerMaxHealth;
+					if (m_Mode != FirstLevel)
+					{
+						for (size_t i = 0; i < m_Enemies.size(); ++i)
+						{
+							m_Enemies[i].health = 2;
+							m_Enemies[i].active = true;
+						}
+					}
+					SetMessage(L"의료 비콘이 전투복을 복구했습니다.", 2.5f);
+				}
+			}
+		}
+
+		if (!waitingForPlayerRespawn && m_Mode == OnFoot)
 			UpdateOnFoot(deltaSeconds);
-		else if (m_Mode == ShipControl)
+		else if (!waitingForPlayerRespawn && m_Mode == ShipControl)
 			UpdateShip(deltaSeconds);
-		else if (m_Mode == Transition)
+		else if (!waitingForPlayerRespawn && m_Mode == Transition)
 		{
 			m_TransitionTimer += deltaSeconds;
 			if (m_TransitionTimer >= 1.4f)
@@ -619,7 +651,7 @@ void Game::Update(float deltaSeconds)
 				}
 			}
 		}
-		else if (m_Mode == FirstLevel)
+		else if (!waitingForPlayerRespawn && m_Mode == FirstLevel)
 			UpdateFirstLevel(deltaSeconds);
 	}
 
@@ -760,11 +792,13 @@ void Game::UpdateEnemies(float deltaSeconds)
 			enemy.moving = true;
 			float nextX = enemy.position.x + dx / distance * movementSpeed * deltaSeconds;
 			float nextY = enemy.position.y + dy / distance * movementSpeed * deltaSeconds;
-			if ((m_Mode == FirstLevel && IsFirstLevelWalkable(nextX, enemy.position.y)) ||
-				(m_Mode != FirstLevel && CanMoveTo(nextX, enemy.position.y)))
+			if ((m_Mode == FirstLevel &&
+					IsFirstLevelAreaWalkable(nextX, enemy.position.y, 0.36f)) ||
+				(m_Mode != FirstLevel && CanMoveTo(nextX, enemy.position.y, 0.36f)))
 				enemy.position.x = nextX;
-			if ((m_Mode == FirstLevel && IsFirstLevelWalkable(enemy.position.x, nextY)) ||
-				(m_Mode != FirstLevel && CanMoveTo(enemy.position.x, nextY)))
+			if ((m_Mode == FirstLevel &&
+					IsFirstLevelAreaWalkable(enemy.position.x, nextY, 0.36f)) ||
+				(m_Mode != FirstLevel && CanMoveTo(enemy.position.x, nextY, 0.36f)))
 				enemy.position.y = nextY;
 		}
 		else if (hasCombatTarget && enemy.attackCooldown <= 0.0f)
@@ -806,26 +840,6 @@ void Game::UpdateEnemies(float deltaSeconds)
 		m_MedicalDroneUsed = true;
 		m_PlayerHealth = 70.0f;
 		SetMessage(L"응급 의료 드론이 생체 신호를 회복했습니다.", 2.2f);
-	}
-	if (m_PlayerHealth <= 0.0f)
-	{
-		if (m_Mode == FirstLevel)
-		{
-			m_Player = {-52.0f, -57.0f};
-			m_PlayerHealth = m_PlayerMaxHealth;
-			SetMessage(L"훈련 구역의 의료 비콘이 시작 지점에서 전투복을 복구했습니다.", 2.5f);
-		}
-		else
-		{
-			m_Player = {-23.0f, -28.0f};
-			m_PlayerHealth = 100.0f;
-			for (size_t i = 0; i < m_Enemies.size(); ++i)
-			{
-				m_Enemies[i].health = 2;
-				m_Enemies[i].active = true;
-			}
-			SetMessage(L"의료 백업이 마지막 지점을 복구했습니다.", 2.5f);
-		}
 	}
 }
 
@@ -938,6 +952,7 @@ void Game::UpdateLevelSurvivors(float deltaSeconds)
 			}
 			else if (distance > 0.05f)
 			{
+				survivor.aimDirection = {deltaX / distance, deltaY / distance};
 				const float nextX = survivor.position.x + deltaX / distance * speed * deltaSeconds;
 				const float nextY = survivor.position.y + deltaY / distance * speed * deltaSeconds;
 				bool separatedX = true;
@@ -952,11 +967,11 @@ void Game::UpdateLevelSurvivors(float deltaSeconds)
 						nextY - survivors[otherIndex].position.y) >= 0.72f;
 				}
 				const bool canMoveX = separatedX && (m_Mode == FirstLevel
-					? IsFirstLevelWalkable(nextX, survivor.position.y)
-					: CanMoveTo(nextX, survivor.position.y));
+					? IsFirstLevelAreaWalkable(nextX, survivor.position.y, 0.28f)
+					: CanMoveTo(nextX, survivor.position.y, 0.28f));
 				const bool canMoveY = separatedY && (m_Mode == FirstLevel
-					? IsFirstLevelWalkable(survivor.position.x, nextY)
-					: CanMoveTo(survivor.position.x, nextY));
+					? IsFirstLevelAreaWalkable(survivor.position.x, nextY, 0.28f)
+					: CanMoveTo(survivor.position.x, nextY, 0.28f));
 				if (canMoveX)
 					survivor.position.x = nextX;
 				if (canMoveY)
@@ -1119,19 +1134,21 @@ void Game::HandleAttack()
 
 	m_AttackCooldown = std::max(0.09f, 0.22f - static_cast<float>(m_Agility - 1) * 0.018f);
 	m_AttackFlash = 0.10f;
-	float aimX = static_cast<float>(m_MouseX - m_Renderer->Width() / 2);
-	float aimY = static_cast<float>(m_Renderer->Height() / 2 - m_MouseY + 30);
-	float aimLength = Length(aimX, aimY);
-	if (aimLength < 1.0f)
+	// Convert the mouse direction in the isometric screen plane back into world space.
+	// Player movement remains WASD-driven, while aiming and firing remain independent.
+	float aimScreenX = static_cast<float>(m_MouseX - m_Renderer->Width() / 2);
+	float aimScreenY = static_cast<float>(m_Renderer->Height() / 2 - m_MouseY + 30);
+	float aimScreenLength = Length(aimScreenX, aimScreenY);
+	if (aimScreenLength < 1.0f)
 	{
-		aimX = 1.0f;
-		aimY = 0.0f;
-		aimLength = 1.0f;
+		aimScreenX = 1.0f;
+		aimScreenY = 0.0f;
+		aimScreenLength = 1.0f;
 	}
-	aimX /= aimLength;
-	aimY /= aimLength;
-
-	WorldPoint worldDirection = {aimX / 64.0f - aimY / 32.0f, -aimX / 64.0f - aimY / 32.0f};
+	aimScreenX /= aimScreenLength;
+	aimScreenY /= aimScreenLength;
+	WorldPoint worldDirection = {aimScreenX / TileWidth - aimScreenY / TileHeight,
+		-aimScreenX / TileWidth - aimScreenY / TileHeight};
 	float worldLength = Length(worldDirection.x, worldDirection.y);
 	if (worldLength > 0.0f)
 	{
@@ -2278,29 +2295,35 @@ void Game::RenderInterior()
 		{
 			if (IsTutorialFloor(static_cast<float>(x), static_cast<float>(y)))
 				continue;
-			const bool besideFloor = IsTutorialFloor(static_cast<float>(x + 1), static_cast<float>(y)) ||
-				IsTutorialFloor(static_cast<float>(x - 1), static_cast<float>(y)) ||
-				IsTutorialFloor(static_cast<float>(x), static_cast<float>(y + 1)) ||
-				IsTutorialFloor(static_cast<float>(x), static_cast<float>(y - 1));
-			if (!besideFloor)
-				continue;
-			Obstacle wall = {static_cast<float>(x),
-				static_cast<float>(y),
-				0.48f,
-				0.48f,
-				58.0f,
-				0.11f,
-				0.17f,
-				0.22f,
-				HullWall};
-			CreateSceneActor("HullWall", wall.x, wall.y, 0.0f, 1, wall.x + wall.y,
-				[this, wall](const ActorTransform& transform)
+
+			// Each solid tile can border the interior on more than one side. Draw one
+			// module per exposed floor edge so corners wrap instead of choosing an
+			// arbitrary single orientation for the whole tile.
+			const int neighborOffsets[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+			for (int side = 0; side < 4; ++side)
+			{
+				const int offsetX = neighborOffsets[side][0];
+				const int offsetY = neighborOffsets[side][1];
+				if (!IsTutorialFloor(static_cast<float>(x + offsetX),
+						static_cast<float>(y + offsetY)))
 				{
-					Obstacle placedWall = wall;
-					placedWall.x = transform.x;
-					placedWall.y = transform.y;
-					DrawWorldBlock(placedWall);
-				});
+					continue;
+				}
+
+				const float wallX = static_cast<float>(x) + static_cast<float>(offsetX) * 0.5f;
+				const float wallY = static_cast<float>(y) + static_cast<float>(offsetY) * 0.5f;
+				const float wallRotation = offsetX != 0 ? Pi * 0.5f : 0.0f;
+				CreateSceneActor("HullWall", wallX, wallY, 0.0f, 1, wallX + wallY,
+					[this, wallRotation](const ActorTransform& transform)
+					{
+						const ScreenPoint wall =
+							WorldToScreen(transform.x, transform.y, transform.height);
+						m_Renderer->DrawSoftShadow(
+							wall.x + 8.0f, wall.y - 4.0f, 62.0f, 18.0f, 0.82f);
+						m_ModelLibrary.DrawMesh(
+							m_Renderer, "ship_wall", wall.x, wall.y, 19.0f, wallRotation);
+					});
+			}
 		}
 	}
 
@@ -2344,11 +2367,12 @@ void Game::RenderInterior()
 				0.86f,
 				false,
 				m_LastMoveDirection,
-				m_PlayerMoving);
+				m_PlayerMoving,
+				m_PlayerHealth <= 0.0f);
 		});
 	for (size_t i = 0; i < m_Enemies.size(); ++i)
 	{
-		if (m_Enemies[i].health > 0 && m_Enemies[i].active)
+		if (m_Enemies[i].active || m_Enemies[i].health <= 0)
 		{
 			const Enemy enemy = m_Enemies[i];
 			const WorldPoint position = enemy.position;
@@ -2367,7 +2391,11 @@ void Game::RenderInterior()
 						0.72f,
 						true,
 						enemy.facingDirection,
-						enemy.moving);
+						enemy.moving,
+						enemy.health <= 0,
+						enemy.attackCooldown >= 0.62f
+							? Clamp((0.9f - enemy.attackCooldown) / 0.28f, 0.001f, 1.0f)
+							: 0.0f);
 				});
 		}
 	}
@@ -2799,64 +2827,223 @@ void Game::DrawCharacter(const WorldPoint& point,
 	float b,
 	bool enemy,
 	const WorldPoint& facingDirection,
-	bool moving)
+	bool moving,
+	bool dead,
+	float attackPhase)
 {
 	const ScreenPoint foot = WorldToScreen(point.x, point.y);
+	if (dead)
+	{
+		WorldPoint deathFacing = facingDirection;
+		if (!enemy)
+		{
+			const float mouseScreenX = static_cast<float>(m_MouseX - m_Renderer->Width() / 2);
+			const float mouseScreenY = static_cast<float>(m_Renderer->Height() / 2 - m_MouseY + 30);
+			deathFacing = {mouseScreenX / TileWidth - mouseScreenY / TileHeight,
+				-mouseScreenX / TileWidth - mouseScreenY / TileHeight};
+		}
+		float deathLength = Length(deathFacing.x, deathFacing.y);
+		if (deathLength < 0.001f)
+		{
+			deathFacing = {1.0f, 0.0f};
+			deathLength = 1.0f;
+		}
+		deathFacing.x /= deathLength;
+		deathFacing.y /= deathLength;
+		const float deathScreenX = (deathFacing.x - deathFacing.y) * TileWidth * 0.5f;
+		const float deathScreenY = -(deathFacing.x + deathFacing.y) * TileHeight * 0.5f;
+		const float deathScreenAngle = std::atan2(deathScreenY, deathScreenX);
+		const float corpseScreenRotation = enemy
+			? (deathScreenX >= 0.0f ? -0.18f : 0.18f)
+			: deathScreenAngle - Pi * 0.5f;
+		const float corpseWorldRotation =
+			std::atan2(deathFacing.y, deathFacing.x) + ModelForwardAxisCorrection;
+		m_Renderer->DrawSoftShadow(
+			foot.x, foot.y + 3.0f, enemy ? 58.0f : 48.0f, enemy ? 19.0f : 14.0f, 0.88f);
+		m_ModelLibrary.DrawMesh(m_Renderer,
+			enemy ? "void_quadruped" : "humanoid_soldier",
+			foot.x,
+			foot.y + (enemy ? 4.0f : 2.0f),
+			enemy ? 16.0f : 17.0f,
+			corpseWorldRotation,
+			corpseScreenRotation,
+			enemy ? 0.28f : 0.34f);
+		if (enemy)
+		{
+			m_ModelLibrary.DrawMesh(m_Renderer,
+				"void_claw_left",
+				foot.x,
+				foot.y + 4.0f,
+				16.0f,
+				corpseWorldRotation,
+				corpseScreenRotation,
+				0.28f,
+				0.0f,
+				0.22f,
+				-0.82f);
+			m_ModelLibrary.DrawMesh(m_Renderer,
+				"void_claw_right",
+				foot.x,
+				foot.y + 4.0f,
+				16.0f,
+				corpseWorldRotation,
+				corpseScreenRotation,
+				0.28f,
+				0.0f,
+				-0.22f,
+				-0.82f);
+		}
+		return;
+	}
 	const float directionLength = Length(facingDirection.x, facingDirection.y);
-	const float facingAngle = directionLength > 0.001f
-		? std::atan2(facingDirection.y, facingDirection.x)
-		: 0.0f;
+	float facingAngle = directionLength > 0.001f
+		? std::atan2(facingDirection.y, facingDirection.x) + ModelForwardAxisCorrection
+		: ModelForwardAxisCorrection;
+	const bool hasWeapon = !enemy && (m_Mode == FirstLevel
+		? m_LevelWeaponCollected
+		: m_Quest != InspectTerminal && m_Quest != CollectTutorialWeapon);
+	float aimScreenX = 1.0f;
+	float aimScreenY = 0.0f;
+	float aimAngle = 0.0f;
+	if (!enemy)
+	{
+		// The player rotates independently from movement and always faces the cursor.
+		aimScreenX = static_cast<float>(m_MouseX - m_Renderer->Width() / 2);
+		aimScreenY = static_cast<float>(m_Renderer->Height() / 2 - m_MouseY + 30);
+		float aimLength = Length(aimScreenX, aimScreenY);
+		if (aimLength < 1.0f)
+		{
+			aimScreenX = 1.0f;
+			aimScreenY = 0.0f;
+			aimLength = 1.0f;
+		}
+		aimScreenX /= aimLength;
+		aimScreenY /= aimLength;
+		const WorldPoint mouseWorldDirection = {
+			aimScreenX / TileWidth - aimScreenY / TileHeight,
+			-aimScreenX / TileWidth - aimScreenY / TileHeight};
+		aimAngle = std::atan2(mouseWorldDirection.y, mouseWorldDirection.x);
+		facingAngle = aimAngle + ModelForwardAxisCorrection;
+	}
 	const float movementPhase =
 		std::sin(m_TotalTime * (enemy ? 9.0f : 11.0f) + point.x * 0.37f + point.y * 0.21f);
 	const float idlePhase = std::sin(m_TotalTime * 2.2f + point.x * 0.13f) * 0.25f;
 	const float animationPhase = moving ? movementPhase : idlePhase;
 	const float bob = moving ? std::fabs(animationPhase) * 2.8f : animationPhase * 0.8f;
 	const float bodySway = animationPhase * (moving ? 0.055f : 0.015f);
+	float facingScreenX = (facingDirection.x - facingDirection.y) * TileWidth * 0.5f;
+	float facingScreenY = -(facingDirection.x + facingDirection.y) * TileHeight * 0.5f;
+	float facingScreenLength = Length(facingScreenX, facingScreenY);
+	if (facingScreenLength < 0.001f)
+	{
+		facingScreenX = 1.0f;
+		facingScreenY = 0.0f;
+		facingScreenLength = 1.0f;
+	}
+	facingScreenX /= facingScreenLength;
+	facingScreenY /= facingScreenLength;
+	const float attackWeight = enemy ? std::sin(Clamp(attackPhase, 0.0f, 1.0f) * Pi) : 0.0f;
+	const float attackLunge = attackWeight * 8.0f;
+	const float renderX = foot.x + facingScreenX * attackLunge;
+	const float renderY = foot.y + bob + facingScreenY * attackLunge;
 
 	m_Renderer->DrawSoftShadow(
 		foot.x + 5.0f, foot.y, enemy ? 46.0f : 34.0f, 14.0f, 0.92f);
 	m_ModelLibrary.DrawMesh(m_Renderer,
 		enemy ? "void_quadruped" : "humanoid_soldier",
-		foot.x,
-		foot.y + bob,
+		renderX,
+		renderY,
 		enemy ? 17.0f : 18.0f,
 		facingAngle + bodySway);
 
 	if (enemy)
+	{
+		// These are the actual Blender-authored blade.L/blade.R objects, exported
+		// separately so they can rotate around their armature socket at runtime.
+		const float clawSwing = attackWeight * 0.78f;
+		m_ModelLibrary.DrawMesh(m_Renderer,
+			"void_claw_left",
+			renderX,
+			renderY,
+			17.0f,
+			facingAngle + bodySway,
+			0.0f,
+			1.0f,
+			-clawSwing,
+			0.22f,
+			-0.82f);
+		m_ModelLibrary.DrawMesh(m_Renderer,
+			"void_claw_right",
+			renderX,
+			renderY,
+			17.0f,
+			facingAngle + bodySway,
+			0.0f,
+			1.0f,
+			clawSwing,
+			-0.22f,
+			-0.82f);
 		return;
+	}
 
-	const bool hasWeapon = m_Mode == FirstLevel
-		? m_LevelWeaponCollected
-		: m_Quest != InspectTerminal && m_Quest != CollectTutorialWeapon;
 	if (!hasWeapon)
 		return;
 
-	float aimScreenX = static_cast<float>(m_MouseX - m_Renderer->Width() / 2);
-	float aimScreenY = static_cast<float>(m_Renderer->Height() / 2 - m_MouseY + 30);
-	float aimLength = Length(aimScreenX, aimScreenY);
-	if (aimLength < 1.0f)
-	{
-		aimScreenX = 1.0f;
-		aimScreenY = 0.0f;
-		aimLength = 1.0f;
-	}
-	aimScreenX /= aimLength;
-	aimScreenY /= aimLength;
-
-	const WorldPoint aimDirection = {
-		aimScreenX / 64.0f - aimScreenY / 32.0f,
-		-aimScreenX / 64.0f - aimScreenY / 32.0f};
-	const float aimAngle = std::atan2(aimDirection.y, aimDirection.x);
-	const float recoil = m_AttackFlash > 0.0f ? -4.0f : 0.0f;
-	const float weaponX = foot.x + aimScreenX * (22.0f + recoil);
-	const float weaponY = foot.y + 34.0f + bob + aimScreenY * 11.0f;
+	// Build the aiming pose from actual shoulder-to-hand segments so the rifle stays
+	// seated between both hands instead of floating above the character.
+	const float aimBreathing = std::sin(m_TotalTime * 2.2f) * 0.8f;
+	const float torsoX = foot.x;
+	const float torsoY = foot.y + 21.0f + bob + aimBreathing;
+	const float perpendicularX = -aimScreenY;
+	const float perpendicularY = aimScreenX;
+	const float recoil = m_AttackFlash > 0.0f ? -2.5f : 0.0f;
+	const ScreenPoint rearShoulder = {
+		torsoX + perpendicularX * 4.0f, torsoY + perpendicularY * 2.5f};
+	const ScreenPoint frontShoulder = {
+		torsoX - perpendicularX * 4.0f, torsoY - perpendicularY * 2.5f};
+	const ScreenPoint triggerHand = {
+		torsoX + aimScreenX * (7.0f + recoil), torsoY + aimScreenY * (7.0f + recoil)};
+	const ScreenPoint supportHand = {
+		torsoX + aimScreenX * (14.0f + recoil), torsoY + aimScreenY * (14.0f + recoil)};
+	auto drawArmSegment = [&](const ScreenPoint& shoulder,
+		const ScreenPoint& hand,
+		float red,
+		float green,
+		float blue) {
+		const float dx = hand.x - shoulder.x;
+		const float dy = hand.y - shoulder.y;
+		DrawRotatedRect(m_Renderer,
+			(shoulder.x + hand.x) * 0.5f,
+			(shoulder.y + hand.y) * 0.5f,
+			Length(dx, dy),
+			4.5f,
+			std::atan2(dy, dx),
+			red,
+			green,
+			blue,
+			1.0f);
+	};
+	drawArmSegment(rearShoulder, triggerHand, 0.15f, 0.18f, 0.20f);
+	drawArmSegment(frontShoulder, supportHand, 0.22f, 0.10f, 0.05f);
+	const float weaponX = torsoX + aimScreenX * (13.0f + recoil);
+	const float weaponY = torsoY + aimScreenY * (13.0f + recoil);
 	m_ModelLibrary.DrawMesh(
-		m_Renderer, "pulse_rifle_mesh", weaponX, weaponY, 38.0f, aimAngle);
+		m_Renderer,
+		"pulse_rifle_mesh",
+		weaponX,
+		weaponY,
+		22.0f,
+		aimAngle + ModelForwardAxisCorrection);
+	// Hands are drawn after the weapon so the grip reads clearly in the final silhouette.
+	m_Renderer->DrawEllipse(
+		triggerHand.x, triggerHand.y, 5.5f, 5.5f, 0.34f, 0.24f, 0.20f, 1.0f);
+	m_Renderer->DrawEllipse(
+		supportHand.x, supportHand.y, 5.5f, 5.5f, 0.34f, 0.24f, 0.20f, 1.0f);
 
 	if (m_AttackFlash > 0.0f)
 	{
-		const float muzzleX = foot.x + aimScreenX * 43.0f;
-		const float muzzleY = foot.y + 34.0f + bob + aimScreenY * 21.0f;
+		const float muzzleX = torsoX + aimScreenX * 27.0f;
+		const float muzzleY = torsoY + aimScreenY * 27.0f;
 		m_Renderer->DrawDiamond(
 			muzzleX, muzzleY, 30.0f, 10.0f, 0.20f, 0.88f, 1.0f, 0.88f);
 	}
@@ -2867,14 +3054,17 @@ void Game::DrawNeutralNpc(const NeutralNpc& npc)
 	const ScreenPoint foot = WorldToScreen(npc.position.x, npc.position.y);
 	const float idlePhase = std::sin(m_TotalTime * 2.4f + npc.animationOffset) * 0.35f;
 	const float verticalOffset = npc.dead ? 0.0f : idlePhase;
-	const float bodySway = npc.dead ? 1.57f : idlePhase * 0.04f;
+	const float bodySway = npc.dead ? 0.0f : idlePhase * 0.04f;
+	const float npcFacingScreenAngle = std::atan2(-TileHeight * 0.5f, TileWidth * 0.5f);
 	m_Renderer->DrawSoftShadow(foot.x, foot.y, npc.dead ? 54.0f : 34.0f, 13.0f, 0.88f);
 	m_ModelLibrary.DrawMesh(m_Renderer,
 		"humanoid_soldier",
 		foot.x,
 		foot.y + verticalOffset,
 		18.0f,
-		bodySway);
+		ModelForwardAxisCorrection + bodySway,
+		npc.dead ? npcFacingScreenAngle - Pi * 0.5f : 0.0f,
+		npc.dead ? 0.34f : 1.0f);
 	return;
 	if (npc.dead)
 	{
@@ -3187,8 +3377,32 @@ void Game::DrawLevelSurvivor(const LevelSurvivor& survivor, size_t survivorIndex
 	const ScreenPoint screen = WorldToScreen(survivor.position.x, survivor.position.y);
 	if (survivor.health <= 0)
 	{
+		WorldPoint deathDirection = survivor.aimDirection;
+		float deathDirectionLength = Length(deathDirection.x, deathDirection.y);
+		if (deathDirectionLength < 0.001f)
+		{
+			deathDirection = {1.0f, 0.0f};
+			deathDirectionLength = 1.0f;
+		}
+		deathDirection.x /= deathDirectionLength;
+		deathDirection.y /= deathDirectionLength;
+		const float deathScreenX =
+			(deathDirection.x - deathDirection.y) * TileWidth * 0.5f;
+		const float deathScreenY =
+			-(deathDirection.x + deathDirection.y) * TileHeight * 0.5f;
+		const float deathScreenAngle = std::atan2(deathScreenY, deathScreenX);
+		const float deathWorldAngle =
+			std::atan2(deathDirection.y, deathDirection.x) + ModelForwardAxisCorrection;
 		m_Renderer->DrawSoftShadow(screen.x, screen.y - 3.0f, 54.0f, 12.0f, 0.84f);
-		m_ModelLibrary.DrawMesh(m_Renderer, "humanoid_soldier", screen.x, screen.y, 17.0f, 1.57f);
+		m_ModelLibrary.DrawMesh(
+			m_Renderer,
+			"humanoid_soldier",
+			screen.x,
+			screen.y,
+			17.0f,
+			deathWorldAngle,
+			deathScreenAngle - Pi * 0.5f,
+			0.34f);
 		return;
 	}
 
@@ -3198,13 +3412,19 @@ void Game::DrawLevelSurvivor(const LevelSurvivor& survivor, size_t survivorIndex
 	const float tremble =
 		std::sin(m_TotalTime * (18.0f + survivor.fear * 12.0f) + survivorIndex) * trembleStrength;
 	const float breathing = std::sin(m_TotalTime * 2.1f + survivorIndex) * 0.45f;
+	const float survivorDirectionLength =
+		Length(survivor.aimDirection.x, survivor.aimDirection.y);
+	const float survivorFacingAngle = survivorDirectionLength > 0.001f
+		? std::atan2(survivor.aimDirection.y, survivor.aimDirection.x) +
+			ModelForwardAxisCorrection
+		: ModelForwardAxisCorrection;
 	m_Renderer->DrawSoftShadow(screen.x, screen.y, 34.0f, 12.0f, 0.82f);
 	m_ModelLibrary.DrawMesh(m_Renderer,
 		"humanoid_soldier",
 		screen.x + tremble,
 		screen.y + breathing,
 		18.0f,
-		tremble * 0.012f);
+		survivorFacingAngle + tremble * 0.012f);
 
 	if (survivor.armed)
 	{
@@ -3218,16 +3438,15 @@ void Game::DrawLevelSurvivor(const LevelSurvivor& survivor, size_t survivorIndex
 			aimScreenX /= aimScreenLength;
 			aimScreenY /= aimScreenLength;
 		}
-		const WorldPoint weaponDirection = {
-			aimScreenX / 64.0f - aimScreenY / 32.0f,
-			-aimScreenX / 64.0f - aimScreenY / 32.0f};
-		const float weaponAngle = std::atan2(weaponDirection.y, weaponDirection.x);
+		const float weaponAngle = survivorDirectionLength > 0.001f
+			? std::atan2(survivor.aimDirection.y, survivor.aimDirection.x)
+			: 0.0f;
 		m_ModelLibrary.DrawMesh(m_Renderer,
 			"pulse_rifle_mesh",
-			screen.x + tremble + aimScreenX * 18.0f,
-			screen.y + 32.0f + breathing + aimScreenY * 10.0f,
-			34.0f,
-			weaponAngle);
+			screen.x + tremble + aimScreenX * 13.0f,
+			screen.y + 21.0f + breathing + aimScreenY * 13.0f,
+			22.0f,
+			weaponAngle + ModelForwardAxisCorrection);
 		m_Renderer->DrawDiamond(screen.x + tremble + aimScreenX * 29.0f,
 			screen.y + 32.0f + breathing + aimScreenY * 16.0f,
 			7.0f,
@@ -3492,24 +3711,42 @@ void Game::RenderFirstLevel()
 	for (size_t index = 0; index < m_FirstLevelWallVisuals.size(); ++index)
 	{
 		const WorldPoint position = m_FirstLevelWallVisuals[index];
-		const ScreenPoint wallScreen = WorldToScreen(position.x, position.y);
-		if (std::fabs(wallScreen.x) > screenWidth * 0.5f + 120.0f ||
-			std::fabs(wallScreen.y) > screenHeight * 0.5f + 120.0f)
+		const int neighborOffsets[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+		for (int side = 0; side < 4; ++side)
 		{
-			continue;
-		}
-		CreateSceneActor("CorridorWall",
-			position.x,
-			position.y,
-			0.0f,
-			1,
-			position.x + position.y,
-			[this](const ActorTransform& transform)
+			const int offsetX = neighborOffsets[side][0];
+			const int offsetY = neighborOffsets[side][1];
+			if (!IsFirstLevelWalkable(position.x + static_cast<float>(offsetX),
+					position.y + static_cast<float>(offsetY)))
 			{
-				ScreenPoint wall = WorldToScreen(transform.x, transform.y, transform.height);
-				m_Renderer->DrawSoftShadow(wall.x, wall.y, 52.0f, 16.0f, 0.76f);
-				m_ModelLibrary.DrawMesh(m_Renderer, "ship_wall", wall.x, wall.y, 20.0f);
-			});
+				continue;
+			}
+
+			const float wallX = position.x + static_cast<float>(offsetX) * 0.5f;
+			const float wallY = position.y + static_cast<float>(offsetY) * 0.5f;
+			const ScreenPoint wallScreen = WorldToScreen(wallX, wallY);
+			if (std::fabs(wallScreen.x) > screenWidth * 0.5f + 120.0f ||
+				std::fabs(wallScreen.y) > screenHeight * 0.5f + 120.0f)
+			{
+				continue;
+			}
+
+			const float wallRotation = offsetX != 0 ? Pi * 0.5f : 0.0f;
+			CreateSceneActor("CorridorWall",
+				wallX,
+				wallY,
+				0.0f,
+				1,
+				wallX + wallY,
+				[this, wallRotation](const ActorTransform& transform)
+				{
+					const ScreenPoint wall =
+						WorldToScreen(transform.x, transform.y, transform.height);
+					m_Renderer->DrawSoftShadow(wall.x, wall.y, 52.0f, 16.0f, 0.76f);
+					m_ModelLibrary.DrawMesh(
+						m_Renderer, "ship_wall", wall.x, wall.y, 20.0f, wallRotation);
+				});
+		}
 	}
 	CreatePersonalShipInteriorActors(FirstLevelPersonalShipDockPosition);
 
@@ -3744,7 +3981,7 @@ void Game::RenderFirstLevel()
 
 	for (size_t index = 0; index < m_Enemies.size(); ++index)
 	{
-		if (!m_Enemies[index].active || m_Enemies[index].health <= 0)
+		if (!m_Enemies[index].active && m_Enemies[index].health > 0)
 			continue;
 
 		const Enemy enemyState = m_Enemies[index];
@@ -3770,7 +4007,11 @@ void Game::RenderFirstLevel()
 					0.72f,
 					true,
 					enemyState.facingDirection,
-					enemyState.moving);
+					enemyState.moving,
+					enemyState.health <= 0,
+					enemyState.attackCooldown >= 0.62f
+						? Clamp((0.9f - enemyState.attackCooldown) / 0.28f, 0.001f, 1.0f)
+						: 0.0f);
 			});
 	}
 
@@ -3789,7 +4030,8 @@ void Game::RenderFirstLevel()
 				0.86f,
 				false,
 				m_LastMoveDirection,
-				m_PlayerMoving);
+				m_PlayerMoving,
+				m_PlayerHealth <= 0.0f);
 		});
 
 	for (size_t index = 0; index < m_Projectiles.size(); ++index)
@@ -4220,7 +4462,7 @@ void Game::RenderInterface()
 	if (m_Keys['\t'] && (m_Mode == OnFoot || m_Mode == FirstLevel))
 		m_Renderer->DrawString(-220.0f,
 			height * 0.5f - 58.0f,
-			L"WASD 이동 | E 상호작용 | 마우스 공격 | Space 회피",
+			L"WASD 8방향 이동 | E 상호작용 | 마우스 조준·공격 | Space 회피",
 			0.60f,
 			0.75f,
 			0.80f,

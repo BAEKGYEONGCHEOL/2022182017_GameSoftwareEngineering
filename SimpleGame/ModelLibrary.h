@@ -49,7 +49,12 @@ class ModelLibrary
 		float x,
 		float y,
 		float scale = 1.0f,
-		float rotation = 0.0f) const;
+		float rotation = 0.0f,
+		float screenRotation = 0.0f,
+		float heightScale = 1.0f,
+		float localRotation = 0.0f,
+		float localPivotX = 0.0f,
+		float localPivotY = 0.0f) const;
 
   private:
 	bool LoadFile(const char* path);

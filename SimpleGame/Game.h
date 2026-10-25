@@ -202,14 +202,16 @@ class Game
 	void GenerateFirstLevel();
 	bool IsFirstLevelConnected(const std::vector<int>& tiles) const;
 	bool IsFirstLevelWalkable(float x, float y) const;
+	bool IsFirstLevelAreaWalkable(float x, float y, float radius) const;
 	void AwardExperience(int amount, const WorldPoint& position);
 	void ApplyStatInput();
 	void HandleInteraction();
 	void HandleAttack();
 	void SetMessage(const std::wstring& message, float seconds);
 	void SetDialogue(const std::wstring& dialogue, const WorldPoint& speakerPosition, float seconds);
-	bool CanMoveTo(float x, float y) const;
+	bool CanMoveTo(float x, float y, float radius = 0.28f) const;
 	bool IsTutorialFloor(float x, float y) const;
+	bool IsTutorialAreaWalkable(float x, float y, float radius) const;
 	bool IsNear(const WorldPoint& point, float distance) const;
 	bool AllEnemiesDefeated() const;
 	bool AllStoryDocumentsRead() const;
@@ -253,7 +255,9 @@ class Game
 		float b,
 		bool enemy,
 		const WorldPoint& facingDirection,
-		bool moving);
+		bool moving,
+		bool dead = false,
+		float attackPhase = 0.0f);
 	void DrawNeutralNpc(const NeutralNpc& npc);
 	void DrawLevelSurvivor(const LevelSurvivor& survivor, size_t survivorIndex);
 	void DrawFlightControlConsole(float x, float y, bool powered, bool infected);
@@ -291,6 +295,7 @@ class Game
 	WorldPoint m_Player;
 	WorldPoint m_LastMoveDirection;
 	float m_PlayerHealth;
+	float m_PlayerDeathTimer;
 	float m_AttackCooldown;
 	float m_AttackFlash;
 	float m_DodgeCooldown;
