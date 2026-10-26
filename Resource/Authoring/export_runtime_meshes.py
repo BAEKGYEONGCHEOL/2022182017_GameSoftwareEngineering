@@ -19,6 +19,10 @@ GROUPS = {
     "asteroid_c": lambda name: name.startswith("SPACE_Asteroid_C"),
     "asteroid_d": lambda name: name.startswith("SPACE_Asteroid_D"),
     "pulse_rifle_mesh": lambda name: name.startswith("HUM_Weapon_PulseRifle_"),
+    "projectile_ballistic": lambda name: name == "PROJ_Rifle_Ballistic",
+    "projectile_armor_piercing": lambda name: name == "PROJ_Rifle_ArmorPiercing",
+    "projectile_plasma_bolt": lambda name: name == "PROJ_Energy_PlasmaBolt",
+    "projectile_spent_casing": lambda name: name == "PROJ_Rifle_SpentCasing",
 }
 
 
@@ -45,6 +49,8 @@ with open(OUTPUT, "w", encoding="utf-8") as output:
                     material = source.data.materials[triangle.material_index]
                 red, green, blue = color_for(material)
                 points = [matrix @ mesh.vertices[index].co for index in triangle.vertices]
+                if group_name.startswith("projectile_"):
+                    points = [point.__class__((point.x, -point.z, point.y)) for point in points]
                 values = " ".join(f"{value:.5f}" for point in points for value in point)
                 output.write(f"tri {values} {red:.4f} {green:.4f} {blue:.4f}\n")
 

@@ -283,51 +283,21 @@ void DrawRotatedRect(PrototypeRenderer* renderer,
 	renderer->DrawQuad(p0, p1, p2, p3, r, g, b, alpha);
 }
 
-float ProjectileScreenAngle(const Projectile& projectile)
-{
-	const float screenDirectionX =
-		(projectile.velocity.x - projectile.velocity.y) * TileWidth * 0.5f;
-	const float screenDirectionY =
-		-(projectile.velocity.x + projectile.velocity.y) * TileHeight * 0.5f;
-	return std::atan2(screenDirectionY, screenDirectionX);
-}
-
-void DrawProjectileVisual(PrototypeRenderer* renderer,
+void DrawProjectileVisual(const ModelLibrary& modelLibrary,
+	PrototypeRenderer* renderer,
 	const Projectile& projectile,
 	float x,
-	float y,
-	float angle)
+	float y)
 {
 	const bool survivorShot = projectile.ownerType == ProjectileOwnerSurvivor;
-	const float bodyLength = projectile.charged ? 31.0f : (survivorShot ? 25.0f : 22.0f);
-	const float bodyWidth = projectile.charged ? 10.0f : 7.0f;
-	const float red = projectile.charged || survivorShot ? 1.0f : 0.20f;
-	const float green = projectile.charged ? 0.46f : (survivorShot ? 0.12f : 0.92f);
-	const float blue = projectile.charged ? 0.10f : (survivorShot ? 0.10f : 1.0f);
+	const char* meshName = projectile.charged
+		? "projectile_plasma_bolt"
+		: (survivorShot ? "projectile_armor_piercing" : "projectile_ballistic");
+	const float meshScale = projectile.charged ? 95.0f : (survivorShot ? 125.0f : 140.0f);
+	const float movementAngle = std::atan2(projectile.velocity.y, projectile.velocity.x);
+	const float modelRotation = movementAngle + ModelForwardAxisCorrection;
 
-	const float directionX = std::cos(angle);
-	const float directionY = std::sin(angle);
-	DrawRotatedRect(renderer,
-		x - directionX * bodyLength * 0.38f,
-		y - directionY * bodyLength * 0.38f,
-		bodyLength * 1.25f,
-		bodyWidth * 0.58f,
-		angle,
-		red,
-		green * 0.70f,
-		blue,
-		0.46f);
-	DrawRotatedRect(renderer, x, y, bodyLength, bodyWidth, angle, red, green, blue, 1.0f);
-	DrawRotatedRect(renderer,
-		x + directionX * bodyLength * 0.27f,
-		y + directionY * bodyLength * 0.27f,
-		bodyLength * 0.28f,
-		bodyWidth * 0.38f,
-		angle,
-		1.0f,
-		projectile.charged ? 0.94f : 1.0f,
-		projectile.charged ? 0.54f : 1.0f,
-		1.0f);
+	modelLibrary.DrawMesh(renderer, meshName, x, y, meshScale, modelRotation);
 }
 } // namespace
 
@@ -2444,9 +2414,7 @@ void Game::RenderInterior()
 			[this, projectile](const ActorTransform& transform)
 			{
 				ScreenPoint shot = WorldToScreen(transform.x, transform.y, transform.height);
-				m_Renderer->DrawSoftShadow(shot.x, shot.y - 25.0f, 24.0f, 7.0f, 0.18f);
-				DrawProjectileVisual(
-					m_Renderer, projectile, shot.x, shot.y, ProjectileScreenAngle(projectile));
+				DrawProjectileVisual(m_ModelLibrary, m_Renderer, projectile, shot.x, shot.y);
 			});
 	}
 	m_SceneGraph.Render();
@@ -4046,23 +4014,7 @@ void Game::RenderFirstLevel()
 			[this, projectile](const ActorTransform& transform)
 			{
 				ScreenPoint bullet = WorldToScreen(transform.x, transform.y, transform.height);
-				ScreenPoint previous = WorldToScreen(
-					projectile.previousPosition.x, projectile.previousPosition.y, transform.height);
-				float tracerWidth =
-					std::max(10.0f, Length(bullet.x - previous.x, bullet.y - previous.y) * 1.7f);
-				const bool survivorShot = projectile.ownerType == ProjectileOwnerSurvivor;
-				const float projectileAngle = ProjectileScreenAngle(projectile);
-				DrawRotatedRect(m_Renderer,
-					(bullet.x + previous.x) * 0.5f,
-					(bullet.y + previous.y) * 0.5f,
-					tracerWidth,
-					5.0f,
-					projectileAngle,
-					projectile.charged || survivorShot ? 1.0f : 0.10f,
-					projectile.charged ? 0.34f : (survivorShot ? 0.12f : 0.62f),
-					projectile.charged ? 0.08f : (survivorShot ? 0.10f : 0.94f),
-					projectile.charged ? 0.70f : 0.42f);
-				DrawProjectileVisual(m_Renderer, projectile, bullet.x, bullet.y, projectileAngle);
+				DrawProjectileVisual(m_ModelLibrary, m_Renderer, projectile, bullet.x, bullet.y);
 			});
 	}
 

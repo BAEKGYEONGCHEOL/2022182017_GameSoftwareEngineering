@@ -2,12 +2,12 @@
   "status": "PASS",
   "files": {
     "DarkSciFi_ModularAssetPack.blend": {
-      "size_bytes": 308444,
-      "objects": 279,
-      "meshes": 273,
+      "size_bytes": 316306,
+      "objects": 283,
+      "meshes": 277,
       "armatures": 2,
-      "materials": 22,
-      "actions": 32,
+      "materials": 24,
+      "actions": 35,
       "action_names": [
         "HUM_Aim_Rifle_Enter",
         "HUM_Aim_Rifle_Fire",
@@ -24,6 +24,9 @@
         "HUM_Turn_Right_90",
         "HUM_Walk_Loop",
         "HUM_Walk_To_Run",
+        "PROJ_Energy_PlasmaBolt_Spin",
+        "PROJ_Rifle_ArmorPiercing_Spin",
+        "PROJ_Rifle_Ballistic_Spin",
         "SPACE_Asteroid_A_DriftSpin",
         "SPACE_Asteroid_B_DriftSpin",
         "SPACE_Asteroid_C_DriftSpin",
@@ -44,10 +47,11 @@
       ],
       "skeletal_mesh_parts": 121,
       "missing_required_actions": [],
+      "missing_required_objects": [],
       "status": "PASS"
     },
     "Libraries/Humanoid_Modular.blend": {
-      "size_bytes": 140313,
+      "size_bytes": 140362,
       "objects": 73,
       "meshes": 72,
       "armatures": 1,
@@ -72,10 +76,11 @@
       ],
       "skeletal_mesh_parts": 72,
       "missing_required_actions": [],
+      "missing_required_objects": [],
       "status": "PASS"
     },
     "Libraries/Void_Quadruped.blend": {
-      "size_bytes": 114257,
+      "size_bytes": 114322,
       "objects": 50,
       "meshes": 49,
       "armatures": 1,
@@ -98,10 +103,11 @@
       ],
       "skeletal_mesh_parts": 49,
       "missing_required_actions": [],
+      "missing_required_objects": [],
       "status": "PASS"
     },
     "Libraries/Ship_ModularKit.blend": {
-      "size_bytes": 149910,
+      "size_bytes": 149665,
       "objects": 136,
       "meshes": 136,
       "armatures": 0,
@@ -110,10 +116,11 @@
       "action_names": [],
       "skeletal_mesh_parts": 0,
       "missing_required_actions": [],
+      "missing_required_objects": [],
       "status": "PASS"
     },
     "Libraries/Space_Asteroids.blend": {
-      "size_bytes": 77372,
+      "size_bytes": 77390,
       "objects": 16,
       "meshes": 16,
       "armatures": 0,
@@ -127,6 +134,24 @@
       ],
       "skeletal_mesh_parts": 0,
       "missing_required_actions": [],
+      "missing_required_objects": [],
+      "status": "PASS"
+    },
+    "Libraries/Projectile_Meshes.blend": {
+      "size_bytes": 75994,
+      "objects": 4,
+      "meshes": 4,
+      "armatures": 0,
+      "materials": 6,
+      "actions": 3,
+      "action_names": [
+        "PROJ_Energy_PlasmaBolt_Spin",
+        "PROJ_Rifle_ArmorPiercing_Spin",
+        "PROJ_Rifle_Ballistic_Spin"
+      ],
+      "skeletal_mesh_parts": 0,
+      "missing_required_actions": [],
+      "missing_required_objects": [],
       "status": "PASS"
     }
   }

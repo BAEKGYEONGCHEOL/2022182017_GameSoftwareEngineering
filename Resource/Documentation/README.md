@@ -10,6 +10,7 @@
 - Ship walls and floor tiles use a 2 m module and 0.25 m snap grid.
 - Materials use dark gunmetal, oxidized armor, cold cyan displays, warning amber, desaturated skin and violet-red alien tissue.
 - Animation clips include walk, run, left/right turn, attack, jump, rifle aiming, death, turn interpolation poses, and walk/run transitions.
+- Projectile meshes use a centered pivot and -Y forward axis; gameplay controls their translation.
 
 ## Libraries
 
@@ -18,5 +19,6 @@
 - `Libraries/Void_Quadruped.blend`: quadruped rig, modular parts, actions.
 - `Libraries/Ship_ModularKit.blend`: walls, controls, medical devices, floor tiles/materials.
 - `Libraries/Space_Asteroids.blend`: four low-poly asteroids and drift-spin actions.
+- `Libraries/Projectile_Meshes.blend`: ballistic, armor-piercing, plasma projectiles and spent casing.
 
 See `AnimationAndAssembly.json` for clip mapping and blend recommendations.

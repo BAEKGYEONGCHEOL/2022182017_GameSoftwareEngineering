@@ -59,6 +59,8 @@ def materials():
         'red': mat('MAT_Emissive_Red', (0.18, 0.01, 0.015), 0.1, 0.28, (0.9, 0.015, 0.01)),
         'black': mat('MAT_Rubber_Black', (0.009, 0.012, 0.014), 0.15, 0.62),
         'steel': mat('MAT_Scratched_Steel', (0.18, 0.20, 0.21), 0.88, 0.28),
+        'brass': mat('MAT_Ammunition_Brass', (0.34, 0.19, 0.055), 0.82, 0.26),
+        'tracer': mat('MAT_Tracer_Orange', (0.34, 0.055, 0.008), 0.25, 0.22, (1.0, 0.08, 0.005)),
         'wall': mat('MAT_Hull_DarkMetal', (0.055, 0.065, 0.075), 0.82, 0.38),
         'trim': mat('MAT_Hull_Trim', (0.14, 0.15, 0.14), 0.72, 0.44),
         'medical': mat('MAT_Medical_Ceramic', (0.28, 0.32, 0.31), 0.3, 0.38),
@@ -145,6 +147,19 @@ def taper_between(name, start, end, radius_start, radius_end, material, collecti
     o.rotation_mode = 'QUATERNION'
     o.rotation_quaternion = direction.to_track_quat('Z', 'Y')
     return o
+
+
+def join_objects(name, objects, collection):
+    bpy.ops.object.select_all(action='DESELECT')
+    for obj in objects:
+        obj.hide_set(False)
+        obj.select_set(True)
+    bpy.context.view_layer.objects.active = objects[0]
+    bpy.ops.object.join()
+    result = objects[0]
+    result.name = name
+    move_to(result, collection)
+    return result
 
 
 def make_armature(name, bones, collection, x=0):
@@ -554,6 +569,63 @@ def build_space(root):
     return c
 
 
+def projectile_props(obj, projectile_type, length_m, diameter_m, speed_hint):
+    obj['projectile_type'] = projectile_type
+    obj['forward_axis'] = '-Y'
+    obj['length_m'] = length_m
+    obj['diameter_m'] = diameter_m
+    obj['speed_hint_mps'] = speed_hint
+    obj['collision_shape'] = 'capsule'
+    obj['pivot'] = 'center'
+    return obj
+
+
+def build_projectiles(root):
+    c = coll('FX_Projectile_Meshes', root)
+    y = -5.35
+    # Physical sizes are intentionally readable rather than strict real-world cartridge scale.
+    parts = [
+        cyl('PROJ_RifleBallistic_Body',(11.70,y,0.46),0.018,0.090,M['brass'],c,rot=(math.radians(90),0,0),vertices=10),
+        cone('PROJ_RifleBallistic_Nose',(11.70,y-0.064,0.46),0.018,0.003,0.040,M['steel'],c,rot=(math.radians(90),0,0),vertices=10),
+        cyl('PROJ_RifleBallistic_Tracer',(11.70,y+0.050,0.46),0.014,0.014,M['tracer'],c,rot=(math.radians(90),0,0),vertices=10)]
+    rifle = join_objects('PROJ_Rifle_Ballistic', parts, c)
+    projectile_props(rifle,'ballistic',0.13,0.036,780)
+
+    parts = [
+        cyl('PROJ_AP_Core',(12.05,y,0.46),0.020,0.110,M['black'],c,rot=(math.radians(90),0,0),vertices=8),
+        cone('PROJ_AP_Penetrator',(12.05,y-0.082,0.46),0.020,0.001,0.055,M['steel'],c,rot=(math.radians(90),0,0),vertices=8),
+        cyl('PROJ_AP_WarningBand',(12.05,y+0.040,0.46),0.022,0.018,M['red'],c,rot=(math.radians(90),0,0),vertices=8)]
+    ap = join_objects('PROJ_Rifle_ArmorPiercing', parts, c)
+    projectile_props(ap,'armor_piercing',0.165,0.044,920)
+
+    parts = [
+        cyl('PROJ_Plasma_Core',(12.42,y,0.46),0.026,0.135,M['cyan'],c,rot=(math.radians(90),0,0),vertices=10),
+        cone('PROJ_Plasma_Head',(12.42,y-0.088,0.46),0.026,0.005,0.055,M['cyan'],c,rot=(math.radians(90),0,0),vertices=10),
+        cone('PROJ_Plasma_Tail',(12.42,y+0.083,0.46),0.026,0.006,0.045,M['tracer'],c,rot=(math.radians(-90),0,0),vertices=10)]
+    for sx in [-1,1]:
+        parts.append(cube(f'PROJ_Plasma_Fin_{sx}',(12.42+0.034*sx,y+0.020,0.46),(0.018,0.034,0.006),M['steel'],c,0.005))
+    plasma = join_objects('PROJ_Energy_PlasmaBolt', parts, c)
+    projectile_props(plasma,'energy',0.235,0.068,430)
+
+    parts = [
+        cyl('PROJ_ShellCase_Body',(12.82,y,0.46),0.026,0.105,M['brass'],c,rot=(math.radians(90),0,0),vertices=10),
+        cyl('PROJ_ShellCase_Rim',(12.82,y+0.057,0.46),0.030,0.012,M['brass'],c,rot=(math.radians(90),0,0),vertices=10),
+        cyl('PROJ_ShellCase_Primer',(12.82,y+0.065,0.46),0.010,0.006,M['steel'],c,rot=(math.radians(90),0,0),vertices=10)]
+    casing = join_objects('PROJ_Rifle_SpentCasing', parts, c)
+    casing['projectile_type']='spent_casing'; casing['forward_axis']='-Y'; casing['pivot']='center'
+
+    # A short loop is included for visible tracer roll; translation remains game-controlled.
+    for obj in [rifle,ap,plasma]:
+        obj.rotation_euler=(0,0,0); obj.keyframe_insert('rotation_euler',frame=1)
+        obj.rotation_euler=(0,math.radians(360),0); obj.keyframe_insert('rotation_euler',frame=13)
+        if obj.animation_data and obj.animation_data.action:
+            obj.animation_data.action.name=obj.name+'_Spin'
+            obj.animation_data.action.use_fake_user=True
+            obj.animation_data.action['loop']=True
+            obj.animation_data.action['translation']='game_controlled'
+    return c
+
+
 def setup_scene():
     sc=bpy.context.scene
     sc.render.engine='BLENDER_EEVEE'
@@ -581,7 +653,7 @@ def camera_and_light():
 def save_libraries(root, category_collections):
     master=os.path.join(ROOT,'DarkSciFi_ModularAssetPack.blend')
     bpy.ops.wm.save_as_mainfile(filepath=master,compress=True)
-    action_prefix={'Humanoid_Modular.blend':'HUM_','Void_Quadruped.blend':'VOID_','Space_Asteroids.blend':'SPACE_'}
+    action_prefix={'Humanoid_Modular.blend':'HUM_','Void_Quadruped.blend':'VOID_','Space_Asteroids.blend':'SPACE_','Projectile_Meshes.blend':'PROJ_'}
     for filename,collections in category_collections.items():
         blocks=set(collections)
         prefix=action_prefix.get(filename)
@@ -618,6 +690,10 @@ def render_previews(groups):
     aim_camera((15.0,-1.0,0.75),(15.0,-11.5,6.0),58)
     scene.render.filepath=os.path.join(PREVIEW,'Asteroids.png')
     bpy.ops.render.render(write_still=True)
+    visible({'FX_Projectile_Meshes'})
+    aim_camera((12.26,-5.36,0.46),(12.26,-7.60,1.35),58)
+    scene.render.filepath=os.path.join(PREVIEW,'Projectiles.png')
+    bpy.ops.render.render(write_still=True)
     visible({c.name for c in groups})
 
 
@@ -634,19 +710,20 @@ def write_docs():
         'recommended_layers':['locomotion base','directional pose additive','upper-body rifle aim override','attack or fire override']},
       'void_quadruped':{'rig':'RIG_Void_Quadruped','socket_standard':'VOID_v1','animations':{
         'walk':{'action':'VOID_Walk_Loop','loop':True},'run':{'action':'VOID_Run_Loop','loop':True},'turn_left':'VOID_Turn_Left_90','turn_right':'VOID_Turn_Right_90','attack':'VOID_Attack_Claw','pounce':'VOID_Attack_Pounce','jump':'VOID_Jump','death':'VOID_Death_Collapse','walk_to_run':'VOID_Walk_To_Run','run_to_walk':'VOID_Run_To_Walk','directional_pose_blend':['VOID_Pose_Turn_Neg45','VOID_Pose_Turn_Zero','VOID_Pose_Turn_Pos45']}},
+      'projectiles':{'forward_axis':'-Y','pivot':'center','translation':'game-controlled','assets':['PROJ_Rifle_Ballistic','PROJ_Rifle_ArmorPiercing','PROJ_Energy_PlasmaBolt','PROJ_Rifle_SpentCasing'],'spin_actions':['PROJ_Rifle_Ballistic_Spin','PROJ_Rifle_ArmorPiercing_Spin','PROJ_Energy_PlasmaBolt_Spin']},
       'modular_rules':{'human':'Enable exactly one base head; face, helmet, chest armor and equipment are optional overlays. All HUM_v1 parts share the same skeleton and origin.','void':'Base body stays enabled; horn, eye cluster, heavy carapace and tail blade are swappable VOID_v1 overlays.','ship':'2 m wall modules and 2 m floor tiles snap on a 0.25 m grid.'},
       'export_notes':['Apply no transforms to armatures before export.','Export deform bones only when supported.','Keep action names unchanged so the animation state map remains valid.','Procedural materials should be baked or replaced with engine PBR textures during integration.']}
     with open(os.path.join(DOCS,'AnimationAndAssembly.json'),'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2)
-    readme='''# Dark Sci-Fi Modular Blender Asset Pack\n\n- Blender 5.2 authoring source, metric units, +Z up, -Y forward.\n- Low-poly modular humanoid uses a 7-head heroic proportion and HUM_v1 shared skeleton.\n- The pulse rifle is a multi-part runtime asset with receiver, barrel, muzzle, stock, grip, magazine, optic, rail, energy coils and status lighting.\n- Rifle animation clips include equip-to-aim, breathing aim idle and firing recoil poses for upper-body layering after weapon pickup.\n- Humanoid and void rigs include distinct fall and collapse death actions.\n- Void quadruped is an original low-center, four-legged assault creature with VOID_v1 modular overlays.\n- Ship controls, pilot seat, medical bed and power junction include rounded housings, articulated supports, hydraulics, conduits and emissive instruments.\n- Ship walls and floor tiles use a 2 m module and 0.25 m snap grid.\n- Materials use dark gunmetal, oxidized armor, cold cyan displays, warning amber, desaturated skin and violet-red alien tissue.\n- Animation clips include walk, run, left/right turn, attack, jump, rifle aiming, death, turn interpolation poses, and walk/run transitions.\n\n## Libraries\n\n- `DarkSciFi_ModularAssetPack.blend`: complete source and showcase scene.\n- `Libraries/Humanoid_Modular.blend`: human rig, body parts, clothing, equipment, rifle and actions.\n- `Libraries/Void_Quadruped.blend`: quadruped rig, modular parts, actions.\n- `Libraries/Ship_ModularKit.blend`: walls, controls, medical devices, floor tiles/materials.\n- `Libraries/Space_Asteroids.blend`: four low-poly asteroids and drift-spin actions.\n\nSee `AnimationAndAssembly.json` for clip mapping and blend recommendations.\n'''
+    readme='''# Dark Sci-Fi Modular Blender Asset Pack\n\n- Blender 5.2 authoring source, metric units, +Z up, -Y forward.\n- Low-poly modular humanoid uses a 7-head heroic proportion and HUM_v1 shared skeleton.\n- The pulse rifle is a multi-part runtime asset with receiver, barrel, muzzle, stock, grip, magazine, optic, rail, energy coils and status lighting.\n- Rifle animation clips include equip-to-aim, breathing aim idle and firing recoil poses for upper-body layering after weapon pickup.\n- Humanoid and void rigs include distinct fall and collapse death actions.\n- Void quadruped is an original low-center, four-legged assault creature with VOID_v1 modular overlays.\n- Ship controls, pilot seat, medical bed and power junction include rounded housings, articulated supports, hydraulics, conduits and emissive instruments.\n- Ship walls and floor tiles use a 2 m module and 0.25 m snap grid.\n- Materials use dark gunmetal, oxidized armor, cold cyan displays, warning amber, desaturated skin and violet-red alien tissue.\n- Animation clips include walk, run, left/right turn, attack, jump, rifle aiming, death, turn interpolation poses, and walk/run transitions.\n- Projectile meshes use a centered pivot and -Y forward axis; gameplay controls their translation.\n\n## Libraries\n\n- `DarkSciFi_ModularAssetPack.blend`: complete source and showcase scene.\n- `Libraries/Humanoid_Modular.blend`: human rig, body parts, clothing, equipment, rifle and actions.\n- `Libraries/Void_Quadruped.blend`: quadruped rig, modular parts, actions.\n- `Libraries/Ship_ModularKit.blend`: walls, controls, medical devices, floor tiles/materials.\n- `Libraries/Space_Asteroids.blend`: four low-poly asteroids and drift-spin actions.\n- `Libraries/Projectile_Meshes.blend`: ballistic, armor-piercing, plasma projectiles and spent casing.\n\nSee `AnimationAndAssembly.json` for clip mapping and blend recommendations.\n'''
     with open(os.path.join(DOCS,'README.md'),'w',encoding='utf-8') as f:f.write(readme)
 
 
 def main():
     clean();materials();setup_scene();root=coll('DarkSciFi_ModularAssetPack')
-    hum,ha=build_humanoid(root);void,va=build_void(root);ship=build_ship(root);space=build_space(root)
+    hum,ha=build_humanoid(root);void,va=build_void(root);ship=build_ship(root);space=build_space(root);projectiles=build_projectiles(root)
     camera_and_light();write_docs()
-    save_libraries(root,{'Humanoid_Modular.blend':[hum],'Void_Quadruped.blend':[void],'Ship_ModularKit.blend':[ship],'Space_Asteroids.blend':[space]})
-    render_previews([hum,void,ship,space])
+    save_libraries(root,{'Humanoid_Modular.blend':[hum],'Void_Quadruped.blend':[void],'Ship_ModularKit.blend':[ship],'Space_Asteroids.blend':[space],'Projectile_Meshes.blend':[projectiles]})
+    render_previews([hum,void,ship,space,projectiles])
     print('ASSET_PACK_COMPLETE',ROOT)
 
 

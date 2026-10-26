@@ -80,6 +80,22 @@
       ]
     }
   },
+  "projectiles": {
+    "forward_axis": "-Y",
+    "pivot": "center",
+    "translation": "game-controlled",
+    "assets": [
+      "PROJ_Rifle_Ballistic",
+      "PROJ_Rifle_ArmorPiercing",
+      "PROJ_Energy_PlasmaBolt",
+      "PROJ_Rifle_SpentCasing"
+    ],
+    "spin_actions": [
+      "PROJ_Rifle_Ballistic_Spin",
+      "PROJ_Rifle_ArmorPiercing_Spin",
+      "PROJ_Energy_PlasmaBolt_Spin"
+    ]
+  },
   "modular_rules": {
     "human": "Enable exactly one base head; face, helmet, chest armor and equipment are optional overlays. All HUM_v1 parts share the same skeleton and origin.",
     "void": "Base body stays enabled; horn, eye cluster, heavy carapace and tail blade are swappable VOID_v1 overlays.",
