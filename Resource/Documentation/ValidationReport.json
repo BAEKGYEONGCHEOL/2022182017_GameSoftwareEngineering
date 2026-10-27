@@ -2,9 +2,9 @@
   "status": "PASS",
   "files": {
     "DarkSciFi_ModularAssetPack.blend": {
-      "size_bytes": 308444,
-      "objects": 279,
-      "meshes": 273,
+      "size_bytes": 329201,
+      "objects": 324,
+      "meshes": 318,
       "armatures": 2,
       "materials": 22,
       "actions": 32,
@@ -47,7 +47,7 @@
       "status": "PASS"
     },
     "Libraries/Humanoid_Modular.blend": {
-      "size_bytes": 140313,
+      "size_bytes": 140025,
       "objects": 73,
       "meshes": 72,
       "armatures": 1,
@@ -75,7 +75,7 @@
       "status": "PASS"
     },
     "Libraries/Void_Quadruped.blend": {
-      "size_bytes": 114257,
+      "size_bytes": 114184,
       "objects": 50,
       "meshes": 49,
       "armatures": 1,
@@ -101,9 +101,9 @@
       "status": "PASS"
     },
     "Libraries/Ship_ModularKit.blend": {
-      "size_bytes": 149910,
-      "objects": 136,
-      "meshes": 136,
+      "size_bytes": 172244,
+      "objects": 181,
+      "meshes": 181,
       "armatures": 0,
       "materials": 14,
       "actions": 0,
@@ -113,7 +113,7 @@
       "status": "PASS"
     },
     "Libraries/Space_Asteroids.blend": {
-      "size_bytes": 77372,
+      "size_bytes": 77363,
       "objects": 16,
       "meshes": 16,
       "armatures": 0,

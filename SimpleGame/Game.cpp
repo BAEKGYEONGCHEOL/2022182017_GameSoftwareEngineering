@@ -2525,9 +2525,9 @@ void Game::SetDialogue(
 
 void Game::DrawFlightControlConsole(float x, float y, bool powered, bool infected)
 {
-	m_Renderer->DrawSoftShadow(x, y - 9.0f, 118.0f, 28.0f, 0.86f);
-	m_ModelLibrary.DrawMesh(m_Renderer, "ship_pilot_seat", x, y, 21.0f);
-	m_ModelLibrary.DrawMesh(m_Renderer, "ship_console", x, y + 10.0f, 21.0f);
+	m_Renderer->DrawSoftShadow(x, y - 9.0f, 148.0f, 34.0f, 0.86f);
+	m_ModelLibrary.DrawMesh(m_Renderer, "ship_pilot_seat", x, y, 24.0f);
+	m_ModelLibrary.DrawMesh(m_Renderer, "ship_console", x, y + 10.0f, 24.0f);
 	if (infected)
 		m_Renderer->DrawDiamond(x, y + 26.0f, 112.0f, 45.0f, 0.46f, 0.03f, 0.62f, 0.22f);
 	else if (powered)
@@ -2628,18 +2628,38 @@ void Game::DrawWorldBlock(const Obstacle& obstacle)
 {
 	ScreenPoint foot = WorldToScreen(obstacle.x, obstacle.y);
 	const char* resourceMesh = NULL;
+	float resourceScale = 19.0f;
 	if (obstacle.type == HullWall)
 		resourceMesh = "ship_wall";
 	else if (obstacle.type == ControlConsole)
+	{
 		resourceMesh = "ship_console";
+		resourceScale = 24.0f;
+	}
 	else if (obstacle.type == MedicalPod)
+	{
 		resourceMesh = "ship_medbed";
-	else if (obstacle.type == PowerRelay || obstacle.type == EngineModule)
+		resourceScale = 23.0f;
+	}
+	else if (obstacle.type == PowerRelay)
+	{
 		resourceMesh = "ship_power";
+		resourceScale = 21.0f;
+	}
+	else if (obstacle.type == EngineModule)
+	{
+		resourceMesh = "ship_engine";
+		resourceScale = 23.0f;
+	}
+	else if (obstacle.type == CoolantPipe)
+	{
+		resourceMesh = "ship_coolant";
+		resourceScale = 22.0f;
+	}
 	if (resourceMesh != NULL)
 	{
-		m_Renderer->DrawSoftShadow(foot.x + 8.0f, foot.y - 4.0f, 62.0f, 18.0f, 0.82f);
-		m_ModelLibrary.DrawMesh(m_Renderer, resourceMesh, foot.x, foot.y, 19.0f);
+		m_Renderer->DrawSoftShadow(foot.x + 8.0f, foot.y - 4.0f, 86.0f, 23.0f, 0.82f);
+		m_ModelLibrary.DrawMesh(m_Renderer, resourceMesh, foot.x, foot.y, resourceScale);
 		return;
 	}
 	float width = (obstacle.halfWidth + obstacle.halfHeight) * TileWidth;
@@ -3786,6 +3806,7 @@ void Game::RenderFirstLevel()
 				const float casingGreen = active ? 0.42f : 0.18f;
 				const float casingBlue = active ? 0.52f : 0.22f;
 				m_Renderer->DrawSoftShadow(engine.x + 12.0f, engine.y - 8.0f, 116.0f, 30.0f, 0.84f);
+				m_ModelLibrary.DrawMesh(m_Renderer, "ship_engine", engine.x, engine.y, 27.0f);
 				m_Renderer->DrawDiamond(engine.x + 32.0f,
 					engine.y + 3.0f,
 					88.0f,

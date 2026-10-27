@@ -446,17 +446,24 @@ def build_ship(root):
     cube('SHIP_Door_Frame_L',(8.12,0,0.94),(0.12,0.14,0.94),M['trim'],walls,0.025)
     cube('SHIP_Door_Frame_R',(9.88,0,0.94),(0.12,0.14,0.94),M['trim'],walls,0.025)
     # Consoles and ship devices.
-    cube('SHIP_Console_Base',(3.7,-2.2,0.48),(0.48,0.34,0.48),M['wall'],controls,0.06)
-    cube('SHIP_Console_Screen',(3.7,-2.52,0.90),(0.42,0.04,0.24),M['cyan'],controls,0.025,rot=(math.radians(18),0,0))
+    cube('SHIP_Console_Base',(3.7,-2.2,0.55),(0.82,0.46,0.55),M['wall'],controls,0.09)
+    cube('SHIP_Console_Desk',(3.7,-2.48,0.83),(1.08,0.36,0.12),M['armor'],controls,0.06,rot=(math.radians(8),0,0))
+    cube('SHIP_Console_Screen',(3.7,-2.62,1.25),(0.60,0.05,0.32),M['cyan'],controls,0.035,rot=(math.radians(15),0,0))
+    for sx in [-1,1]:
+        cube(f'SHIP_Console_Wing_{sx}',(3.7+sx*0.82,-2.39,0.76),(0.28,0.34,0.10),M['armor2'],controls,0.05,rot=(0,0,math.radians(-10*sx)))
+        cube(f'SHIP_Console_SideScreen_{sx}',(3.7+sx*0.80,-2.63,1.04),(0.25,0.035,0.20),M['cyan'],controls,0.025,rot=(math.radians(18),0,math.radians(-10*sx)))
+        cyl(f'SHIP_Console_Throttle_{sx}',(3.7+sx*0.72,-2.70,0.88),0.045,0.22,M['steel'],controls,rot=(math.radians(68),0,0),vertices=10)
     cube('SHIP_PilotSeat_Base',(5.1,-2.1,0.24),(0.34,0.38,0.24),M['armor'],controls,0.08)
     cube('SHIP_PilotSeat_Back',(5.1,-1.78,0.72),(0.34,0.12,0.56),M['armor'],controls,0.08,rot=(math.radians(-8),0,0))
-    cyl('SHIP_Device_OxygenTank',(6.5,-2.0,0.68),0.23,1.25,M['medical'],devices,vertices=10)
+    cyl('SHIP_Device_OxygenTank',(6.5,-2.0,0.82),0.30,1.55,M['medical'],devices,vertices=12)
     cube('SHIP_Device_PowerJunction',(7.4,-2.0,0.62),(0.42,0.25,0.62),M['wall'],devices,0.05)
     for z in [0.35,0.62,0.89]: cube(f'SHIP_Device_PowerLight_{z}',(7.4,-2.27,z),(0.22,0.025,0.035),M['amber'],devices,0.01)
     # Medical station and pod.
-    cube('SHIP_MedBed_Base',(8.9,-2.0,0.42),(0.92,0.38,0.22),M['medical'],medical,0.08)
-    cube('SHIP_MedBed_Pad',(8.9,-2.0,0.67),(0.82,0.33,0.08),M['cloth'],medical,0.04)
-    cube('SHIP_MedScanner_Arch',(8.9,-2.0,1.20),(0.08,0.52,0.08),M['cyan'],medical,0.03)
+    cube('SHIP_MedBed_Base',(8.9,-2.0,0.46),(1.30,0.56,0.28),M['medical'],medical,0.10)
+    cube('SHIP_MedBed_Pad',(8.9,-2.0,0.79),(1.18,0.47,0.10),M['cloth'],medical,0.06)
+    cube('SHIP_MedBed_FootModule',(7.73,-2.0,0.74),(0.18,0.52,0.42),M['wall'],medical,0.07)
+    cube('SHIP_MedBed_HeadModule',(10.07,-2.0,0.92),(0.20,0.54,0.58),M['medical'],medical,0.07)
+    cube('SHIP_MedScanner_Arch',(8.9,-2.0,1.62),(0.10,0.72,0.10),M['cyan'],medical,0.04)
     cube('SHIP_MedCabinet',(10.7,-2.0,0.82),(0.55,0.25,0.82),M['medical'],medical,0.05)
     # Rounded housings, articulated supports and exposed service hardware keep the
     # interior kit from reading as a collection of plain cuboids.
@@ -484,6 +491,34 @@ def build_ship(root):
         sphere(f'SHIP_MedScanner_Sensor_{sx}',(8.9+sx*0.42,-2.0,1.38),(0.095,0.12,0.075),M['cyan'],medical,segments=10,rings=5)
     sphere('SHIP_MedBed_HeadCushion',(8.9,-1.74,0.79),(0.34,0.18,0.09),M['cloth'],medical,segments=12,rings=6)
     cyl('SHIP_MedScanner_Rotator',(8.9,-2.0,1.47),0.13,0.10,M['steel'],medical,rot=(0,math.radians(90),0),vertices=12)
+    # Heavy drive machinery and life-support equipment are separate runtime assets.
+    engine_x=13.0
+    cube('SHIP_Engine_Cradle',(engine_x,-2.0,0.30),(1.18,0.62,0.22),M['wall'],devices,0.10)
+    cyl('SHIP_Engine_ReactorCore',(engine_x,-2.0,0.92),0.47,1.55,M['cyan'],devices,rot=(0,math.radians(90),0),vertices=16)
+    for ix,xoff in enumerate([-0.82,-0.54,-0.26,0.26,0.54,0.82]):
+        cyl(f'SHIP_Engine_ContainmentRing_{ix}',(engine_x+xoff,-2.0,0.92),0.62,0.10,M['steel'],devices,rot=(0,math.radians(90),0),vertices=14)
+    for sx in [-1,1]:
+        cube(f'SHIP_Engine_EndHousing_{sx}',(engine_x+sx*1.03,-2.0,0.92),(0.22,0.57,0.57),M['armor'],devices,0.10)
+        beam_between(f'SHIP_Engine_Brace_{sx}',(engine_x+sx*0.76,-2.45,0.24),(engine_x+sx*0.55,-2.31,1.37),0.065,M['armor2'],devices,vertices=10)
+        cyl(f'SHIP_Engine_Coupling_{sx}',(engine_x+sx*1.28,-2.0,0.92),0.31,0.34,M['black'],devices,rot=(0,math.radians(90),0),vertices=12)
+    for iz,z in enumerate([0.47,1.37]):
+        beam_between(f'SHIP_Engine_CoolantLine_{iz}',(engine_x-0.86,-2.54,z),(engine_x+0.86,-2.54,z),0.055,M['medical'],devices,vertices=10)
+    cube('SHIP_Engine_ServicePanel',(engine_x,-2.63,1.62),(0.48,0.05,0.23),M['amber'],devices,0.025,rot=(math.radians(10),0,0))
+
+    coolant_x=16.2
+    cube('SHIP_Coolant_Base',(coolant_x,-2.0,0.20),(1.05,0.55,0.20),M['wall'],devices,0.08)
+    for sx in [-1,1]:
+        tank_x=coolant_x+sx*0.52
+        cyl(f'SHIP_Coolant_Tank_{sx}',(tank_x,-2.0,0.98),0.34,1.42,M['medical'],devices,vertices=14)
+        cyl(f'SHIP_Coolant_TankCap_{sx}',(tank_x,-2.0,1.74),0.24,0.18,M['steel'],devices,vertices=12)
+        for iz,z in enumerate([0.52,1.05,1.48]):
+            cyl(f'SHIP_Coolant_TankBand_{sx}_{iz}',(tank_x,-2.0,z),0.37,0.065,M['armor2'],devices,vertices=14)
+        beam_between(f'SHIP_Coolant_FeedLine_{sx}',(tank_x,-2.28,0.42),(coolant_x+sx*0.22,-2.44,0.18),0.055,M['cyan'],devices,vertices=10)
+    cube('SHIP_Coolant_Manifold',(coolant_x,-2.48,0.86),(0.30,0.15,0.38),M['armor'],devices,0.06)
+    for iz,z in enumerate([0.65,0.86,1.07]):
+        cube(f'SHIP_Coolant_Status_{iz}',(coolant_x,-2.645,z),(0.18,0.018,0.035),M['cyan'] if iz<2 else M['amber'],devices,0.008)
+    for sx in [-1,1]:
+        cyl(f'SHIP_Coolant_Valve_{sx}',(coolant_x+sx*0.24,-2.66,0.50),0.095,0.045,M['amber'],devices,rot=(math.radians(90),0,0),vertices=10)
     # Architectural seams, fasteners, vents and controls break up large silhouettes.
     for wall_x in [3.6,5.8]:
         cube(f'SHIP_Wall_Inset_{wall_x}',(wall_x,-0.112,1.0),(0.72,0.012,0.70),M['black'],walls,0.018)
@@ -611,7 +646,7 @@ def render_previews(groups):
     scene.render.filepath=os.path.join(PREVIEW,'Characters.png')
     bpy.ops.render.render(write_still=True)
     visible({'ENV_Ship_ModularKit'})
-    aim_camera((7.0,-2.0,0.75),(7.0,-13.5,8.2),55)
+    aim_camera((9.8,-2.0,0.82),(9.8,-18.0,10.2),52)
     scene.render.filepath=os.path.join(PREVIEW,'ShipKit.png')
     bpy.ops.render.render(write_still=True)
     visible({'ENV_Space_Asteroids'})

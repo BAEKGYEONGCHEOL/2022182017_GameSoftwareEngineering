@@ -13,6 +13,8 @@ GROUPS = {
     "ship_console": lambda name: name.startswith("SHIP_Console_"),
     "ship_medbed": lambda name: name.startswith("SHIP_MedBed_") or name.startswith("SHIP_MedScanner_"),
     "ship_power": lambda name: name.startswith("SHIP_Device_Power") or name.startswith("SHIP_PowerJunction_"),
+    "ship_engine": lambda name: name.startswith("SHIP_Engine_"),
+    "ship_coolant": lambda name: name.startswith("SHIP_Coolant_") or name.startswith("SHIP_Device_Oxygen"),
     "ship_pilot_seat": lambda name: name.startswith("SHIP_PilotSeat_"),
     "asteroid_a": lambda name: name.startswith("SPACE_Asteroid_A"),
     "asteroid_b": lambda name: name.startswith("SPACE_Asteroid_B"),
