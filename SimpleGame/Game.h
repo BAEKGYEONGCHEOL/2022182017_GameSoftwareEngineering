@@ -9,6 +9,23 @@
 
 class LocalMonitoringServer;
 
+enum GameSpecialKey
+{
+	GameKeyLeft,
+	GameKeyUp,
+	GameKeyRight,
+	GameKeyDown,
+	GameKeyLeftShift,
+	GameKeyRightShift
+};
+
+enum GameMouseInput
+{
+	GameMouseLeftButton,
+	GameMouseButtonDown,
+	GameMouseButtonUp
+};
+
 struct WorldPoint
 {
 	float x;

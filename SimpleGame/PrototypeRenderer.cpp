@@ -9,7 +9,6 @@
 #include <iomanip>
 #include <iostream>
 #include <sstream>
-#include "Dependencies\\freeglut.h"
 
 namespace
 {

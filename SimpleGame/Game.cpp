@@ -14,7 +14,6 @@
 #define NOMINMAX
 #endif
 #include <Windows.h>
-#include "Dependencies\\freeglut.h"
 #include "LocalMonitoringServer.h"
 
 namespace
@@ -590,7 +589,7 @@ void Game::MouseMove(int x, int y)
 
 void Game::MouseButton(int button, int state)
 {
-	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN)
+	if (button == GameMouseLeftButton && state == GameMouseButtonDown)
 		m_MousePressed = true;
 }
 
@@ -1624,16 +1623,17 @@ void Game::HandleInteraction()
 void Game::UpdateShip(float deltaSeconds)
 {
 	m_PreviousShipPosition = m_ShipPosition;
-	if (m_SpecialKeys[GLUT_KEY_LEFT])
+	if (m_SpecialKeys[GameKeyLeft])
 		m_ShipAngle += 2.1f * deltaSeconds;
-	if (m_SpecialKeys[GLUT_KEY_RIGHT])
+	if (m_SpecialKeys[GameKeyRight])
 		m_ShipAngle -= 2.1f * deltaSeconds;
 	float thrust = 0.0f;
-	if (m_SpecialKeys[GLUT_KEY_UP])
+	if (m_SpecialKeys[GameKeyUp])
 		thrust += 95.0f;
-	if (m_SpecialKeys[GLUT_KEY_DOWN])
+	if (m_SpecialKeys[GameKeyDown])
 		thrust -= 48.0f;
-	const bool boostActive = (GetAsyncKeyState(VK_LSHIFT) & 0x8000) != 0;
+	const bool boostActive =
+		m_SpecialKeys[GameKeyLeftShift] || m_SpecialKeys[GameKeyRightShift];
 	if (boostActive)
 		thrust += 135.0f;
 	m_ShipVelocity.x += std::cos(m_ShipAngle) * thrust * deltaSeconds;
