@@ -87,13 +87,10 @@ bool Game::CanMoveTo(float x, float y, float radius) const
 	for (size_t i = 0; i < m_Obstacles.size(); ++i)
 	{
 		const Obstacle& obstacle = m_Obstacles[i];
-		if (x + radius > obstacle.x - obstacle.halfWidth &&
-			x - radius < obstacle.x + obstacle.halfWidth &&
-			y + radius > obstacle.y - obstacle.halfHeight &&
-			y - radius < obstacle.y + obstacle.halfHeight)
+		if (OverlapsObstacle(x, y, radius, obstacle))
 			return false;
 	}
-	return true;
+	return !IsBlockedByInteriorFixture(x, y, radius, false);
 }
 
 bool Game::IsTutorialAreaWalkable(float x, float y, float radius) const

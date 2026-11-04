@@ -55,10 +55,33 @@ class ModelLibrary
 		float localRotation = 0.0f,
 		float localPivotX = 0.0f,
 		float localPivotY = 0.0f) const;
+	void PrecacheMesh(const std::string& meshName,
+		float scale = 1.0f,
+		float rotation = 0.0f,
+		float screenRotation = 0.0f,
+		float heightScale = 1.0f,
+		float localRotation = 0.0f,
+		float localPivotX = 0.0f,
+		float localPivotY = 0.0f) const;
 
   private:
+	struct CachedMeshProjection
+	{
+		std::string meshName;
+		float scale;
+		float rotation;
+		float screenRotation;
+		float heightScale;
+		float localRotation;
+		float localPivotX;
+		float localPivotY;
+		std::vector<ColoredTriangle> triangles;
+	};
+
 	bool LoadFile(const char* path);
 	bool LoadMeshFile(const char* path);
 	std::unordered_map<std::string, std::vector<ModelPrimitive>> m_Models;
 	std::unordered_map<std::string, std::vector<MeshTriangle>> m_Meshes;
+	mutable std::vector<CachedMeshProjection> m_StaticMeshCache;
+	mutable std::vector<ColoredTriangle> m_DynamicMeshScratch;
 };

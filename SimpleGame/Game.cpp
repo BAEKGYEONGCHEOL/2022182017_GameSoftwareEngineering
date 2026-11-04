@@ -42,6 +42,12 @@ const WorldPoint SpaceBoundaryCenter = {0.0f, 325.0f};
 const float SpaceBoundaryHalfWidth = 620.0f;
 const float SpaceBoundaryHalfHeight = 720.0f;
 
+float QuantizeMeshFacing(float angle)
+{
+	const float directionStep = Pi / 8.0f;
+	return std::round(angle / directionStep) * directionStep;
+}
+
 float EstimatedGlyphWidth(wchar_t character)
 {
 	if (character == L' ' || character == L'\t')
@@ -154,6 +160,13 @@ enum ProjectileOwnerType
 	ProjectileOwnerSurvivor
 };
 
+enum MuzzleFlashType
+{
+	MuzzleBallistic,
+	MuzzleArmorPiercing,
+	MuzzlePlasma
+};
+
 enum SurvivorPattern
 {
 	SurvivorFrozen,
@@ -257,6 +270,20 @@ float DistanceToSegment(
 	return Length(point.x - closestX, point.y - closestY);
 }
 
+void BuildPersonalShipFixtures(const WorldPoint& dockPosition, Obstacle* fixtures)
+{
+	fixtures[0] = {dockPosition.x, dockPosition.y, 0.70f, 0.45f, 38.0f,
+		0.08f, 0.36f, 0.46f, ControlConsole};
+	fixtures[1] = {dockPosition.x - 2.6f, dockPosition.y + 1.8f, 0.55f, 0.65f, 42.0f,
+		0.10f, 0.29f, 0.38f, PowerRelay};
+	fixtures[2] = {dockPosition.x + 2.6f, dockPosition.y + 1.8f, 0.55f, 0.65f, 42.0f,
+		0.10f, 0.29f, 0.38f, PowerRelay};
+	fixtures[3] = {dockPosition.x - 2.4f, dockPosition.y - 2.2f, 0.62f, 0.52f, 47.0f,
+		0.12f, 0.34f, 0.42f, EngineModule};
+	fixtures[4] = {dockPosition.x + 2.4f, dockPosition.y - 2.2f, 0.62f, 0.52f, 47.0f,
+		0.12f, 0.34f, 0.42f, EngineModule};
+}
+
 ScreenPoint Rotate(float x, float y, float angle, float centerX, float centerY)
 {
 	const float cosine = std::cos(angle);
@@ -281,6 +308,75 @@ void DrawRotatedRect(PrototypeRenderer* renderer,
 	ScreenPoint p2 = Rotate(width * 0.5f, height * 0.5f, angle, x, y);
 	ScreenPoint p3 = Rotate(-width * 0.5f, height * 0.5f, angle, x, y);
 	renderer->DrawQuad(p0, p1, p2, p3, r, g, b, alpha);
+}
+
+void DrawMuzzleSparks(PrototypeRenderer* renderer,
+	float x,
+	float y,
+	float angle,
+	MuzzleFlashType flashType,
+	float progress)
+{
+	const float directionX = std::cos(angle);
+	const float directionY = std::sin(angle);
+	const float perpendicularX = -directionY;
+	const float perpendicularY = directionX;
+	float red = 1.0f;
+	float green = 0.68f;
+	float blue = 0.16f;
+	if (flashType == MuzzleArmorPiercing)
+	{
+		green = 0.20f;
+		blue = 0.06f;
+	}
+	else if (flashType == MuzzlePlasma)
+	{
+		red = 0.18f;
+		green = 0.88f;
+		blue = 1.0f;
+	}
+
+	const float clampedProgress = Clamp(progress, 0.0f, 1.0f);
+	const float fade = 1.0f - clampedProgress;
+	const float flameLength = 24.0f + fade * 7.0f;
+	const float flameWidth = 6.0f + fade * 3.0f;
+	const ScreenPoint flameBaseA = {
+		x + perpendicularX * flameWidth, y + perpendicularY * flameWidth};
+	const ScreenPoint flameBaseB = {
+		x - perpendicularX * flameWidth, y - perpendicularY * flameWidth};
+	const ScreenPoint flameTip = {
+		x + directionX * flameLength, y + directionY * flameLength};
+	renderer->DrawTriangle(
+		flameBaseA, flameBaseB, flameTip, red, green, blue, 0.82f * fade);
+
+	const float sparkOffsets[] = {-0.62f, -0.34f, -0.14f, 0.18f, 0.39f, 0.67f};
+	for (int sparkIndex = 0; sparkIndex < 6; ++sparkIndex)
+	{
+		const float sparkAngle = angle + sparkOffsets[sparkIndex];
+		const float sparkDirectionX = std::cos(sparkAngle);
+		const float sparkDirectionY = std::sin(sparkAngle);
+		const float sparkPerpendicularX = -sparkDirectionY;
+		const float sparkPerpendicularY = sparkDirectionX;
+		const float sparkLength = 11.0f + static_cast<float>((sparkIndex * 7) % 9) + fade * 8.0f;
+		const float sparkWidth = sparkIndex % 2 == 0 ? 1.8f : 1.2f;
+		const float sparkTravel =
+			clampedProgress * (8.0f + static_cast<float>(sparkIndex % 3) * 4.0f);
+		const float sparkX = x + sparkDirectionX * sparkTravel;
+		const float sparkY = y + sparkDirectionY * sparkTravel;
+		const ScreenPoint sparkBaseA = {sparkX + sparkPerpendicularX * sparkWidth,
+			sparkY + sparkPerpendicularY * sparkWidth};
+		const ScreenPoint sparkBaseB = {sparkX - sparkPerpendicularX * sparkWidth,
+			sparkY - sparkPerpendicularY * sparkWidth};
+		const ScreenPoint sparkTip = {sparkX + sparkDirectionX * sparkLength,
+			sparkY + sparkDirectionY * sparkLength};
+		renderer->DrawTriangle(sparkBaseA,
+			sparkBaseB,
+			sparkTip,
+			std::min(1.0f, red + 0.18f),
+			std::min(1.0f, green + 0.12f),
+			std::min(1.0f, blue + 0.10f),
+			0.74f * fade);
+	}
 }
 
 void DrawProjectileVisual(const ModelLibrary& modelLibrary,
@@ -355,6 +451,7 @@ void Game::Reset()
 	m_PlayerDeathTimer = 0.0f;
 	m_AttackCooldown = 0.0f;
 	m_AttackFlash = 0.0f;
+	m_LastPlayerShotCharged = false;
 	m_DodgeCooldown = 0.0f;
 	m_DodgeTimer = 0.0f;
 	m_DamageCooldown = 0.0f;
@@ -390,8 +487,8 @@ void Game::Reset()
 	m_StoryDocuments.clear();
 	m_LevelSurvivors.clear();
 	m_MagazinePickups.clear();
-	if (!m_ModelLibrary.IsLoaded())
-		m_ModelLibrary.Load();
+	if (!m_ModelLibrary.IsLoaded() && m_ModelLibrary.Load())
+		PrecacheGameplayMeshes();
 	m_ShipPosition = {0.0f, 0.0f};
 	m_PreviousShipPosition = m_ShipPosition;
 	m_ShipVelocity = {0.0f, 0.0f};
@@ -495,6 +592,33 @@ void Game::MouseButton(int button, int state)
 {
 	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN)
 		m_MousePressed = true;
+}
+
+void Game::PrecacheGameplayMeshes()
+{
+	const float directionStep = Pi / 8.0f;
+	for (int directionIndex = -8; directionIndex <= 12; ++directionIndex)
+	{
+		const float direction = static_cast<float>(directionIndex) * directionStep;
+		m_ModelLibrary.PrecacheMesh("humanoid_soldier", 18.0f, direction);
+		m_ModelLibrary.PrecacheMesh("void_quadruped", 17.0f, direction);
+	}
+
+	const float wallRotations[] = {0.0f, Pi * 0.5f};
+	for (int rotationIndex = 0; rotationIndex < 2; ++rotationIndex)
+	{
+		m_ModelLibrary.PrecacheMesh("ship_wall", 19.0f, wallRotations[rotationIndex]);
+		m_ModelLibrary.PrecacheMesh("ship_wall", 20.0f, wallRotations[rotationIndex]);
+	}
+
+	m_ModelLibrary.PrecacheMesh("ship_console", 24.0f);
+	m_ModelLibrary.PrecacheMesh("ship_medbed", 23.0f);
+	m_ModelLibrary.PrecacheMesh("ship_power", 21.0f);
+	m_ModelLibrary.PrecacheMesh("ship_engine", 23.0f);
+	m_ModelLibrary.PrecacheMesh("ship_engine", 27.0f);
+	m_ModelLibrary.PrecacheMesh("ship_coolant", 22.0f);
+	m_ModelLibrary.PrecacheMesh("ship_pilot_seat", 24.0f);
+	m_ModelLibrary.PrecacheMesh("humanoid_soldier", 18.0f, 1.57f);
 }
 
 void Game::Update(float deltaSeconds)
@@ -1129,6 +1253,7 @@ void Game::HandleAttack()
 	int bulletDamage = 1 + (m_Firepower - 1) / 2;
 	++m_ShotsFired;
 	bool chargedBullet = m_Mode == FirstLevel && m_ShotsFired % 4 == 0;
+	m_LastPlayerShotCharged = chargedBullet;
 	if (chargedBullet)
 		++bulletDamage;
 	m_Projectiles.push_back({m_Player,
@@ -1159,10 +1284,10 @@ void Game::UpdateProjectiles(float deltaSeconds)
 			projectile.life <= 0.0f || projectile.distanceTravelled >= projectile.maximumDistance;
 
 		if (m_Mode == FirstLevel &&
-			!IsFirstLevelWalkable(projectile.position.x, projectile.position.y))
+			!IsFirstLevelAreaWalkable(projectile.position.x, projectile.position.y, 0.08f))
 			remove = true;
 		if (m_Mode == OnFoot &&
-			!IsTutorialFloor(projectile.position.x, projectile.position.y))
+			!CanMoveTo(projectile.position.x, projectile.position.y, 0.08f))
 			remove = true;
 
 		for (size_t enemyIndex = 0;
@@ -1302,6 +1427,94 @@ void Game::UpdateProjectiles(float deltaSeconds)
 		else
 			++projectileIndex;
 	}
+}
+
+bool Game::OverlapsObstacle(
+	float x, float y, float radius, const Obstacle& obstacle) const
+{
+	const float closestX = Clamp(
+		x, obstacle.x - obstacle.halfWidth, obstacle.x + obstacle.halfWidth);
+	const float closestY = Clamp(
+		y, obstacle.y - obstacle.halfHeight, obstacle.y + obstacle.halfHeight);
+	const float deltaX = x - closestX;
+	const float deltaY = y - closestY;
+	return deltaX * deltaX + deltaY * deltaY < radius * radius;
+}
+
+bool Game::IsBlockedByInteriorFixture(
+	float x, float y, float radius, bool firstLevel) const
+{
+	const WorldPoint dockPosition = firstLevel ?
+		FirstLevelPersonalShipDockPosition : TutorialPersonalShipDockPosition;
+	Obstacle personalShipFixtures[5];
+	BuildPersonalShipFixtures(dockPosition, personalShipFixtures);
+	for (size_t fixtureIndex = 0; fixtureIndex < 5; ++fixtureIndex)
+	{
+		if (OverlapsObstacle(x, y, radius, personalShipFixtures[fixtureIndex]))
+			return true;
+	}
+
+	const Obstacle personalShipCockpit = {dockPosition.x,
+		dockPosition.y + 3.0f,
+		0.72f,
+		0.58f,
+		42.0f,
+		0.12f,
+		0.42f,
+		0.52f,
+		ControlConsole};
+	if (OverlapsObstacle(x, y, radius, personalShipCockpit))
+		return true;
+
+	if (!firstLevel)
+	{
+		const Obstacle terminal = {TerminalPosition.x,
+			TerminalPosition.y,
+			0.62f,
+			0.50f,
+			32.0f,
+			0.10f,
+			0.36f,
+			0.46f,
+			ControlConsole};
+		const Obstacle cockpit = {CockpitPosition.x,
+			CockpitPosition.y,
+			0.72f,
+			0.58f,
+			42.0f,
+			0.12f,
+			0.42f,
+			0.52f,
+			ControlConsole};
+		return OverlapsObstacle(x, y, radius, terminal) ||
+			OverlapsObstacle(x, y, radius, cockpit);
+	}
+
+	for (int engineIndex = 0; engineIndex < 4; ++engineIndex)
+	{
+		const Obstacle engine = {m_LevelEnginePositions[engineIndex].x,
+			m_LevelEnginePositions[engineIndex].y,
+			0.68f,
+			0.58f,
+			45.0f,
+			0.12f,
+			0.34f,
+			0.42f,
+			EngineModule};
+		if (OverlapsObstacle(x, y, radius, engine))
+			return true;
+	}
+
+	const Obstacle levelControl = {m_LevelControlPosition.x,
+		m_LevelControlPosition.y,
+		0.72f,
+		0.56f,
+		40.0f,
+		0.10f,
+		0.38f,
+		0.48f,
+		ControlConsole};
+	return OverlapsObstacle(x, y, radius, levelControl);
 }
 
 void Game::HandleInteraction()
@@ -1450,6 +1663,56 @@ void Game::UpdateShip(float deltaSeconds)
 		SetMessage(L"항법 경계에 도달했습니다. 항로 안쪽으로 복귀하십시오.", 1.5f);
 	}
 	UpdateAsteroids(deltaSeconds);
+
+	for (int fixedShipIndex = 0; fixedShipIndex < 6; ++fixedShipIndex)
+	{
+		const WorldPoint fixedShipPosition = FixedShipPosition(fixedShipIndex);
+		const float collisionRadius = fixedShipIndex == 2 ? 76.0f :
+			(fixedShipIndex == 1 ? 68.0f : 58.0f);
+		const float previousDistance = Length(
+			m_PreviousShipPosition.x - fixedShipPosition.x,
+			m_PreviousShipPosition.y - fixedShipPosition.y);
+		if (fixedShipIndex == m_CurrentShip && previousDistance <= collisionRadius)
+			continue;
+		if (DistanceToSegment(fixedShipPosition, m_PreviousShipPosition, m_ShipPosition) >=
+			collisionRadius)
+		{
+			continue;
+		}
+
+		float normalX = m_PreviousShipPosition.x - fixedShipPosition.x;
+		float normalY = m_PreviousShipPosition.y - fixedShipPosition.y;
+		float normalLength = Length(normalX, normalY);
+		if (normalLength <= 0.01f)
+		{
+			normalX = -std::cos(m_ShipAngle);
+			normalY = -std::sin(m_ShipAngle);
+			normalLength = 1.0f;
+		}
+		normalX /= normalLength;
+		normalY /= normalLength;
+		m_ShipPosition.x = fixedShipPosition.x + normalX * (collisionRadius + 1.0f);
+		m_ShipPosition.y = fixedShipPosition.y + normalY * (collisionRadius + 1.0f);
+
+		const float velocityAlongNormal =
+			m_ShipVelocity.x * normalX + m_ShipVelocity.y * normalY;
+		if (velocityAlongNormal < 0.0f)
+		{
+			m_ShipVelocity.x -= velocityAlongNormal * 1.35f * normalX;
+			m_ShipVelocity.y -= velocityAlongNormal * 1.35f * normalY;
+		}
+		m_ShipVelocity.x *= 0.35f;
+		m_ShipVelocity.y *= 0.35f;
+
+		if (m_DamageCooldown <= 0.0f)
+		{
+			m_ShipHealth = std::max(0.0f, m_ShipHealth - 10.0f);
+			m_DamageCooldown = 0.8f;
+			m_ShipImpactFlash = 0.35f;
+			SetMessage(L"함선 선체와 충돌했습니다. 도킹 신호 범위에서 E 키를 누르십시오.", 2.0f);
+		}
+		break;
+	}
 
 	const WorldPoint debris[] = {
 		{-90.0f, 170.0f}, {85.0f, 290.0f}, {-70.0f, 410.0f}, {55.0f, 520.0f}};
@@ -2918,7 +3181,7 @@ void Game::DrawCharacter(const WorldPoint& point,
 	const float idlePhase = std::sin(m_TotalTime * 2.2f + point.x * 0.13f) * 0.25f;
 	const float animationPhase = moving ? movementPhase : idlePhase;
 	const float bob = moving ? std::fabs(animationPhase) * 2.8f : animationPhase * 0.8f;
-	const float bodySway = animationPhase * (moving ? 0.055f : 0.015f);
+	const float bodySway = animationPhase * (moving ? 1.6f : 0.35f);
 	float facingScreenX = (facingDirection.x - facingDirection.y) * TileWidth * 0.5f;
 	float facingScreenY = -(facingDirection.x + facingDirection.y) * TileHeight * 0.5f;
 	float facingScreenLength = Length(facingScreenX, facingScreenY);
@@ -2932,8 +3195,9 @@ void Game::DrawCharacter(const WorldPoint& point,
 	facingScreenY /= facingScreenLength;
 	const float attackWeight = enemy ? std::sin(Clamp(attackPhase, 0.0f, 1.0f) * Pi) : 0.0f;
 	const float attackLunge = attackWeight * 8.0f;
-	const float renderX = foot.x + facingScreenX * attackLunge;
+	const float renderX = foot.x + facingScreenX * attackLunge + bodySway;
 	const float renderY = foot.y + bob + facingScreenY * attackLunge;
+	const float renderFacingAngle = QuantizeMeshFacing(facingAngle);
 
 	m_Renderer->DrawSoftShadow(
 		foot.x + 5.0f, foot.y, enemy ? 46.0f : 34.0f, 14.0f, 0.92f);
@@ -2942,7 +3206,7 @@ void Game::DrawCharacter(const WorldPoint& point,
 		renderX,
 		renderY,
 		enemy ? 17.0f : 18.0f,
-		facingAngle + bodySway);
+		renderFacingAngle);
 
 	if (enemy)
 	{
@@ -2954,7 +3218,7 @@ void Game::DrawCharacter(const WorldPoint& point,
 			renderX,
 			renderY,
 			17.0f,
-			facingAngle + bodySway,
+			renderFacingAngle,
 			0.0f,
 			1.0f,
 			-clawSwing,
@@ -2965,7 +3229,7 @@ void Game::DrawCharacter(const WorldPoint& point,
 			renderX,
 			renderY,
 			17.0f,
-			facingAngle + bodySway,
+			renderFacingAngle,
 			0.0f,
 			1.0f,
 			clawSwing,
@@ -3032,8 +3296,13 @@ void Game::DrawCharacter(const WorldPoint& point,
 	{
 		const float muzzleX = torsoX + aimScreenX * 27.0f;
 		const float muzzleY = torsoY + aimScreenY * 27.0f;
-		m_Renderer->DrawDiamond(
-			muzzleX, muzzleY, 30.0f, 10.0f, 0.20f, 0.88f, 1.0f, 0.88f);
+		const float flashProgress = 1.0f - m_AttackFlash / 0.10f;
+		DrawMuzzleSparks(m_Renderer,
+			muzzleX,
+			muzzleY,
+			std::atan2(aimScreenY, aimScreenX),
+			m_LastPlayerShotCharged ? MuzzlePlasma : MuzzleBallistic,
+			flashProgress);
 	}
 }
 
@@ -3042,7 +3311,6 @@ void Game::DrawNeutralNpc(const NeutralNpc& npc)
 	const ScreenPoint foot = WorldToScreen(npc.position.x, npc.position.y);
 	const float idlePhase = std::sin(m_TotalTime * 2.4f + npc.animationOffset) * 0.35f;
 	const float verticalOffset = npc.dead ? 0.0f : idlePhase;
-	const float bodySway = npc.dead ? 0.0f : idlePhase * 0.04f;
 	const float npcFacingScreenAngle = std::atan2(-TileHeight * 0.5f, TileWidth * 0.5f);
 	m_Renderer->DrawSoftShadow(foot.x, foot.y, npc.dead ? 54.0f : 34.0f, 13.0f, 0.88f);
 	m_ModelLibrary.DrawMesh(m_Renderer,
@@ -3050,7 +3318,7 @@ void Game::DrawNeutralNpc(const NeutralNpc& npc)
 		foot.x,
 		foot.y + verticalOffset,
 		18.0f,
-		ModelForwardAxisCorrection + bodySway,
+		ModelForwardAxisCorrection,
 		npc.dead ? npcFacingScreenAngle - Pi * 0.5f : 0.0f,
 		npc.dead ? 0.34f : 1.0f);
 	return;
@@ -3412,11 +3680,10 @@ void Game::DrawLevelSurvivor(const LevelSurvivor& survivor, size_t survivorIndex
 		screen.x + tremble,
 		screen.y + breathing,
 		18.0f,
-		survivorFacingAngle + tremble * 0.012f);
+		QuantizeMeshFacing(survivorFacingAngle));
 
 	if (survivor.armed)
 	{
-		const float warning = survivor.confused ? 0.92f : 0.35f;
 		float aimScreenX = (survivor.aimDirection.x - survivor.aimDirection.y) * TileWidth * 0.5f;
 		float aimScreenY =
 			-(survivor.aimDirection.x + survivor.aimDirection.y) * TileHeight * 0.5f;
@@ -3435,14 +3702,22 @@ void Game::DrawLevelSurvivor(const LevelSurvivor& survivor, size_t survivorIndex
 			screen.y + 21.0f + breathing + aimScreenY * 13.0f,
 			22.0f,
 			weaponAngle + ModelForwardAxisCorrection);
-		m_Renderer->DrawDiamond(screen.x + tremble + aimScreenX * 29.0f,
-			screen.y + 32.0f + breathing + aimScreenY * 16.0f,
-			7.0f,
-			4.0f,
-			warning,
-			survivor.confused ? 0.12f : 0.52f,
-			0.10f,
-			0.85f);
+
+		const float fireCooldownStart = 1.15f + survivor.fear * 0.7f;
+		const float muzzleFlashDuration = 0.10f;
+		if (survivor.fireCooldown > fireCooldownStart - muzzleFlashDuration)
+		{
+			const float muzzleX = screen.x + tremble + aimScreenX * 29.0f;
+			const float muzzleY = screen.y + 21.0f + breathing + aimScreenY * 29.0f;
+			const float flashProgress =
+				(fireCooldownStart - survivor.fireCooldown) / muzzleFlashDuration;
+			DrawMuzzleSparks(m_Renderer,
+				muzzleX,
+				muzzleY,
+				std::atan2(aimScreenY, aimScreenX),
+				MuzzleArmorPiercing,
+				flashProgress);
+		}
 	}
 
 	std::wstring label = SurvivorRoleName(survivor.pattern);
@@ -3465,54 +3740,8 @@ void Game::DrawLevelSurvivor(const LevelSurvivor& survivor, size_t survivorIndex
 
 void Game::CreatePersonalShipInteriorActors(const WorldPoint& dockPosition)
 {
-	const Obstacle fixtures[] = {
-		{dockPosition.x,
-			dockPosition.y,
-			0.70f,
-			0.45f,
-			38.0f,
-			0.08f,
-			0.36f,
-			0.46f,
-			ControlConsole},
-		{dockPosition.x - 2.6f,
-			dockPosition.y + 1.8f,
-			0.55f,
-			0.65f,
-			42.0f,
-			0.10f,
-			0.29f,
-			0.38f,
-			PowerRelay},
-		{dockPosition.x + 2.6f,
-			dockPosition.y + 1.8f,
-			0.55f,
-			0.65f,
-			42.0f,
-			0.10f,
-			0.29f,
-			0.38f,
-			PowerRelay},
-		{dockPosition.x - 2.4f,
-			dockPosition.y - 2.2f,
-			0.62f,
-			0.52f,
-			47.0f,
-			0.12f,
-			0.34f,
-			0.42f,
-			EngineModule},
-		{dockPosition.x + 2.4f,
-			dockPosition.y - 2.2f,
-			0.62f,
-			0.52f,
-			47.0f,
-			0.12f,
-			0.34f,
-			0.42f,
-			EngineModule},
-	};
-
+	Obstacle fixtures[5];
+	BuildPersonalShipFixtures(dockPosition, fixtures);
 	const size_t fixtureCount = sizeof(fixtures) / sizeof(fixtures[0]);
 	for (size_t fixtureIndex = 0; fixtureIndex < fixtureCount; ++fixtureIndex)
 	{

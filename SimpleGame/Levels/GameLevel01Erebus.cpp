@@ -629,7 +629,7 @@ bool Game::IsFirstLevelAreaWalkable(float x, float y, float radius) const
 			return false;
 		}
 	}
-	return true;
+	return !IsBlockedByInteriorFixture(x, y, radius, true);
 }
 
 void Game::AwardExperience(int amount, const WorldPoint& position)

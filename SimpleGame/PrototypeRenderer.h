@@ -12,6 +12,16 @@ struct ScreenPoint
 	float y;
 };
 
+struct ColoredTriangle
+{
+	ScreenPoint points[3];
+	float red;
+	float green;
+	float blue;
+	float alpha;
+	float depth;
+};
+
 class PrototypeRenderer
 {
   public:
@@ -57,6 +67,8 @@ class PrototypeRenderer
 		float g,
 		float bColor,
 		float alpha);
+	void DrawTriangles(
+		const std::vector<ColoredTriangle>& triangles, float offsetX = 0.0f, float offsetY = 0.0f);
 	void DrawRect(float x, float y, float width, float height, float r, float g, float b, float a);
 	void DrawDiamond(
 		float x, float y, float width, float height, float r, float g, float b, float a);

@@ -210,6 +210,8 @@ class Game
 	void SetMessage(const std::wstring& message, float seconds);
 	void SetDialogue(const std::wstring& dialogue, const WorldPoint& speakerPosition, float seconds);
 	bool CanMoveTo(float x, float y, float radius = 0.28f) const;
+	bool OverlapsObstacle(float x, float y, float radius, const Obstacle& obstacle) const;
+	bool IsBlockedByInteriorFixture(float x, float y, float radius, bool firstLevel) const;
 	bool IsTutorialFloor(float x, float y) const;
 	bool IsTutorialAreaWalkable(float x, float y, float radius) const;
 	bool IsNear(const WorldPoint& point, float distance) const;
@@ -233,6 +235,7 @@ class Game
 	void RebuildMonitoringMapCache();
 	void PublishMonitoringState(float deltaSeconds, bool force = false);
 	void RebuildGameplayMinimapCache();
+	void PrecacheGameplayMeshes();
 	Actor* CreateSceneActor(const std::string& name,
 		float x,
 		float y,
@@ -298,6 +301,7 @@ class Game
 	float m_PlayerDeathTimer;
 	float m_AttackCooldown;
 	float m_AttackFlash;
+	bool m_LastPlayerShotCharged;
 	float m_DodgeCooldown;
 	float m_DodgeTimer;
 	float m_DamageCooldown;

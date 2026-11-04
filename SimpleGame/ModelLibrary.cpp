@@ -10,6 +10,9 @@ bool ModelLibrary::Load()
 {
 	m_Models.clear();
 	m_Meshes.clear();
+	m_StaticMeshCache.clear();
+	m_DynamicMeshScratch.clear();
+	m_StaticMeshCache.reserve(128);
 
 	const char* paths[] = {
 		"./Data/Models.txt",
@@ -46,25 +49,63 @@ void ModelLibrary::DrawMesh(PrototypeRenderer* renderer,
 	auto mesh = m_Meshes.find(meshName);
 	if (mesh == m_Meshes.end())
 		return;
+
+	const bool flattenedCorpse = heightScale < 0.5f;
+	const bool fixedLevelCorpse = meshName == "humanoid_soldier" &&
+		rotation == 1.57f && screenRotation == 0.0f && localRotation == 0.0f;
+	const bool sharedCharacterPose =
+		(meshName == "humanoid_soldier" || meshName == "void_quadruped") &&
+		screenRotation == 0.0f && heightScale == 1.0f && localRotation == 0.0f;
+	bool cacheStaticProjection =
+		meshName.compare(0, 5, "ship_") == 0 || flattenedCorpse || fixedLevelCorpse ||
+		sharedCharacterPose;
+	if (cacheStaticProjection)
+	{
+		for (size_t cacheIndex = 0; cacheIndex < m_StaticMeshCache.size(); ++cacheIndex)
+		{
+			const CachedMeshProjection& cached = m_StaticMeshCache[cacheIndex];
+			if (cached.meshName == meshName && cached.scale == scale &&
+				cached.rotation == rotation && cached.screenRotation == screenRotation &&
+				cached.heightScale == heightScale && cached.localRotation == localRotation &&
+				cached.localPivotX == localPivotX && cached.localPivotY == localPivotY)
+			{
+				if (renderer != NULL)
+					renderer->DrawTriangles(cached.triangles, x, y);
+				return;
+			}
+		}
+	}
+	if (m_StaticMeshCache.size() >= 256)
+		cacheStaticProjection = false;
+
 	const float cosine = std::cos(rotation);
 	const float sine = std::sin(rotation);
 	const float screenCosine = std::cos(screenRotation);
 	const float screenSine = std::sin(screenRotation);
 	const float localCosine = std::cos(localRotation);
 	const float localSine = std::sin(localRotation);
-	struct RenderTriangle
+	std::vector<ColoredTriangle>* renderTriangles = &m_DynamicMeshScratch;
+	if (cacheStaticProjection)
 	{
-		ScreenPoint points[3];
-		float depth;
-		float red;
-		float green;
-		float blue;
-	};
-	std::vector<RenderTriangle> renderTriangles;
-	renderTriangles.reserve(mesh->second.size());
+		CachedMeshProjection cached = {};
+		cached.meshName = meshName;
+		cached.scale = scale;
+		cached.rotation = rotation;
+		cached.screenRotation = screenRotation;
+		cached.heightScale = heightScale;
+		cached.localRotation = localRotation;
+		cached.localPivotX = localPivotX;
+		cached.localPivotY = localPivotY;
+		m_StaticMeshCache.push_back(cached);
+		renderTriangles = &m_StaticMeshCache.back().triangles;
+	}
+	renderTriangles->clear();
+	renderTriangles->reserve(mesh->second.size());
+	const float baseX = cacheStaticProjection ? 0.0f : x;
+	const float baseY = cacheStaticProjection ? 0.0f : y;
 	for (const MeshTriangle& triangle : mesh->second)
 	{
-		RenderTriangle rendered = {};
+		ColoredTriangle rendered = {};
 		float rotatedPositions[9] = {};
 		for (int vertex = 0; vertex < 3; ++vertex)
 		{
@@ -89,8 +130,9 @@ void ModelLibrary::DrawMesh(PrototypeRenderer* renderer,
 			// diagonal facing appeared opposite to its movement/aim direction.
 			const float projectedY =
 				-(rotatedX + rotatedY) * scale * 0.5f + localZ * scale * heightScale;
-			rendered.points[vertex] = {x + projectedX * screenCosine - projectedY * screenSine,
-				y + projectedX * screenSine + projectedY * screenCosine};
+			rendered.points[vertex] = {
+				baseX + projectedX * screenCosine - projectedY * screenSine,
+				baseY + projectedX * screenSine + projectedY * screenCosine};
 			rendered.depth += rendered.points[vertex].y;
 		}
 		rendered.depth /= 3.0f;
@@ -118,21 +160,42 @@ void ModelLibrary::DrawMesh(PrototypeRenderer* renderer,
 		rendered.red = std::min(1.0f, triangle.red * light);
 		rendered.green = std::min(1.0f, triangle.green * light);
 		rendered.blue = std::min(1.0f, triangle.blue * light);
-		renderTriangles.push_back(rendered);
+		rendered.alpha = 1.0f;
+		renderTriangles->push_back(rendered);
 	}
-	std::stable_sort(renderTriangles.begin(),
-		renderTriangles.end(),
-		[](const RenderTriangle& left, const RenderTriangle& right) {
+	std::sort(renderTriangles->begin(),
+		renderTriangles->end(),
+		[](const ColoredTriangle& left, const ColoredTriangle& right) {
 			return left.depth < right.depth;
 		});
-	for (const RenderTriangle& triangle : renderTriangles)
-		renderer->DrawTriangle(triangle.points[0],
-			triangle.points[1],
-			triangle.points[2],
-			triangle.red,
-			triangle.green,
-			triangle.blue,
-			1.0f);
+
+	if (renderer != NULL)
+	{
+		renderer->DrawTriangles(
+			*renderTriangles, cacheStaticProjection ? x : 0.0f, cacheStaticProjection ? y : 0.0f);
+	}
+}
+
+void ModelLibrary::PrecacheMesh(const std::string& meshName,
+	float scale,
+	float rotation,
+	float screenRotation,
+	float heightScale,
+	float localRotation,
+	float localPivotX,
+	float localPivotY) const
+{
+	DrawMesh(NULL,
+		meshName,
+		0.0f,
+		0.0f,
+		scale,
+		rotation,
+		screenRotation,
+		heightScale,
+		localRotation,
+		localPivotX,
+		localPivotY);
 }
 
 bool ModelLibrary::IsLoaded() const

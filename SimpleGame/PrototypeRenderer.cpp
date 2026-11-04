@@ -360,6 +360,34 @@ void PrototypeRenderer::DrawTriangle(const ScreenPoint& a,
 	DrawVertices(vertices, 3, r, g, bColor, alpha);
 }
 
+void PrototypeRenderer::DrawTriangles(
+	const std::vector<ColoredTriangle>& triangles, float offsetX, float offsetY)
+{
+	if (!m_Initialized || triangles.empty())
+		return;
+
+	const size_t firstVertexValue = m_BatchedVertices.size();
+	m_BatchedVertices.resize(firstVertexValue + triangles.size() * 27);
+	float* destination = &m_BatchedVertices[firstVertexValue];
+	for (size_t triangleIndex = 0; triangleIndex < triangles.size(); ++triangleIndex)
+	{
+		const ColoredTriangle& triangle = triangles[triangleIndex];
+		for (int vertexIndex = 0; vertexIndex < 3; ++vertexIndex)
+		{
+			*destination++ = triangle.points[vertexIndex].x + offsetX;
+			*destination++ = triangle.points[vertexIndex].y + offsetY;
+			*destination++ = triangle.red;
+			*destination++ = triangle.green;
+			*destination++ = triangle.blue;
+			*destination++ = triangle.alpha;
+			*destination++ = 0.0f;
+			*destination++ = 0.0f;
+			*destination++ = 0.0f;
+		}
+	}
+	m_PrimitiveCount += static_cast<unsigned int>(triangles.size());
+}
+
 void PrototypeRenderer::DrawRect(
 	float x, float y, float width, float height, float r, float g, float b, float a)
 {
