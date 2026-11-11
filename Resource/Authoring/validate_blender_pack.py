@@ -9,6 +9,7 @@ FILES = [
     os.path.join('Libraries', 'Humanoid_Modular.blend'),
     os.path.join('Libraries', 'Void_Quadruped.blend'),
     os.path.join('Libraries', 'Ship_ModularKit.blend'),
+    os.path.join('Libraries', 'ShipInterior_Props.blend'),
     os.path.join('Libraries', 'Space_Asteroids.blend'),
     os.path.join('Libraries', 'Projectile_Meshes.blend'),
 ]
@@ -21,6 +22,7 @@ EXPECTED = {
 SKELETAL_EXPECTED = {'Humanoid_Modular.blend', 'Void_Quadruped.blend'}
 EXPECTED_OBJECTS = {
     'Projectile_Meshes.blend': ['PROJ_Rifle_Ballistic', 'PROJ_Rifle_ArmorPiercing', 'PROJ_Energy_PlasmaBolt', 'PROJ_Rifle_SpentCasing'],
+    'ShipInterior_Props.blend': ['SHIPPROP_CargoCrate_Body', 'SHIPPROP_Locker_Housing', 'SHIPPROP_Workbench_Top', 'SHIPPROP_Bunk_Frame_0', 'SHIPPROP_Galley_Housing', 'SHIPPROP_AirScrubber_Core', 'SHIPPROP_Vent_Housing', 'SHIPPROP_PipeRack_Backplate', 'SHIPPROP_Emergency_Backplate', 'SHIPPROP_Shelf_Beam_0'],
 }
 
 

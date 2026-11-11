@@ -483,6 +483,20 @@ void Game::GenerateFirstLevel()
 	for (int engineIndex = 0; engineIndex < 4; ++engineIndex)
 		m_LevelEngineActive[engineIndex] = false;
 	m_LevelControlPosition = toWorld(rooms[0], 2.5f, 0.0f);
+	m_LevelInteriorProps = {
+		{toWorld(rooms[1], -3.5f, -3.5f), "ship_prop_cargo", 20.0f, 0.0f, 0.72f, 0.52f},
+		{toWorld(rooms[2], 3.5f, -3.5f), "ship_prop_locker", 20.0f, 0.0f, 0.68f, 0.42f},
+		{toWorld(rooms[5], -3.5f, 3.5f), "ship_prop_workbench", 20.0f, 0.0f, 0.98f, 0.55f},
+		{toWorld(rooms[7], 3.5f, 3.5f), "ship_prop_bunk", 19.0f, 0.0f, 1.05f, 0.52f},
+		{toWorld(rooms[8], -3.5f, -3.5f), "ship_prop_galley", 20.0f, 0.0f, 0.76f, 0.48f},
+		{toWorld(rooms[10], 3.5f, -3.5f), "ship_prop_air_scrubber", 20.0f, 0.0f, 0.76f, 0.58f},
+		{toWorld(rooms[12], -3.5f, 3.5f), "ship_prop_vent", 20.0f, 0.0f, 0.82f, 0.30f},
+		{toWorld(rooms[13], 3.5f, 3.5f), "ship_prop_pipe_rack", 20.0f, 0.0f, 0.98f, 0.32f},
+		{toWorld(rooms[15], 3.5f, -3.5f), "ship_prop_emergency", 18.0f, 0.0f, 0.74f, 0.34f},
+		{toWorld(rooms[17], -3.5f, -3.5f), "ship_prop_shelf", 18.0f, 0.0f, 0.84f, 0.42f},
+		{toWorld(rooms[19], 3.5f, 3.5f), "ship_prop_cable_reel", 18.0f, 0.0f, 0.48f, 0.42f},
+		{toWorld(rooms[21], -3.5f, 3.5f), "ship_prop_ceiling_light", 18.0f, 0.0f, 0.74f, 0.38f},
+	};
 
 	m_Player = {-52.0f, -57.0f};
 	m_LevelCorpses.clear();

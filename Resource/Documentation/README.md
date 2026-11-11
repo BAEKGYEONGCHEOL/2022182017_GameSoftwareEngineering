@@ -20,5 +20,6 @@
 - `Libraries/Ship_ModularKit.blend`: walls, controls, medical devices, floor tiles/materials.
 - `Libraries/Space_Asteroids.blend`: four low-poly asteroids and drift-spin actions.
 - `Libraries/Projectile_Meshes.blend`: ballistic, armor-piercing, plasma projectiles and spent casing.
+- `Libraries/ShipInterior_Props.blend`: cargo, lockers, bunks, galley, workbench, life support, vents, pipe rack, emergency gear and shelving.
 
 See `AnimationAndAssembly.json` for clip mapping and blend recommendations.

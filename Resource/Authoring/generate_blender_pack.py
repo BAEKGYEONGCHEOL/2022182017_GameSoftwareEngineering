@@ -572,6 +572,132 @@ def build_ship(root):
     return c
 
 
+def build_ship_interior_props(root):
+    c=coll('ENV_ShipInteriorProps',root)
+    storage=coll('SHIPPROP_Storage',c); utility=coll('SHIPPROP_Utility',c)
+    crew=coll('SHIPPROP_Crew',c); maintenance=coll('SHIPPROP_Maintenance',c)
+
+    # Reinforced cargo crate with readable corners and latches.
+    x,y=20.0,-2.0
+    cube('SHIPPROP_CargoCrate_Body',(x,y,0.48),(0.68,0.46,0.40),M['armor'],storage,0.08)
+    cube('SHIPPROP_CargoCrate_Lid',(x,y-0.01,0.91),(0.72,0.49,0.08),M['wall'],storage,0.04)
+    for sx in [-1,1]:
+        for sy in [-1,1]:
+            cube(f'SHIPPROP_CargoCrate_Corner_{sx}_{sy}',(x+sx*0.60,y+sy*0.39,0.50),(0.09,0.08,0.38),M['steel'],storage,0.025)
+    for sx in [-1,1]:
+        cube(f'SHIPPROP_CargoCrate_Latch_{sx}',(x+sx*0.26,y-0.475,0.76),(0.09,0.025,0.12),M['amber'],storage,0.015)
+    cube('SHIPPROP_CargoCrate_Label',(x,y-0.475,0.42),(0.22,0.018,0.10),M['cyan'],storage,0.008)
+
+    # Two-door crew locker.
+    x=22.3
+    cube('SHIPPROP_Locker_Housing',(x,y,1.05),(0.65,0.34,1.02),M['wall'],storage,0.07)
+    for sx in [-1,1]:
+        cube(f'SHIPPROP_Locker_Door_{sx}',(x+sx*0.31,y-0.365,1.05),(0.29,0.035,0.92),M['armor'],storage,0.035)
+        cube(f'SHIPPROP_Locker_Handle_{sx}',(x+sx*0.12,y-0.414,1.02),(0.025,0.018,0.18),M['steel'],storage,0.008)
+        for iz in range(4):
+            cube(f'SHIPPROP_Locker_Vent_{sx}_{iz}',(x+sx*0.31,y-0.407,1.58+iz*0.075),(0.16,0.012,0.018),M['black'],storage,0.004)
+    cube('SHIPPROP_Locker_Status',(x,y-0.414,1.90),(0.055,0.012,0.035),M['cyan'],storage,0.006)
+
+    # Maintenance workbench with drawers and diagnostic screen.
+    x=24.9
+    cube('SHIPPROP_Workbench_Top',(x,y,0.92),(0.95,0.48,0.09),M['steel'],maintenance,0.04)
+    for sx in [-1,1]:
+        cube(f'SHIPPROP_Workbench_Leg_{sx}',(x+sx*0.78,y+0.24,0.45),(0.09,0.12,0.45),M['wall'],maintenance,0.025)
+        cube(f'SHIPPROP_Workbench_LegFront_{sx}',(x+sx*0.78,y-0.24,0.45),(0.09,0.12,0.45),M['wall'],maintenance,0.025)
+    cube('SHIPPROP_Workbench_DrawerBank',(x+0.53,y-0.08,0.56),(0.30,0.34,0.28),M['armor'],maintenance,0.04)
+    for iz in range(3):
+        cube(f'SHIPPROP_Workbench_Drawer_{iz}',(x+0.53,y-0.43,0.40+iz*0.18),(0.25,0.025,0.065),M['trim'],maintenance,0.01)
+    cube('SHIPPROP_Workbench_ScreenStand',(x-0.42,y+0.10,1.18),(0.045,0.06,0.27),M['steel'],maintenance,0.015)
+    cube('SHIPPROP_Workbench_DiagnosticScreen',(x-0.42,y-0.02,1.43),(0.35,0.055,0.24),M['cyan'],maintenance,0.035,rot=(math.radians(8),0,0))
+    for ix in range(5):
+        cyl(f'SHIPPROP_Workbench_ToolSocket_{ix}',(x-0.45+ix*0.18,y-0.49,0.99),0.028,0.022,M['amber'] if ix==2 else M['black'],maintenance,rot=(math.radians(90),0,0),vertices=8)
+
+    # Stacked crew bunk with privacy frame and reading lights.
+    x=27.6
+    for level,z in enumerate([0.48,1.38]):
+        cube(f'SHIPPROP_Bunk_Frame_{level}',(x,y,z),(1.02,0.46,0.10),M['wall'],crew,0.05)
+        cube(f'SHIPPROP_Bunk_Mattress_{level}',(x,y-0.01,z+0.16),(0.92,0.40,0.10),M['cloth'],crew,0.06)
+        cube(f'SHIPPROP_Bunk_Pillow_{level}',(x+0.70,y-0.02,z+0.28),(0.20,0.32,0.08),M['medical'],crew,0.05)
+        cube(f'SHIPPROP_Bunk_Light_{level}',(x-0.78,y-0.44,z+0.42),(0.13,0.025,0.045),M['amber'],crew,0.012)
+    for sx in [-1,1]:
+        cube(f'SHIPPROP_Bunk_Post_{sx}',(x+sx*0.94,y+0.38,0.98),(0.07,0.07,0.98),M['steel'],crew,0.02)
+
+    # Galley dispenser and fold-out meal tray.
+    x=30.3
+    cube('SHIPPROP_Galley_Housing',(x,y,1.04),(0.72,0.38,1.02),M['medical'],crew,0.07)
+    cube('SHIPPROP_Galley_Display',(x,y-0.405,1.56),(0.42,0.035,0.23),M['cyan'],crew,0.025)
+    cube('SHIPPROP_Galley_DispenseBay',(x,y-0.43,0.92),(0.43,0.08,0.28),M['black'],crew,0.025)
+    cube('SHIPPROP_Galley_Tray',(x,y-0.73,0.70),(0.54,0.34,0.055),M['steel'],crew,0.035,rot=(math.radians(-4),0,0))
+    for ix in [-0.22,0,0.22]:
+        cyl(f'SHIPPROP_Galley_Button_{ix}',(x+ix,y-0.447,1.28),0.035,0.018,M['amber'] if ix==0 else M['cyan'],crew,rot=(math.radians(90),0,0),vertices=8)
+
+    # Air scrubber / life support tower.
+    x,y=20.0,-5.0
+    cube('SHIPPROP_AirScrubber_Base',(x,y,0.18),(0.72,0.50,0.18),M['wall'],utility,0.06)
+    cyl('SHIPPROP_AirScrubber_Core',(x,y,1.02),0.43,1.55,M['medical'],utility,vertices=14)
+    for z in [0.38,0.88,1.38,1.72]:
+        cyl(f'SHIPPROP_AirScrubber_Band_{z}',(x,y,z),0.47,0.075,M['armor2'],utility,vertices=14)
+    for sx in [-1,1]:
+        cyl(f'SHIPPROP_AirScrubber_Filter_{sx}',(x+sx*0.53,y,0.88),0.18,0.92,M['black'],utility,vertices=10)
+        beam_between(f'SHIPPROP_AirScrubber_Pipe_{sx}',(x+sx*0.48,y,1.32),(x+sx*0.72,y,1.72),0.045,M['cyan'],utility,vertices=8)
+    cube('SHIPPROP_AirScrubber_Meter',(x,y-0.445,1.08),(0.22,0.035,0.18),M['cyan'],utility,0.025)
+
+    # Wall vent with fan hub and protective grille.
+    x=22.6
+    cube('SHIPPROP_Vent_Housing',(x,y,1.02),(0.78,0.16,0.78),M['wall'],utility,0.06)
+    cyl('SHIPPROP_Vent_FanHub',(x,y-0.19,1.02),0.15,0.12,M['steel'],utility,rot=(math.radians(90),0,0),vertices=12)
+    for i in range(8):
+        a=math.radians(i*45)
+        cube(f'SHIPPROP_Vent_FanBlade_{i}',(x+math.cos(a)*0.28,y-0.235,1.02+math.sin(a)*0.28),(0.23,0.035,0.055),M['armor'],utility,0.015,rot=(0,a,0))
+    for i in range(6):
+        cube(f'SHIPPROP_Vent_Grille_{i}',(x,y-0.285,0.52+i*0.20),(0.66,0.018,0.025),M['steel'],utility,0.006)
+
+    # Modular exposed pipe rack.
+    x=25.2
+    cube('SHIPPROP_PipeRack_Backplate',(x,y,1.03),(0.95,0.12,1.00),M['wall'],maintenance,0.05)
+    pipe_colors=[M['medical'],M['armor2'],M['cyan']]
+    for i,px in enumerate([-0.55,0,0.55]):
+        cyl(f'SHIPPROP_PipeRack_Vertical_{i}',(x+px,y-0.20,1.02),0.075,1.62,pipe_colors[i],maintenance,vertices=10)
+        cyl(f'SHIPPROP_PipeRack_Valve_{i}',(x+px,y-0.30,1.20),0.15,0.055,M['amber'],maintenance,rot=(math.radians(90),0,0),vertices=10)
+    for z in [0.38,1.68]:
+        beam_between(f'SHIPPROP_PipeRack_Header_{z}',(x-0.72,y-0.20,z),(x+0.72,y-0.20,z),0.065,M['steel'],maintenance,vertices=10)
+
+    # Emergency station: extinguisher, oxygen mask and alarm.
+    x=27.7
+    cube('SHIPPROP_Emergency_Backplate',(x,y,1.02),(0.72,0.12,1.00),M['wall'],utility,0.05)
+    cyl('SHIPPROP_Extinguisher_Bottle',(x-0.25,y-0.25,0.86),0.16,0.92,M['red'],utility,vertices=12)
+    cyl('SHIPPROP_Extinguisher_Nozzle',(x-0.25,y-0.27,1.39),0.07,0.20,M['black'],utility,vertices=10)
+    beam_between('SHIPPROP_Extinguisher_Hose',(x-0.10,y-0.25,1.22),(x+0.30,y-0.27,0.72),0.026,M['black'],utility,vertices=8)
+    sphere('SHIPPROP_Emergency_Mask',(x+0.30,y-0.27,1.08),(0.20,0.07,0.24),M['medical'],utility,segments=10,rings=5)
+    cube('SHIPPROP_Emergency_Alarm',(x+0.32,y-0.27,1.67),(0.18,0.05,0.12),M['red'],utility,0.025)
+
+    # Open storage shelf with modular supply bins.
+    x=30.3
+    for sx in [-1,1]:
+        cube(f'SHIPPROP_Shelf_Post_{sx}',(x+sx*0.74,y,1.02),(0.06,0.34,1.00),M['steel'],storage,0.018)
+    for level,z in enumerate([0.22,0.72,1.22,1.72]):
+        cube(f'SHIPPROP_Shelf_Beam_{level}',(x,y,z),(0.80,0.36,0.055),M['steel'],storage,0.018)
+        if level<3:
+            for ix in [-0.42,0,0.42]:
+                cube(f'SHIPPROP_SupplyBin_{level}_{ix}',(x+ix,y-0.02,z+0.23),(0.18,0.28,0.17),M['armor2'] if level==1 else M['armor'],storage,0.035)
+                cube(f'SHIPPROP_SupplyBinLabel_{level}_{ix}',(x+ix,y-0.31,z+0.24),(0.08,0.012,0.045),M['cyan'],storage,0.006)
+
+    # Portable cable reel and ceiling light fixture.
+    x=32.6
+    cyl('SHIPPROP_CableReel_Core',(x,y,0.46),0.24,0.48,M['black'],maintenance,rot=(0,math.radians(90),0),vertices=12)
+    for sx in [-1,1]:
+        cyl(f'SHIPPROP_CableReel_Flange_{sx}',(x+sx*0.28,y,0.46),0.42,0.08,M['armor2'],maintenance,rot=(0,math.radians(90),0),vertices=12)
+    beam_between('SHIPPROP_CableReel_Handle',(x-0.34,y,0.78),(x+0.34,y,0.78),0.045,M['steel'],maintenance,vertices=8)
+    cube('SHIPPROP_CeilingLight_Housing',(x,y,1.58),(0.72,0.34,0.10),M['wall'],utility,0.04)
+    cube('SHIPPROP_CeilingLight_Diffuser',(x,y-0.02,1.45),(0.58,0.27,0.055),M['cyan'],utility,0.03)
+    for obj in c.all_objects:
+        if obj.type=='MESH':
+            obj['snap_grid_m']=0.25
+            obj['asset_family']='ship_interior_prop'
+            obj['collision_hint']='box_or_convex_hull'
+    return c
+
+
 def asteroid(name, loc, scale, seed, collection):
     bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2, radius=1.0, location=loc)
     o=bpy.context.object;o.name=name
@@ -729,6 +855,10 @@ def render_previews(groups):
     aim_camera((12.26,-5.36,0.46),(12.26,-7.60,1.35),58)
     scene.render.filepath=os.path.join(PREVIEW,'Projectiles.png')
     bpy.ops.render.render(write_still=True)
+    visible({'ENV_ShipInteriorProps'})
+    aim_camera((26.3,-3.45,0.95),(26.3,-25.0,13.5),52)
+    scene.render.filepath=os.path.join(PREVIEW,'ShipInteriorProps.png')
+    bpy.ops.render.render(write_still=True)
     visible({c.name for c in groups})
 
 
@@ -746,19 +876,21 @@ def write_docs():
       'void_quadruped':{'rig':'RIG_Void_Quadruped','socket_standard':'VOID_v1','animations':{
         'walk':{'action':'VOID_Walk_Loop','loop':True},'run':{'action':'VOID_Run_Loop','loop':True},'turn_left':'VOID_Turn_Left_90','turn_right':'VOID_Turn_Right_90','attack':'VOID_Attack_Claw','pounce':'VOID_Attack_Pounce','jump':'VOID_Jump','death':'VOID_Death_Collapse','walk_to_run':'VOID_Walk_To_Run','run_to_walk':'VOID_Run_To_Walk','directional_pose_blend':['VOID_Pose_Turn_Neg45','VOID_Pose_Turn_Zero','VOID_Pose_Turn_Pos45']}},
       'projectiles':{'forward_axis':'-Y','pivot':'center','translation':'game-controlled','assets':['PROJ_Rifle_Ballistic','PROJ_Rifle_ArmorPiercing','PROJ_Energy_PlasmaBolt','PROJ_Rifle_SpentCasing'],'spin_actions':['PROJ_Rifle_Ballistic_Spin','PROJ_Rifle_ArmorPiercing_Spin','PROJ_Energy_PlasmaBolt_Spin']},
+      'ship_interior_props':{'snap_grid_m':0.25,'library':'Libraries/ShipInterior_Props.blend','families':['storage','utility','crew','maintenance'],'placement':'append or link the ENV_ShipInteriorProps collection, then move individual named parts as one prop assembly'},
       'modular_rules':{'human':'Enable exactly one base head; face, helmet, chest armor and equipment are optional overlays. All HUM_v1 parts share the same skeleton and origin.','void':'Base body stays enabled; horn, eye cluster, heavy carapace and tail blade are swappable VOID_v1 overlays.','ship':'2 m wall modules and 2 m floor tiles snap on a 0.25 m grid.'},
       'export_notes':['Apply no transforms to armatures before export.','Export deform bones only when supported.','Keep action names unchanged so the animation state map remains valid.','Procedural materials should be baked or replaced with engine PBR textures during integration.']}
     with open(os.path.join(DOCS,'AnimationAndAssembly.json'),'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2)
     readme='''# Dark Sci-Fi Modular Blender Asset Pack\n\n- Blender 5.2 authoring source, metric units, +Z up, -Y forward.\n- Low-poly modular humanoid uses a 7-head heroic proportion and HUM_v1 shared skeleton.\n- The pulse rifle is a multi-part runtime asset with receiver, barrel, muzzle, stock, grip, magazine, optic, rail, energy coils and status lighting.\n- Rifle animation clips include equip-to-aim, breathing aim idle and firing recoil poses for upper-body layering after weapon pickup.\n- Humanoid and void rigs include distinct fall and collapse death actions.\n- Void quadruped is an original low-center, four-legged assault creature with VOID_v1 modular overlays.\n- Ship controls, pilot seat, medical bed and power junction include rounded housings, articulated supports, hydraulics, conduits and emissive instruments.\n- Ship walls and floor tiles use a 2 m module and 0.25 m snap grid.\n- Materials use dark gunmetal, oxidized armor, cold cyan displays, warning amber, desaturated skin and violet-red alien tissue.\n- Animation clips include walk, run, left/right turn, attack, jump, rifle aiming, death, turn interpolation poses, and walk/run transitions.\n- Projectile meshes use a centered pivot and -Y forward axis; gameplay controls their translation.\n\n## Libraries\n\n- `DarkSciFi_ModularAssetPack.blend`: complete source and showcase scene.\n- `Libraries/Humanoid_Modular.blend`: human rig, body parts, clothing, equipment, rifle and actions.\n- `Libraries/Void_Quadruped.blend`: quadruped rig, modular parts, actions.\n- `Libraries/Ship_ModularKit.blend`: walls, controls, medical devices, floor tiles/materials.\n- `Libraries/Space_Asteroids.blend`: four low-poly asteroids and drift-spin actions.\n- `Libraries/Projectile_Meshes.blend`: ballistic, armor-piercing, plasma projectiles and spent casing.\n\nSee `AnimationAndAssembly.json` for clip mapping and blend recommendations.\n'''
+    readme=readme.replace('\n\nSee `AnimationAndAssembly.json`','\n- `Libraries/ShipInterior_Props.blend`: cargo, lockers, bunks, galley, workbench, life support, vents, pipe rack, emergency gear and shelving.\n\nSee `AnimationAndAssembly.json`')
     with open(os.path.join(DOCS,'README.md'),'w',encoding='utf-8') as f:f.write(readme)
 
 
 def main():
     clean();materials();setup_scene();root=coll('DarkSciFi_ModularAssetPack')
-    hum,ha=build_humanoid(root);void,va=build_void(root);ship=build_ship(root);space=build_space(root);projectiles=build_projectiles(root)
+    hum,ha=build_humanoid(root);void,va=build_void(root);ship=build_ship(root);shipprops=build_ship_interior_props(root);space=build_space(root);projectiles=build_projectiles(root)
     camera_and_light();write_docs()
-    save_libraries(root,{'Humanoid_Modular.blend':[hum],'Void_Quadruped.blend':[void],'Ship_ModularKit.blend':[ship],'Space_Asteroids.blend':[space],'Projectile_Meshes.blend':[projectiles]})
-    render_previews([hum,void,ship,space,projectiles])
+    save_libraries(root,{'Humanoid_Modular.blend':[hum],'Void_Quadruped.blend':[void],'Ship_ModularKit.blend':[ship],'ShipInterior_Props.blend':[shipprops],'Space_Asteroids.blend':[space],'Projectile_Meshes.blend':[projectiles]})
+    render_previews([hum,void,ship,shipprops,space,projectiles])
     print('ASSET_PACK_COMPLETE',ROOT)
 
 

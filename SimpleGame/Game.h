@@ -142,6 +142,16 @@ struct MapVisualTile
 	float variation;
 };
 
+struct InteriorPropPlacement
+{
+	WorldPoint position;
+	std::string meshName;
+	float scale;
+	float rotation;
+	float halfWidth;
+	float halfHeight;
+};
+
 struct NeutralNpc
 {
 	WorldPoint position;
@@ -228,6 +238,10 @@ class Game
 	void SetDialogue(const std::wstring& dialogue, const WorldPoint& speakerPosition, float seconds);
 	bool CanMoveTo(float x, float y, float radius = 0.28f) const;
 	bool OverlapsObstacle(float x, float y, float radius, const Obstacle& obstacle) const;
+	bool IsBlockedByInteriorProps(float x,
+		float y,
+		float radius,
+		const std::vector<InteriorPropPlacement>& props) const;
 	bool IsBlockedByInteriorFixture(float x, float y, float radius, bool firstLevel) const;
 	bool IsTutorialFloor(float x, float y) const;
 	bool IsTutorialAreaWalkable(float x, float y, float radius) const;
@@ -281,6 +295,7 @@ class Game
 	void DrawNeutralNpc(const NeutralNpc& npc);
 	void DrawLevelSurvivor(const LevelSurvivor& survivor, size_t survivorIndex);
 	void DrawFlightControlConsole(float x, float y, bool powered, bool infected);
+	void CreateInteriorPropActors(const std::vector<InteriorPropPlacement>& props);
 	void CreatePersonalShipInteriorActors(const WorldPoint& dockPosition);
 	void DrawAsteroid(const Asteroid& asteroid);
 	void DrawShip(float x, float y, float angle, float scale, float r, float g, float b);
@@ -325,6 +340,8 @@ class Game
 	float m_TotalTime;
 	bool m_PlayerMoving;
 	std::vector<Obstacle> m_Obstacles;
+	std::vector<InteriorPropPlacement> m_TutorialInteriorProps;
+	std::vector<InteriorPropPlacement> m_LevelInteriorProps;
 	std::vector<Enemy> m_Enemies;
 	std::vector<NeutralNpc> m_NeutralNpcs;
 	std::vector<LevelSurvivor> m_TutorialSurvivors;

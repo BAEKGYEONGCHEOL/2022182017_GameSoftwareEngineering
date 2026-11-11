@@ -515,6 +515,22 @@ void Game::Reset()
 	m_Obstacles.push_back({10.0f, 16.5f, 0.55f, 0.85f, 49.0f, 0.14f, 0.23f, 0.30f, CoolantPipe});
 	m_Obstacles.push_back({17.5f, 10.0f, 0.80f, 0.55f, 45.0f, 0.17f, 0.25f, 0.31f, CargoCrate});
 
+	m_TutorialInteriorProps = {
+		{{-19.0f, -19.0f}, "ship_prop_cargo", 20.0f, 0.0f, 0.72f, 0.52f},
+		{{-7.0f, -19.0f}, "ship_prop_locker", 20.0f, 0.0f, 0.68f, 0.42f},
+		{{-19.0f, -7.0f}, "ship_prop_cable_reel", 18.0f, 0.0f, 0.48f, 0.42f},
+		{{7.0f, -19.0f}, "ship_prop_workbench", 20.0f, 0.0f, 0.98f, 0.55f},
+		{{19.0f, -7.0f}, "ship_prop_bunk", 19.0f, 0.0f, 1.05f, 0.52f},
+		{{19.0f, -19.0f}, "ship_prop_emergency", 18.0f, 0.0f, 0.74f, 0.34f},
+		{{-19.0f, 19.0f}, "ship_prop_galley", 20.0f, 0.0f, 0.76f, 0.48f},
+		{{-7.0f, 19.0f}, "ship_prop_air_scrubber", 20.0f, 0.0f, 0.76f, 0.58f},
+		{{-19.0f, 7.0f}, "ship_prop_shelf", 18.0f, 0.0f, 0.84f, 0.42f},
+		{{7.0f, 19.0f}, "ship_prop_vent", 20.0f, 0.0f, 0.82f, 0.30f},
+		{{19.0f, 19.0f}, "ship_prop_pipe_rack", 20.0f, 0.0f, 0.98f, 0.32f},
+		{{19.0f, 7.0f}, "ship_prop_ceiling_light", 18.0f, 0.0f, 0.74f, 0.38f},
+	};
+	m_LevelInteriorProps.clear();
+
 	m_Enemies.clear();
 	m_Enemies.push_back({{15.0f, 11.0f}, 2, false, 0.0f, {15.0f, 11.0f}, 0.0f});
 	m_Enemies.push_back({{11.0f, 16.0f}, 2, false, 0.0f, {11.0f, 16.0f}, 1.4f});
@@ -617,6 +633,18 @@ void Game::PrecacheGameplayMeshes()
 	m_ModelLibrary.PrecacheMesh("ship_engine", 27.0f);
 	m_ModelLibrary.PrecacheMesh("ship_coolant", 22.0f);
 	m_ModelLibrary.PrecacheMesh("ship_pilot_seat", 24.0f);
+	m_ModelLibrary.PrecacheMesh("ship_prop_cargo", 20.0f);
+	m_ModelLibrary.PrecacheMesh("ship_prop_locker", 20.0f);
+	m_ModelLibrary.PrecacheMesh("ship_prop_workbench", 20.0f);
+	m_ModelLibrary.PrecacheMesh("ship_prop_bunk", 19.0f);
+	m_ModelLibrary.PrecacheMesh("ship_prop_galley", 20.0f);
+	m_ModelLibrary.PrecacheMesh("ship_prop_air_scrubber", 20.0f);
+	m_ModelLibrary.PrecacheMesh("ship_prop_vent", 20.0f);
+	m_ModelLibrary.PrecacheMesh("ship_prop_pipe_rack", 20.0f);
+	m_ModelLibrary.PrecacheMesh("ship_prop_emergency", 18.0f);
+	m_ModelLibrary.PrecacheMesh("ship_prop_shelf", 18.0f);
+	m_ModelLibrary.PrecacheMesh("ship_prop_cable_reel", 18.0f);
+	m_ModelLibrary.PrecacheMesh("ship_prop_ceiling_light", 18.0f);
 	m_ModelLibrary.PrecacheMesh("humanoid_soldier", 18.0f, 1.57f);
 }
 
@@ -1440,9 +1468,37 @@ bool Game::OverlapsObstacle(
 	return deltaX * deltaX + deltaY * deltaY < radius * radius;
 }
 
+bool Game::IsBlockedByInteriorProps(float x,
+	float y,
+	float radius,
+	const std::vector<InteriorPropPlacement>& props) const
+{
+	for (size_t propIndex = 0; propIndex < props.size(); ++propIndex)
+	{
+		const InteriorPropPlacement& prop = props[propIndex];
+		const Obstacle collision = {prop.position.x,
+			prop.position.y,
+			prop.halfWidth,
+			prop.halfHeight,
+			0.0f,
+			0.0f,
+			0.0f,
+			0.0f,
+			CargoCrate};
+		if (OverlapsObstacle(x, y, radius, collision))
+			return true;
+	}
+	return false;
+}
+
 bool Game::IsBlockedByInteriorFixture(
 	float x, float y, float radius, bool firstLevel) const
 {
+	const std::vector<InteriorPropPlacement>& props =
+		firstLevel ? m_LevelInteriorProps : m_TutorialInteriorProps;
+	if (IsBlockedByInteriorProps(x, y, radius, props))
+		return true;
+
 	const WorldPoint dockPosition = firstLevel ?
 		FirstLevelPersonalShipDockPosition : TutorialPersonalShipDockPosition;
 	Obstacle personalShipFixtures[5];
@@ -2584,6 +2640,7 @@ void Game::RenderInterior()
 				DrawWorldBlock(placedObstacle);
 			});
 	}
+	CreateInteriorPropActors(m_TutorialInteriorProps);
 	CreatePersonalShipInteriorActors(TutorialPersonalShipDockPosition);
 	CreateSceneActor("Player",
 		m_Player.x,
@@ -2884,8 +2941,13 @@ void Game::DrawWorldBlock(const Obstacle& obstacle)
 	}
 	else if (obstacle.type == CoolantPipe)
 	{
-		resourceMesh = "ship_coolant";
-		resourceScale = 22.0f;
+		resourceMesh = "ship_prop_pipe_rack";
+		resourceScale = 20.0f;
+	}
+	else if (obstacle.type == CargoCrate)
+	{
+		resourceMesh = "ship_prop_cargo";
+		resourceScale = 20.0f;
 	}
 	if (resourceMesh != NULL)
 	{
@@ -3738,6 +3800,35 @@ void Game::DrawLevelSurvivor(const LevelSurvivor& survivor, size_t survivorIndex
 		0.92f);
 }
 
+void Game::CreateInteriorPropActors(const std::vector<InteriorPropPlacement>& props)
+{
+	for (size_t propIndex = 0; propIndex < props.size(); ++propIndex)
+	{
+		const InteriorPropPlacement prop = props[propIndex];
+		CreateSceneActor("InteriorProp",
+			prop.position.x,
+			prop.position.y,
+			0.0f,
+			1,
+			prop.position.x + prop.position.y,
+			[this, prop](const ActorTransform& transform)
+			{
+				const ScreenPoint screen =
+					WorldToScreen(transform.x, transform.y, transform.height);
+				const float shadowWidth =
+					(prop.halfWidth + prop.halfHeight) * TileWidth * 0.86f;
+				m_Renderer->DrawSoftShadow(
+					screen.x + 7.0f, screen.y - 4.0f, shadowWidth, 20.0f, 0.80f);
+				m_ModelLibrary.DrawMesh(m_Renderer,
+					prop.meshName,
+					screen.x,
+					screen.y,
+					prop.scale,
+					prop.rotation);
+			});
+	}
+}
+
 void Game::CreatePersonalShipInteriorActors(const WorldPoint& dockPosition)
 {
 	Obstacle fixtures[5];
@@ -3965,6 +4056,7 @@ void Game::RenderFirstLevel()
 				});
 		}
 	}
+	CreateInteriorPropActors(m_LevelInteriorProps);
 	CreatePersonalShipInteriorActors(FirstLevelPersonalShipDockPosition);
 
 	if (!m_LevelWeaponCollected)

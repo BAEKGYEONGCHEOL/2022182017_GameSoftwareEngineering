@@ -2,9 +2,9 @@
   "status": "PASS",
   "files": {
     "DarkSciFi_ModularAssetPack.blend": {
-      "size_bytes": 338626,
-      "objects": 328,
-      "meshes": 322,
+      "size_bytes": 402958,
+      "objects": 456,
+      "meshes": 450,
       "armatures": 2,
       "materials": 24,
       "actions": 35,
@@ -51,7 +51,7 @@
       "status": "PASS"
     },
     "Libraries/Humanoid_Modular.blend": {
-      "size_bytes": 140446,
+      "size_bytes": 138734,
       "objects": 73,
       "meshes": 72,
       "armatures": 1,
@@ -80,7 +80,7 @@
       "status": "PASS"
     },
     "Libraries/Void_Quadruped.blend": {
-      "size_bytes": 114383,
+      "size_bytes": 114221,
       "objects": 50,
       "meshes": 49,
       "armatures": 1,
@@ -107,7 +107,7 @@
       "status": "PASS"
     },
     "Libraries/Ship_ModularKit.blend": {
-      "size_bytes": 172499,
+      "size_bytes": 172054,
       "objects": 181,
       "meshes": 181,
       "armatures": 0,
@@ -119,8 +119,21 @@
       "missing_required_objects": [],
       "status": "PASS"
     },
+    "Libraries/ShipInterior_Props.blend": {
+      "size_bytes": 141972,
+      "objects": 128,
+      "meshes": 128,
+      "armatures": 0,
+      "materials": 11,
+      "actions": 0,
+      "action_names": [],
+      "skeletal_mesh_parts": 0,
+      "missing_required_actions": [],
+      "missing_required_objects": [],
+      "status": "PASS"
+    },
     "Libraries/Space_Asteroids.blend": {
-      "size_bytes": 77346,
+      "size_bytes": 77363,
       "objects": 16,
       "meshes": 16,
       "armatures": 0,
@@ -138,7 +151,7 @@
       "status": "PASS"
     },
     "Libraries/Projectile_Meshes.blend": {
-      "size_bytes": 75987,
+      "size_bytes": 75957,
       "objects": 4,
       "meshes": 4,
       "armatures": 0,
