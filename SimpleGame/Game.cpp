@@ -508,26 +508,26 @@ void Game::Reset()
 	m_Obstacles.clear();
 	m_Obstacles.push_back({-18.0f, -14.5f, 0.65f, 0.55f, 42.0f, 0.16f, 0.25f, 0.30f, MedicalPod});
 	m_Obstacles.push_back({-10.0f, -17.0f, 0.75f, 0.50f, 48.0f, 0.20f, 0.25f, 0.28f, ControlConsole});
-	m_Obstacles.push_back({9.5f, -16.5f, 0.80f, 0.55f, 38.0f, 0.24f, 0.20f, 0.25f, CargoCrate});
+	m_Obstacles.push_back({9.5f, -16.5f, 0.31f, 0.21f, 38.0f, 0.24f, 0.20f, 0.25f, CargoCrate});
 	m_Obstacles.push_back({16.5f, -9.5f, 0.65f, 0.85f, 54.0f, 0.13f, 0.23f, 0.29f, PowerRelay});
 	m_Obstacles.push_back({-18.0f, 10.0f, 0.60f, 0.80f, 50.0f, 0.14f, 0.21f, 0.27f, EngineModule});
 	m_Obstacles.push_back({-9.5f, 17.0f, 0.75f, 0.50f, 44.0f, 0.18f, 0.24f, 0.29f, ControlConsole});
-	m_Obstacles.push_back({10.0f, 16.5f, 0.55f, 0.85f, 49.0f, 0.14f, 0.23f, 0.30f, CoolantPipe});
-	m_Obstacles.push_back({17.5f, 10.0f, 0.80f, 0.55f, 45.0f, 0.17f, 0.25f, 0.31f, CargoCrate});
+	m_Obstacles.push_back({10.0f, 16.5f, 0.28f, 0.07f, 49.0f, 0.14f, 0.23f, 0.30f, CoolantPipe});
+	m_Obstacles.push_back({17.5f, 10.0f, 0.31f, 0.21f, 45.0f, 0.17f, 0.25f, 0.31f, CargoCrate});
 
 	m_TutorialInteriorProps = {
-		{{-19.0f, -19.0f}, "ship_prop_cargo", 20.0f, 0.0f, 0.72f, 0.52f},
-		{{-7.0f, -19.0f}, "ship_prop_locker", 20.0f, 0.0f, 0.68f, 0.42f},
-		{{-19.0f, -7.0f}, "ship_prop_cable_reel", 18.0f, 0.0f, 0.48f, 0.42f},
-		{{7.0f, -19.0f}, "ship_prop_workbench", 20.0f, 0.0f, 0.98f, 0.55f},
-		{{19.0f, -7.0f}, "ship_prop_bunk", 19.0f, 0.0f, 1.05f, 0.52f},
-		{{19.0f, -19.0f}, "ship_prop_emergency", 18.0f, 0.0f, 0.74f, 0.34f},
-		{{-19.0f, 19.0f}, "ship_prop_galley", 20.0f, 0.0f, 0.76f, 0.48f},
-		{{-7.0f, 19.0f}, "ship_prop_air_scrubber", 20.0f, 0.0f, 0.76f, 0.58f},
-		{{-19.0f, 7.0f}, "ship_prop_shelf", 18.0f, 0.0f, 0.84f, 0.42f},
-		{{7.0f, 19.0f}, "ship_prop_vent", 20.0f, 0.0f, 0.82f, 0.30f},
-		{{19.0f, 19.0f}, "ship_prop_pipe_rack", 20.0f, 0.0f, 0.98f, 0.32f},
-		{{19.0f, 7.0f}, "ship_prop_ceiling_light", 18.0f, 0.0f, 0.74f, 0.38f},
+		{{-19.0f, -19.0f}, "ship_prop_cargo", 13.4f, 0.0f, 0.31f, 0.21f},
+		{{-7.0f, -19.0f}, "ship_prop_locker", 9.2f, 0.0f, 0.19f, 0.12f},
+		{{-19.0f, -7.0f}, "ship_prop_cable_reel", 22.3f, 0.0f, 0.24f, 0.30f},
+		{{7.0f, -19.0f}, "ship_prop_workbench", 10.3f, 0.0f, 0.31f, 0.16f},
+		{{19.0f, -7.0f}, "ship_prop_bunk", 8.6f, 0.0f, 0.28f, 0.13f},
+		{{19.0f, -19.0f}, "ship_prop_emergency", 9.9f, 0.0f, 0.23f, 0.09f},
+		{{-19.0f, 19.0f}, "ship_prop_galley", 8.9f, 0.0f, 0.21f, 0.21f},
+		{{-7.0f, 19.0f}, "ship_prop_air_scrubber", 10.3f, 0.0f, 0.25f, 0.17f},
+		{{-19.0f, 7.0f}, "ship_prop_shelf", 8.9f, 0.0f, 0.23f, 0.11f},
+		{{7.0f, 19.0f}, "ship_prop_vent", 11.2f, 0.0f, 0.28f, 0.09f},
+		{{19.0f, 19.0f}, "ship_prop_pipe_rack", 9.1f, 0.0f, 0.28f, 0.07f},
+		{{19.0f, 7.0f}, "ship_prop_ceiling_light", 22.2f, 0.0f, 0.50f, 0.24f},
 	};
 	m_LevelInteriorProps.clear();
 
@@ -633,18 +633,18 @@ void Game::PrecacheGameplayMeshes()
 	m_ModelLibrary.PrecacheMesh("ship_engine", 27.0f);
 	m_ModelLibrary.PrecacheMesh("ship_coolant", 22.0f);
 	m_ModelLibrary.PrecacheMesh("ship_pilot_seat", 24.0f);
-	m_ModelLibrary.PrecacheMesh("ship_prop_cargo", 20.0f);
-	m_ModelLibrary.PrecacheMesh("ship_prop_locker", 20.0f);
-	m_ModelLibrary.PrecacheMesh("ship_prop_workbench", 20.0f);
-	m_ModelLibrary.PrecacheMesh("ship_prop_bunk", 19.0f);
-	m_ModelLibrary.PrecacheMesh("ship_prop_galley", 20.0f);
-	m_ModelLibrary.PrecacheMesh("ship_prop_air_scrubber", 20.0f);
-	m_ModelLibrary.PrecacheMesh("ship_prop_vent", 20.0f);
-	m_ModelLibrary.PrecacheMesh("ship_prop_pipe_rack", 20.0f);
-	m_ModelLibrary.PrecacheMesh("ship_prop_emergency", 18.0f);
-	m_ModelLibrary.PrecacheMesh("ship_prop_shelf", 18.0f);
-	m_ModelLibrary.PrecacheMesh("ship_prop_cable_reel", 18.0f);
-	m_ModelLibrary.PrecacheMesh("ship_prop_ceiling_light", 18.0f);
+	m_ModelLibrary.PrecacheMesh("ship_prop_cargo", 13.4f);
+	m_ModelLibrary.PrecacheMesh("ship_prop_locker", 9.2f);
+	m_ModelLibrary.PrecacheMesh("ship_prop_workbench", 10.3f);
+	m_ModelLibrary.PrecacheMesh("ship_prop_bunk", 8.6f);
+	m_ModelLibrary.PrecacheMesh("ship_prop_galley", 8.9f);
+	m_ModelLibrary.PrecacheMesh("ship_prop_air_scrubber", 10.3f);
+	m_ModelLibrary.PrecacheMesh("ship_prop_vent", 11.2f);
+	m_ModelLibrary.PrecacheMesh("ship_prop_pipe_rack", 9.1f);
+	m_ModelLibrary.PrecacheMesh("ship_prop_emergency", 9.9f);
+	m_ModelLibrary.PrecacheMesh("ship_prop_shelf", 8.9f);
+	m_ModelLibrary.PrecacheMesh("ship_prop_cable_reel", 22.3f);
+	m_ModelLibrary.PrecacheMesh("ship_prop_ceiling_light", 22.2f);
 	m_ModelLibrary.PrecacheMesh("humanoid_soldier", 18.0f, 1.57f);
 }
 
@@ -2942,12 +2942,12 @@ void Game::DrawWorldBlock(const Obstacle& obstacle)
 	else if (obstacle.type == CoolantPipe)
 	{
 		resourceMesh = "ship_prop_pipe_rack";
-		resourceScale = 20.0f;
+		resourceScale = 9.1f;
 	}
 	else if (obstacle.type == CargoCrate)
 	{
 		resourceMesh = "ship_prop_cargo";
-		resourceScale = 20.0f;
+		resourceScale = 13.4f;
 	}
 	if (resourceMesh != NULL)
 	{

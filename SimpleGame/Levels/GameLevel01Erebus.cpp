@@ -484,18 +484,18 @@ void Game::GenerateFirstLevel()
 		m_LevelEngineActive[engineIndex] = false;
 	m_LevelControlPosition = toWorld(rooms[0], 2.5f, 0.0f);
 	m_LevelInteriorProps = {
-		{toWorld(rooms[1], -3.5f, -3.5f), "ship_prop_cargo", 20.0f, 0.0f, 0.72f, 0.52f},
-		{toWorld(rooms[2], 3.5f, -3.5f), "ship_prop_locker", 20.0f, 0.0f, 0.68f, 0.42f},
-		{toWorld(rooms[5], -3.5f, 3.5f), "ship_prop_workbench", 20.0f, 0.0f, 0.98f, 0.55f},
-		{toWorld(rooms[7], 3.5f, 3.5f), "ship_prop_bunk", 19.0f, 0.0f, 1.05f, 0.52f},
-		{toWorld(rooms[8], -3.5f, -3.5f), "ship_prop_galley", 20.0f, 0.0f, 0.76f, 0.48f},
-		{toWorld(rooms[10], 3.5f, -3.5f), "ship_prop_air_scrubber", 20.0f, 0.0f, 0.76f, 0.58f},
-		{toWorld(rooms[12], -3.5f, 3.5f), "ship_prop_vent", 20.0f, 0.0f, 0.82f, 0.30f},
-		{toWorld(rooms[13], 3.5f, 3.5f), "ship_prop_pipe_rack", 20.0f, 0.0f, 0.98f, 0.32f},
-		{toWorld(rooms[15], 3.5f, -3.5f), "ship_prop_emergency", 18.0f, 0.0f, 0.74f, 0.34f},
-		{toWorld(rooms[17], -3.5f, -3.5f), "ship_prop_shelf", 18.0f, 0.0f, 0.84f, 0.42f},
-		{toWorld(rooms[19], 3.5f, 3.5f), "ship_prop_cable_reel", 18.0f, 0.0f, 0.48f, 0.42f},
-		{toWorld(rooms[21], -3.5f, 3.5f), "ship_prop_ceiling_light", 18.0f, 0.0f, 0.74f, 0.38f},
+		{toWorld(rooms[1], -3.5f, -3.5f), "ship_prop_cargo", 13.4f, 0.0f, 0.31f, 0.21f},
+		{toWorld(rooms[2], 3.5f, -3.5f), "ship_prop_locker", 9.2f, 0.0f, 0.19f, 0.12f},
+		{toWorld(rooms[5], -3.5f, 3.5f), "ship_prop_workbench", 10.3f, 0.0f, 0.31f, 0.16f},
+		{toWorld(rooms[7], 3.5f, 3.5f), "ship_prop_bunk", 8.6f, 0.0f, 0.28f, 0.13f},
+		{toWorld(rooms[8], -3.5f, -3.5f), "ship_prop_galley", 8.9f, 0.0f, 0.21f, 0.21f},
+		{toWorld(rooms[10], 3.5f, -3.5f), "ship_prop_air_scrubber", 10.3f, 0.0f, 0.25f, 0.17f},
+		{toWorld(rooms[12], -3.5f, 3.5f), "ship_prop_vent", 11.2f, 0.0f, 0.28f, 0.09f},
+		{toWorld(rooms[13], 3.5f, 3.5f), "ship_prop_pipe_rack", 9.1f, 0.0f, 0.28f, 0.07f},
+		{toWorld(rooms[15], 3.5f, -3.5f), "ship_prop_emergency", 9.9f, 0.0f, 0.23f, 0.09f},
+		{toWorld(rooms[17], -3.5f, -3.5f), "ship_prop_shelf", 8.9f, 0.0f, 0.23f, 0.11f},
+		{toWorld(rooms[19], 3.5f, 3.5f), "ship_prop_cable_reel", 22.3f, 0.0f, 0.24f, 0.30f},
+		{toWorld(rooms[21], -3.5f, 3.5f), "ship_prop_ceiling_light", 22.2f, 0.0f, 0.50f, 0.24f},
 	};
 
 	m_Player = {-52.0f, -57.0f};
