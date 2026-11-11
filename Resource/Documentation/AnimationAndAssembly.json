@@ -107,6 +107,31 @@
     ],
     "placement": "append or link the ENV_ShipInteriorProps collection, then move individual named parts as one prop assembly"
   },
+  "navigation_data_props": {
+    "library": "Libraries/NavigationDataProps.blend",
+    "families": [
+      "navigation_core",
+      "electronic_document"
+    ],
+    "navigation_core": "separate gimbal rings support independent rotation",
+    "documents": "handheld pickup props facing -Y"
+  },
+  "additional_ship_props": {
+    "library": "Libraries/AdditionalShipProps.blend",
+    "families": [
+      "navigation_comms",
+      "maintenance",
+      "science_survival",
+      "security"
+    ],
+    "snap_grid_m": 0.25
+  },
+  "mesh_replacements": {
+    "tutorial_level1": "Libraries/TutorialLevel1_Replacements.blend",
+    "space_travel": "Libraries/SpaceTravel_Replacements.blend",
+    "destination_arrival": "Libraries/DestinationArrival_Replacements.blend",
+    "rule": "all replacement parts are physical meshes; rotatable engine impeller and pickup effect remain separate collections"
+  },
   "modular_rules": {
     "human": "Enable exactly one base head; face, helmet, chest armor and equipment are optional overlays. All HUM_v1 parts share the same skeleton and origin.",
     "void": "Base body stays enabled; horn, eye cluster, heavy carapace and tail blade are swappable VOID_v1 overlays.",

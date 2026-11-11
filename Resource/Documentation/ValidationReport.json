@@ -2,10 +2,10 @@
   "status": "PASS",
   "files": {
     "DarkSciFi_ModularAssetPack.blend": {
-      "size_bytes": 402958,
-      "objects": 456,
-      "meshes": 450,
-      "armatures": 2,
+      "size_bytes": 625025,
+      "objects": 839,
+      "meshes": 832,
+      "armatures": 3,
       "materials": 24,
       "actions": 35,
       "action_names": [
@@ -45,13 +45,13 @@
         "VOID_Walk_Loop",
         "VOID_Walk_To_Run"
       ],
-      "skeletal_mesh_parts": 121,
+      "skeletal_mesh_parts": 130,
       "missing_required_actions": [],
       "missing_required_objects": [],
       "status": "PASS"
     },
     "Libraries/Humanoid_Modular.blend": {
-      "size_bytes": 138734,
+      "size_bytes": 140379,
       "objects": 73,
       "meshes": 72,
       "armatures": 1,
@@ -80,7 +80,7 @@
       "status": "PASS"
     },
     "Libraries/Void_Quadruped.blend": {
-      "size_bytes": 114221,
+      "size_bytes": 114241,
       "objects": 50,
       "meshes": 49,
       "armatures": 1,
@@ -107,7 +107,7 @@
       "status": "PASS"
     },
     "Libraries/Ship_ModularKit.blend": {
-      "size_bytes": 172054,
+      "size_bytes": 171996,
       "objects": 181,
       "meshes": 181,
       "armatures": 0,
@@ -120,7 +120,7 @@
       "status": "PASS"
     },
     "Libraries/ShipInterior_Props.blend": {
-      "size_bytes": 141972,
+      "size_bytes": 141973,
       "objects": 128,
       "meshes": 128,
       "armatures": 0,
@@ -132,8 +132,73 @@
       "missing_required_objects": [],
       "status": "PASS"
     },
+    "Libraries/NavigationDataProps.blend": {
+      "size_bytes": 124153,
+      "objects": 75,
+      "meshes": 75,
+      "armatures": 0,
+      "materials": 9,
+      "actions": 0,
+      "action_names": [],
+      "skeletal_mesh_parts": 0,
+      "missing_required_actions": [],
+      "missing_required_objects": [],
+      "status": "PASS"
+    },
+    "Libraries/AdditionalShipProps.blend": {
+      "size_bytes": 135797,
+      "objects": 90,
+      "meshes": 90,
+      "armatures": 0,
+      "materials": 10,
+      "actions": 0,
+      "action_names": [],
+      "skeletal_mesh_parts": 0,
+      "missing_required_actions": [],
+      "missing_required_objects": [],
+      "status": "PASS"
+    },
+    "Libraries/TutorialLevel1_Replacements.blend": {
+      "size_bytes": 117474,
+      "objects": 64,
+      "meshes": 63,
+      "armatures": 1,
+      "materials": 10,
+      "actions": 0,
+      "action_names": [],
+      "skeletal_mesh_parts": 9,
+      "missing_required_actions": [],
+      "missing_required_objects": [],
+      "status": "PASS"
+    },
+    "Libraries/SpaceTravel_Replacements.blend": {
+      "size_bytes": 129069,
+      "objects": 95,
+      "meshes": 95,
+      "armatures": 0,
+      "materials": 11,
+      "actions": 0,
+      "action_names": [],
+      "skeletal_mesh_parts": 0,
+      "missing_required_actions": [],
+      "missing_required_objects": [],
+      "status": "PASS"
+    },
+    "Libraries/DestinationArrival_Replacements.blend": {
+      "size_bytes": 112069,
+      "objects": 59,
+      "meshes": 59,
+      "armatures": 0,
+      "materials": 9,
+      "actions": 0,
+      "action_names": [],
+      "skeletal_mesh_parts": 0,
+      "missing_required_actions": [],
+      "missing_required_objects": [],
+      "status": "PASS"
+    },
     "Libraries/Space_Asteroids.blend": {
-      "size_bytes": 77363,
+      "size_bytes": 77411,
       "objects": 16,
       "meshes": 16,
       "armatures": 0,
@@ -151,7 +216,7 @@
       "status": "PASS"
     },
     "Libraries/Projectile_Meshes.blend": {
-      "size_bytes": 75957,
+      "size_bytes": 75976,
       "objects": 4,
       "meshes": 4,
       "armatures": 0,

@@ -21,5 +21,10 @@
 - `Libraries/Space_Asteroids.blend`: four low-poly asteroids and drift-spin actions.
 - `Libraries/Projectile_Meshes.blend`: ballistic, armor-piercing, plasma projectiles and spent casing.
 - `Libraries/ShipInterior_Props.blend`: cargo, lockers, bunks, galley, workbench, life support, vents, pipe rack, emergency gear and shelving.
+- `Libraries/NavigationDataProps.blend`: navigation core, data slates, holographic clipboard, memory canister and identity chip.
+- `Libraries/AdditionalShipProps.blend`: communications, drone maintenance, fabrication, science, survival and security props.
+- `Libraries/TutorialLevel1_Replacements.blend`: medical terminal, weapon-arm rig, auxiliary engine, magazine, pickup effect and story documents.
+- `Libraries/SpaceTravel_Replacements.blend`: player ship, named ships, station and six debris families.
+- `Libraries/DestinationArrival_Replacements.blend`: docking gantry, infected structure, light pylons and docked player ship.
 
 See `AnimationAndAssembly.json` for clip mapping and blend recommendations.

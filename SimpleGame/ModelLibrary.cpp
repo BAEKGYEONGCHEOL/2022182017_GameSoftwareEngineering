@@ -54,10 +54,16 @@ void ModelLibrary::DrawMesh(PrototypeRenderer* renderer,
 	const bool fixedLevelCorpse = meshName == "humanoid_soldier" &&
 		rotation == 1.57f && screenRotation == 0.0f && localRotation == 0.0f;
 	const bool sharedCharacterPose =
-		(meshName == "humanoid_soldier" || meshName == "void_quadruped") &&
+		(meshName == "humanoid_soldier" || meshName == "humanoid_armed_body" ||
+			meshName == "void_quadruped") &&
 		screenRotation == 0.0f && heightScale == 1.0f && localRotation == 0.0f;
+	const bool cacheReplacementProjection =
+		meshName.compare(0, 12, "replacement_") == 0 &&
+		((rotation == 0.0f && screenRotation == 0.0f && localRotation == 0.0f) ||
+			meshName == "replacement_weapon_arms");
 	bool cacheStaticProjection =
-		meshName.compare(0, 5, "ship_") == 0 || flattenedCorpse || fixedLevelCorpse ||
+		meshName.compare(0, 5, "ship_") == 0 ||
+		cacheReplacementProjection || flattenedCorpse || fixedLevelCorpse ||
 		sharedCharacterPose;
 	if (cacheStaticProjection)
 	{

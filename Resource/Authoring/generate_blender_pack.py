@@ -122,6 +122,33 @@ def sphere(name, loc, scale, material, collection, segments=8, rings=4):
     return o
 
 
+def torus(name, loc, major_radius, minor_radius, material, collection, rot=(0,0,0), major_segments=16, minor_segments=6):
+    bpy.ops.mesh.primitive_torus_add(major_radius=major_radius, minor_radius=minor_radius,
+        major_segments=major_segments, minor_segments=minor_segments, location=loc, rotation=rot)
+    o=bpy.context.object
+    o.name=name
+    assign(o,material)
+    move_to(o,collection)
+    return o
+
+
+def extruded_outline(name, outline, z_bottom, z_top, loc, material, collection):
+    count=len(outline)
+    verts=[(x,y,z_bottom) for x,y in outline]+[(x,y,z_top) for x,y in outline]
+    faces=[]
+    faces.append(tuple(range(count-1,-1,-1)))
+    faces.append(tuple(range(count,count*2)))
+    for i in range(count):
+        j=(i+1)%count
+        faces.append((i,j,count+j,count+i))
+    mesh=bpy.data.meshes.new(name+'_Mesh')
+    mesh.from_pydata(verts,[],faces); mesh.update()
+    obj=bpy.data.objects.new(name,mesh); collection.objects.link(obj); obj.location=loc
+    assign(obj,material)
+    bevel=obj.modifiers.new('LowPolyEdge','BEVEL'); bevel.width=0.035; bevel.segments=1
+    return obj
+
+
 def cone(name, loc, r1, r2, depth, material, collection, rot=(0, 0, 0), vertices=7):
     bpy.ops.mesh.primitive_cone_add(vertices=vertices, radius1=r1, radius2=r2, depth=depth, location=loc, rotation=rot)
     o = bpy.context.object
@@ -698,6 +725,311 @@ def build_ship_interior_props(root):
     return c
 
 
+def build_navigation_data_props(root):
+    c=coll('ENV_NavigationDataProps',root)
+    nav=coll('NAV_NavigationCore',c); docs=coll('EDOC_ElectronicDocuments',c)
+    x,y=35.0,-2.0
+    # Navigation core: pedestal, service housings, gyroscopic rings and stellar core.
+    cyl('NAV_Core_Base',(x,y,0.18),1.18,0.34,M['wall'],nav,vertices=16)
+    cyl('NAV_Core_DeckRing',(x,y,0.40),0.98,0.16,M['steel'],nav,vertices=16)
+    cyl('NAV_Core_ServiceDrum',(x,y,0.68),0.78,0.44,M['armor'],nav,vertices=16)
+    for i,a in enumerate(range(0,360,60)):
+        rad=math.radians(a); px=x+math.cos(rad)*0.84; py=y+math.sin(rad)*0.84
+        cube(f'NAV_Core_ServicePod_{i}',(px,py,0.60),(0.24,0.20,0.25),M['armor2'] if i%2 else M['wall'],nav,0.045,rot=(0,0,rad))
+        cube(f'NAV_Core_Status_{i}',(px-math.sin(rad)*0.21,py+math.cos(rad)*0.21,0.66),(0.08,0.015,0.035),M['amber'] if i%3==0 else M['cyan'],nav,0.006,rot=(0,0,rad))
+    sphere('NAV_Core_StellarSphere',(x,y,1.55),(0.48,0.48,0.48),M['cyan'],nav,segments=16,rings=8)
+    torus('NAV_Core_GimbalOuter',(x,y,1.55),0.84,0.075,M['armor'],nav,rot=(math.radians(90),0,0),major_segments=20)
+    torus('NAV_Core_GimbalMiddle',(x,y,1.55),0.66,0.055,M['steel'],nav,rot=(0,math.radians(90),0),major_segments=20)
+    torus('NAV_Core_GimbalInner',(x,y,1.55),0.54,0.035,M['amber'],nav,rot=(math.radians(58),math.radians(22),math.radians(18)),major_segments=20)
+    for sx in [-1,1]:
+        beam_between(f'NAV_Core_Arch_{sx}',(x+sx*0.78,y,0.72),(x+sx*0.86,y,1.75),0.09,M['armor'],nav,vertices=10)
+        sphere(f'NAV_Core_Bearing_{sx}',(x+sx*0.85,y,1.55),(0.16,0.16,0.16),M['steel'],nav,segments=10,rings=5)
+        beam_between(f'NAV_Core_Coolant_{sx}',(x+sx*0.58,y-0.55,0.40),(x+sx*0.78,y-0.25,0.92),0.045,M['cyan'],nav,vertices=8)
+    for i in range(3):
+        cyl(f'NAV_Core_DataCylinder_{i}',(x-0.22+i*0.22,y-0.73,0.58),0.075,0.34,M['cyan'],nav,vertices=10)
+        torus(f'NAV_Core_DataCylinderRing_{i}',(x-0.22+i*0.22,y-0.73,0.58),0.080,0.012,M['steel'],nav,major_segments=10,minor_segments=4)
+    for obj in nav.all_objects:
+        if obj.type=='MESH': obj['asset_family']='navigation_core'; obj['snap_grid_m']=0.25
+
+    # Electronic document family. All displays face -Y and use abstract emissive panels.
+    y=-5.0
+    doc_specs=[('RuggedSlate',33.0,0.62,0.42),('MissionDossier',34.6,0.88,0.43),('HoloClipboard',36.5,0.58,0.46),('DataWafer',38.0,0.36,0.30),('DamagedLog',39.2,0.58,0.45),('MedicalRecord',40.7,0.52,0.58)]
+    for name,dx,w,h in doc_specs:
+        cube(f'EDOC_{name}_Frame',(dx,y,0.82),(w,0.07,h),M['armor'],docs,0.055)
+        cube(f'EDOC_{name}_Screen',(dx,y-0.078,0.84),(w*0.80,0.018,h*0.72),M['cyan'],docs,0.018)
+        for sx in [-1,1]:
+            cube(f'EDOC_{name}_Grip_{sx}',(dx+sx*w*0.88,y,0.82),(w*0.10,0.11,h*0.70),M['black'],docs,0.025)
+        cube(f'EDOC_{name}_Status',(dx+w*0.68,y-0.103,0.82+h*0.70),(w*0.12,0.012,h*0.06),M['amber'] if name!='DamagedLog' else M['red'],docs,0.005)
+    # Folded dossier hinge and transparent projection layer.
+    beam_between('EDOC_MissionDossier_Hinge',(34.6,-5.09,0.46),(34.6,-5.09,1.18),0.035,M['steel'],docs,vertices=8)
+    cube('EDOC_HoloClipboard_Projector',(36.5,y,0.32),(0.26,0.12,0.10),M['steel'],docs,0.03)
+    cube('EDOC_HoloClipboard_Glass',(36.5,y-0.035,1.30),(0.44,0.018,0.18),M['cyan'],docs,0.018)
+    # Cylindrical memory canister and identity chip.
+    cyl('EDOC_MemoryCanister_Body',(42.1,y,0.78),0.22,1.02,M['armor'],docs,vertices=12)
+    cyl('EDOC_MemoryCanister_Core',(42.1,y-0.02,0.78),0.14,0.78,M['cyan'],docs,vertices=12)
+    for z in [0.31,1.25]: cyl(f'EDOC_MemoryCanister_Cap_{z}',(42.1,y,z),0.25,0.12,M['steel'],docs,vertices=12)
+    cube('EDOC_IdentityChip_Frame',(43.0,y,0.72),(0.30,0.055,0.22),M['armor2'],docs,0.035)
+    cube('EDOC_IdentityChip_Display',(43.0,y-0.064,0.74),(0.18,0.012,0.11),M['cyan'],docs,0.012)
+    for i in range(5): cube(f'EDOC_IdentityChip_Contact_{i}',(42.82+i*0.09,y+0.065,0.55),(0.025,0.012,0.05),M['brass'],docs,0.004)
+    for obj in docs.all_objects:
+        if obj.type=='MESH': obj['asset_family']='electronic_document'; obj['pickup_scale']='handheld'; obj['forward_axis']='-Y'
+    return c
+
+
+def build_additional_ship_props(root):
+    c=coll('ENV_AdditionalShipProps',root)
+    nav=coll('ADDPROP_NavigationComms',c); maintain=coll('ADDPROP_Maintenance',c)
+    science=coll('ADDPROP_ScienceSurvival',c); security=coll('ADDPROP_Security',c)
+    # Holographic star-chart table.
+    x,y=34.0,-8.0
+    cyl('ADDPROP_StarChart_Base',(x,y,0.28),0.90,0.40,M['wall'],nav,vertices=14)
+    cyl('ADDPROP_StarChart_Table',(x,y,0.78),1.05,0.16,M['armor'],nav,vertices=16)
+    torus('ADDPROP_StarChart_Rim',(x,y,0.90),0.82,0.045,M['cyan'],nav,major_segments=20)
+    sphere('ADDPROP_StarChart_Hologram',(x,y,1.20),(0.48,0.48,0.18),M['cyan'],nav,segments=14,rings=6)
+    # Communications relay dish and intercom.
+    x=37.0
+    cyl('ADDPROP_CommRelay_Base',(x,y,0.28),0.55,0.42,M['wall'],nav,vertices=12)
+    beam_between('ADDPROP_CommRelay_Mast',(x,y,0.40),(x,y,1.48),0.10,M['steel'],nav,vertices=10)
+    torus('ADDPROP_CommRelay_DishRim',(x,y-0.12,1.55),0.50,0.065,M['armor'],nav,rot=(math.radians(70),0,0),major_segments=16)
+    sphere('ADDPROP_CommRelay_Dish',(x,y-0.10,1.52),(0.43,0.12,0.43),M['medical'],nav,segments=12,rings=6)
+    beam_between('ADDPROP_CommRelay_Antenna',(x,y-0.40,1.50),(x,y-0.72,1.56),0.035,M['amber'],nav,vertices=8)
+    cube('ADDPROP_WallIntercom_Housing',(38.5,y,1.05),(0.38,0.16,0.55),M['wall'],nav,0.05)
+    cube('ADDPROP_WallIntercom_Screen',(38.5,y-0.175,1.25),(0.24,0.018,0.15),M['cyan'],nav,0.015)
+    for i in range(5): cube(f'ADDPROP_WallIntercom_Grille_{i}',(38.5,y-0.177,0.78+i*0.07),(0.22,0.012,0.016),M['black'],nav,0.004)
+    # Drone repair cradle and compact drone.
+    x=40.5
+    cyl('ADDPROP_DroneCradle_Platform',(x,y,0.24),0.95,0.32,M['wall'],maintain,vertices=14)
+    for sx in [-1,1]:
+        beam_between(f'ADDPROP_DroneCradle_Arm_{sx}',(x+sx*0.72,y,0.32),(x+sx*0.72,y,1.55),0.085,M['armor'],maintain,vertices=10)
+        beam_between(f'ADDPROP_DroneCradle_ToolArm_{sx}',(x+sx*0.70,y,1.45),(x+sx*0.35,y-0.12,0.92),0.045,M['steel'],maintain,vertices=8)
+    sphere('ADDPROP_MaintenanceDrone_Body',(x,y,0.85),(0.42,0.30,0.25),M['armor'],maintain,segments=10,rings=5)
+    sphere('ADDPROP_MaintenanceDrone_Eye',(x,y-0.31,0.88),(0.12,0.045,0.09),M['cyan'],maintain,segments=8,rings=4)
+    for sx in [-1,1]: beam_between(f'ADDPROP_MaintenanceDrone_Leg_{sx}',(x+sx*0.24,y,0.72),(x+sx*0.48,y-0.08,0.42),0.045,M['steel'],maintain,vertices=8)
+    # Tool cart and fabrication printer.
+    x=43.2
+    cube('ADDPROP_ToolCart_Body',(x,y,0.65),(0.72,0.42,0.62),M['armor'],maintain,0.07)
+    for z in [0.35,0.65,0.95]: cube(f'ADDPROP_ToolCart_Drawer_{z}',(x,y-0.445,z),(0.58,0.025,0.10),M['trim'],maintain,0.012)
+    for sx in [-1,1]:
+        for sy in [-1,1]: cyl(f'ADDPROP_ToolCart_Wheel_{sx}_{sy}',(x+sx*0.56,y+sy*0.30,0.12),0.12,0.09,M['black'],maintain,rot=(0,math.radians(90),0),vertices=10)
+    x=45.5
+    cube('ADDPROP_Fabricator_Housing',(x,y,1.02),(0.74,0.48,1.00),M['wall'],maintain,0.08)
+    cube('ADDPROP_Fabricator_Chamber',(x,y-0.50,1.08),(0.48,0.08,0.45),M['black'],maintain,0.04)
+    cube('ADDPROP_Fabricator_Field',(x,y-0.59,1.08),(0.38,0.018,0.34),M['cyan'],maintain,0.025)
+    cube('ADDPROP_Fabricator_Tray',(x,y-0.72,0.56),(0.50,0.30,0.055),M['steel'],maintain,0.025)
+
+    # Second row: science, survival and security assets.
+    y=-11.0; x=34.0
+    cyl('ADDPROP_Specimen_Base',(x,y,0.20),0.58,0.32,M['wall'],science,vertices=14)
+    cyl('ADDPROP_Specimen_Glass',(x,y,1.04),0.42,1.48,M['cyan'],science,vertices=16)
+    for z in [0.30,1.78]: cyl(f'ADDPROP_Specimen_Cap_{z}',(x,y,z),0.52,0.18,M['armor'],science,vertices=14)
+    for sx in [-1,1]: beam_between(f'ADDPROP_Specimen_Pipe_{sx}',(x+sx*0.36,y,0.45),(x+sx*0.55,y,0.20),0.045,M['medical'],science,vertices=8)
+    x=36.5
+    cube('ADDPROP_WasteRecycler_Body',(x,y,0.88),(0.72,0.48,0.86),M['wall'],science,0.08)
+    cube('ADDPROP_WasteRecycler_Hatch',(x,y-0.50,1.15),(0.48,0.045,0.30),M['armor2'],science,0.035)
+    torus('ADDPROP_WasteRecycler_Intake',(x,y-0.56,0.62),0.22,0.055,M['amber'],science,rot=(math.radians(90),0,0),major_segments=12)
+    x=39.0
+    cube('ADDPROP_BatteryRack_Frame',(x,y,1.02),(0.82,0.36,1.00),M['steel'],science,0.045)
+    for row,z in enumerate([0.42,0.98,1.54]):
+        for col,sx in enumerate([-0.42,0.42]):
+            cube(f'ADDPROP_BatteryModule_{row}_{col}',(x+sx,y-0.38,z),(0.30,0.12,0.22),M['armor'],science,0.035)
+            cube(f'ADDPROP_BatteryStatus_{row}_{col}',(x+sx,y-0.51,z),(0.12,0.012,0.035),M['cyan'] if row<2 else M['amber'],science,0.005)
+    x=41.6
+    cube('ADDPROP_DeconArch_Top',(x,y,2.05),(0.95,0.32,0.14),M['armor'],science,0.06)
+    for sx in [-1,1]:
+        cube(f'ADDPROP_DeconArch_Post_{sx}',(x+sx*0.82,y,1.08),(0.14,0.32,0.95),M['wall'],science,0.05)
+        for z in [0.60,1.15,1.70]: sphere(f'ADDPROP_DeconNozzle_{sx}_{z}',(x+sx*0.68,y-0.34,z),(0.055,0.07,0.055),M['cyan'],science,segments=8,rings=4)
+    cube('ADDPROP_DeconArch_Floor',(x,y,0.10),(0.86,0.52,0.10),M['steel'],science,0.035)
+    # Security camera, beacon, suit rack, salvage scanner and emergency terminal.
+    x=44.0
+    cube('ADDPROP_SecurityCamera_Mount',(x,y+0.18,1.60),(0.22,0.16,0.20),M['wall'],security,0.04)
+    sphere('ADDPROP_SecurityCamera_Body',(x,y-0.05,1.38),(0.30,0.28,0.24),M['armor'],security,segments=10,rings=5)
+    sphere('ADDPROP_SecurityCamera_Lens',(x,y-0.31,1.38),(0.12,0.045,0.12),M['red'],security,segments=8,rings=4)
+    cyl('ADDPROP_WarningBeacon_Base',(45.0,y,0.30),0.28,0.22,M['wall'],security,vertices=12)
+    cyl('ADDPROP_WarningBeacon_Light',(45.0,y,0.65),0.21,0.48,M['red'],security,vertices=12)
+    torus('ADDPROP_WarningBeacon_Cage',(45.0,y,0.65),0.25,0.025,M['steel'],security,rot=(math.radians(90),0,0),major_segments=12)
+    x=47.0
+    cube('ADDPROP_SuitRack_Frame',(x,y,1.08),(0.90,0.30,1.05),M['wall'],science,0.06)
+    for sx in [-1,1]:
+        sphere(f'ADDPROP_SuitRack_Helmet_{sx}',(x+sx*0.38,y-0.34,1.48),(0.24,0.16,0.24),M['medical'],science,segments=10,rings=5)
+        cube(f'ADDPROP_SuitRack_Torso_{sx}',(x+sx*0.38,y-0.30,0.88),(0.26,0.14,0.42),M['medical'],science,0.06)
+    x=49.5
+    cube('ADDPROP_EmergencyNav_Base',(x,y,0.78),(0.72,0.42,0.74),M['wall'],nav,0.07)
+    cube('ADDPROP_EmergencyNav_Screen',(x,y-0.45,1.12),(0.48,0.045,0.34),M['cyan'],nav,0.03,rot=(math.radians(8),0,0))
+    for i in range(5): cube(f'ADDPROP_EmergencyNav_Key_{i}',(x-0.32+i*0.16,y-0.48,0.55),(0.05,0.018,0.04),M['amber'] if i==2 else M['steel'],nav,0.006)
+    # Handheld salvage scanner positioned beside terminal.
+    cube('ADDPROP_SalvageScanner_Body',(51.0,y,0.92),(0.24,0.12,0.36),M['armor'],maintain,0.045)
+    cube('ADDPROP_SalvageScanner_Display',(51.0,y-0.13,1.02),(0.16,0.018,0.16),M['cyan'],maintain,0.012)
+    cube('ADDPROP_SalvageScanner_Grip',(51.0,y,0.50),(0.10,0.10,0.18),M['black'],maintain,0.025,rot=(math.radians(-12),0,0))
+    for obj in c.all_objects:
+        if obj.type=='MESH': obj['asset_family']='additional_ship_prop'; obj['snap_grid_m']=0.25; obj['collision_hint']='box_or_convex_hull'
+    return c
+
+
+def build_tutorial_level1_replacements(root):
+    c=coll('REPL_TutorialLevel1',root); tutorial=coll('REPL_Tutorial',c); level1=coll('REPL_Level1',c)
+    # Medical terminal: freestanding and wall-mounted variants.
+    x,y=55.0,-2.0
+    cube('REPL_MedTerminal_Base',(x,y,0.18),(0.62,0.44,0.18),M['wall'],tutorial,0.07)
+    cube('REPL_MedTerminal_Pedestal',(x,y,0.82),(0.46,0.34,0.56),M['medical'],tutorial,0.08)
+    beam_between('REPL_MedTerminal_ScreenArm',(x,y,1.12),(x,y-0.22,1.55),0.085,M['steel'],tutorial,vertices=10)
+    cube('REPL_MedTerminal_Screen',(x,y-0.34,1.66),(0.58,0.07,0.36),M['armor'],tutorial,0.055,rot=(math.radians(8),0,0))
+    cube('REPL_MedTerminal_Display',(x,y-0.414,1.68),(0.46,0.018,0.26),M['cyan'],tutorial,0.022,rot=(math.radians(8),0,0))
+    cyl('REPL_MedTerminal_HoloProjector',(x,y-0.36,1.08),0.16,0.08,M['steel'],tutorial,vertices=12)
+    sphere('REPL_MedTerminal_Hologram',(x,y-0.36,1.27),(0.18,0.18,0.30),M['cyan'],tutorial,segments=10,rings=5)
+    cube('REPL_MedTerminal_DataSlot',(x+0.28,y-0.37,0.82),(0.12,0.035,0.09),M['amber'],tutorial,0.012)
+    for sx in [-1,1]: beam_between(f'REPL_MedTerminal_Cable_{sx}',(x+sx*0.24,y+0.18,0.42),(x+sx*0.38,y+0.12,0.06),0.028,M['black'],tutorial,vertices=8)
+    x=57.0
+    cube('REPL_MedTerminalWall_Back',(x,y,1.05),(0.55,0.18,0.70),M['wall'],tutorial,0.06)
+    cube('REPL_MedTerminalWall_Screen',(x,y-0.20,1.28),(0.40,0.035,0.25),M['cyan'],tutorial,0.025)
+    sphere('REPL_MedTerminalWall_Scanner',(x-0.30,y-0.22,0.86),(0.10,0.05,0.10),M['cyan'],tutorial,segments=8,rings=4)
+    # Standalone weapon-arm rig compatible with the humanoid arm proportions.
+    armc=coll('REPL_WeaponArms',tutorial)
+    bones=[('root',(0,0,1.15),(0,0,1.30),None),('upper_arm.L',(0,0,1.30),(0.34,-0.05,1.18),'root'),('lower_arm.L',(0.34,-0.05,1.18),(0.58,-0.24,1.08),'upper_arm.L'),('hand.L',(0.58,-0.24,1.08),(0.72,-0.34,1.03),'lower_arm.L'),('upper_arm.R',(0,0,1.30),(-0.34,-0.05,1.18),'root'),('lower_arm.R',(-0.34,-0.05,1.18),(-0.58,-0.24,1.08),'upper_arm.R'),('hand.R',(-0.58,-0.24,1.08),(-0.72,-0.34,1.03),'lower_arm.R')]
+    rig=make_armature('RIG_WeaponArms_Standard',bones,armc,x=59.0); rig.location.y=-2.0
+    for side,sx in [('L',1),('R',-1)]:
+        pieces=[(beam_between(f'REPL_Arm_Upper_{side}',(0,0,1.30),(0.34*sx,-0.05,1.18),0.095,M['cloth'],armc,vertices=8),f'upper_arm.{side}'),(sphere(f'REPL_Arm_Elbow_{side}',(0.36*sx,-0.07,1.17),(0.11,0.10,0.10),M['armor'],armc,segments=8,rings=4),f'lower_arm.{side}'),(beam_between(f'REPL_Arm_Forearm_{side}',(0.36*sx,-0.08,1.16),(0.60*sx,-0.25,1.07),0.085,M['armor2'],armc,vertices=8),f'lower_arm.{side}'),(cube(f'REPL_Arm_Hand_{side}',(0.67*sx,-0.30,1.04),(0.09,0.12,0.065),M['black'],armc,0.025),f'hand.{side}')]
+        for obj,bone in pieces: bind_rigid(obj,rig,bone)
+    cube('REPL_Arm_TestWeapon',(0,-0.62,1.12),(0.54,0.18,0.10),M['armor'],armc,0.04); bind_rigid(bpy.context.object if bpy.context.object and bpy.context.object.name=='REPL_Arm_TestWeapon' else armc.objects.get('REPL_Arm_TestWeapon'),rig,'hand.R')
+
+    # Auxiliary engine with physical armor bands and independent impeller.
+    x,y=62.0,-2.0
+    cyl('REPL_AuxEngine_Core',(x,y,0.90),0.58,1.65,M['armor'],level1,rot=(0,math.radians(90),0),vertices=16)
+    cyl('REPL_AuxEngine_Emitter',(x-0.82,y,0.90),0.40,0.30,M['cyan'],level1,rot=(0,math.radians(90),0),vertices=14)
+    for i,ox in enumerate([-0.62,-0.20,0.22,0.64]): torus(f'REPL_AuxEngine_Band_{i}',(x+ox,y,0.90),0.62,0.085,M['steel'],level1,rot=(0,math.radians(90),0),major_segments=16)
+    for sy in [-1,1]: beam_between(f'REPL_AuxEngine_Pipe_{sy}',(x-0.55,y+sy*0.50,0.62),(x+0.52,y+sy*0.50,0.62),0.045,M['cyan'],level1,vertices=8)
+    impeller=coll('REPL_AuxEngine_Impeller',level1)
+    cyl('REPL_AuxEngine_ImpellerHub',(x+0.88,y,0.90),0.18,0.28,M['steel'],impeller,rot=(0,math.radians(90),0),vertices=12)
+    for i in range(10):
+        a=math.radians(i*36); cube(f'REPL_AuxEngine_Blade_{i}',(x+1.02,y+math.cos(a)*0.28,0.90+math.sin(a)*0.28),(0.045,0.24,0.07),M['armor2'],impeller,0.02,rot=(a,0,0))
+    # Magazine, pickup-effect geometry and document states.
+    x=65.0
+    extruded_outline('REPL_Magazine_Body',[(-0.24,-0.42),(0.20,-0.38),(0.30,0.32),(-0.18,0.42)],0.30,1.10,(x,y,0),M['armor'],level1)
+    cube('REPL_Magazine_Window',(x,y-0.43,0.72),(0.12,0.025,0.27),M['amber'],level1,0.015)
+    for i in range(5): cyl(f'REPL_Magazine_Round_{i}',(x,y-0.46,0.52+i*0.10),0.025,0.14,M['brass'],level1,rot=(0,math.radians(90),0),vertices=8)
+    effect=coll('REPL_MagazinePickupEffect',level1)
+    for i,z in enumerate([0.08,0.38,0.76]): torus(f'REPL_MagPickup_Ring_{i}',(66.1,y,z),0.36-i*0.06,0.025,M['cyan'],effect,major_segments=14)
+    for i,a in enumerate(range(0,360,60)):
+        rad=math.radians(a); cone(f'REPL_MagPickup_Fin_{i}',(66.1+math.cos(rad)*0.28,y+math.sin(rad)*0.28,0.52),0.045,0.005,0.65,M['cyan'],effect,rot=(0,0,rad),vertices=5)
+    for state,dx,screen in [('Unread',67.5,M['amber']),('Read',69.0,M['cyan'])]:
+        cube(f'REPL_StoryDocument_{state}_Frame',(dx,y,0.78),(0.56,0.08,0.42),M['armor'],level1,0.055)
+        cube(f'REPL_StoryDocument_{state}_Screen',(dx,y-0.09,0.80),(0.44,0.018,0.30),screen,level1,0.025)
+        cube(f'REPL_StoryDocument_{state}_Latch',(dx,y-0.12,0.42),(0.15,0.03,0.08),M['steel'],level1,0.015)
+    for obj in c.all_objects:
+        if obj.type=='MESH': obj['replacement_asset']=True; obj['forward_axis']='-Y'
+    return c
+
+
+def add_ship_engines(collection,x,y,z,spacing,material=None):
+    material=material or M['armor']
+    for sx in [-1,1]:
+        cyl(f'{collection.name}_Engine_{sx}_{x}',(x+sx*spacing,y,z),0.22,0.52,material,collection,rot=(math.radians(90),0,0),vertices=10)
+        cyl(f'{collection.name}_Glow_{sx}_{x}',(x+sx*spacing,y+0.28,z),0.14,0.06,M['cyan'],collection,rot=(math.radians(90),0,0),vertices=10)
+
+
+def build_space_travel_replacements(root):
+    c=coll('REPL_SpaceTravel',root); ships=coll('REPL_Ships',c); station=coll('REPL_Station',c); debris=coll('REPL_Debris',c)
+    # Player ship.
+    x,y=55.0,-8.0
+    extruded_outline('REPL_PlayerShip_Hull',[(0,-1.35),(0.46,-0.78),(0.78,0.15),(0.62,1.05),(-0.62,1.05),(-0.78,0.15),(-0.46,-0.78)],0.42,0.86,(x,y,0),M['armor'],ships)
+    extruded_outline('REPL_PlayerShip_Cockpit',[(0,-1.18),(0.30,-0.72),(0.38,-0.20),(-0.38,-0.20),(-0.30,-0.72)],0.78,1.08,(x,y,0),M['cyan'],ships)
+    add_ship_engines(ships,x,y+0.86,0.64,0.47)
+    torus('REPL_PlayerShip_DockingCollar',(x,y+0.18,0.64),0.24,0.055,M['steel'],ships,rot=(math.radians(90),0,0),major_segments=12)
+    # Noctis stealth ship.
+    x=59.0
+    extruded_outline('REPL_Noctis_Hull',[(0,-1.90),(0.26,-1.15),(0.92,0.28),(0.48,1.35),(0,1.05),(-0.48,1.35),(-0.92,0.28),(-0.26,-1.15)],0.40,0.72,(x,y,0),M['black'],ships)
+    for sx in [-1,1]: extruded_outline(f'REPL_Noctis_Fin_{sx}',[(0,-0.9),(0.20,-0.2),(0.50,1.1),(0.08,0.7)],0.56,0.66,(x+sx*0.72,y,0),M['armor'],ships)
+    add_ship_engines(ships,x,y+1.02,0.56,0.34,M['black'])
+    # Erebus heavy ship.
+    x=63.0
+    extruded_outline('REPL_Erebus_Hull',[(-0.82,-1.25),(0.82,-1.25),(1.10,0.82),(0.72,1.35),(-0.72,1.35),(-1.10,0.82)],0.32,0.96,(x,y,0),M['armor2'],ships)
+    for sx in [-1,1]:
+        cube(f'REPL_Erebus_ArmorBlock_{sx}',(x+sx*0.88,y+0.10,0.78),(0.34,0.78,0.40),M['wall'],ships,0.08)
+        cyl(f'REPL_Erebus_Reactor_{sx}',(x+sx*0.62,y+1.42,0.64),0.28,0.46,M['red'],ships,rot=(math.radians(90),0,0),vertices=12)
+    # Cargo and patrol ships.
+    x=67.0
+    extruded_outline('REPL_CargoShip_Bridge',[(-0.55,-1.15),(0.55,-1.15),(0.78,-0.30),(0.58,0.35),(-0.58,0.35),(-0.78,-0.30)],0.45,0.88,(x,y,0),M['medical'],ships)
+    for i in range(3): cube(f'REPL_CargoShip_Container_{i}',(x,y+0.62+i*0.62,0.62),(0.82,0.28,0.38),M['armor2'],ships,0.05)
+    add_ship_engines(ships,x,y+2.10,0.62,0.52)
+    x=71.0
+    extruded_outline('REPL_PatrolShip_Hull',[(0,-1.45),(0.52,-0.62),(0.78,0.36),(0.38,1.08),(-0.38,1.08),(-0.78,0.36),(-0.52,-0.62)],0.40,0.78,(x,y,0),M['steel'],ships)
+    for sx in [-1,1]: beam_between(f'REPL_PatrolShip_Wing_{sx}',(x+sx*0.34,y,0.62),(x+sx*1.05,y+0.55,0.62),0.10,M['armor'],ships,vertices=8)
+    add_ship_engines(ships,x,y+0.98,0.58,0.36)
+    # Giant station with diamond ring and vertical core.
+    x,y=63.0,-14.0
+    cyl('REPL_Station_Core',(x,y,1.30),0.62,2.60,M['wall'],station,vertices=14)
+    for z in [0.35,1.00,1.65,2.25]: cyl(f'REPL_Station_HabRing_{z}',(x,y,z),1.05,0.18,M['armor'],station,vertices=16)
+    ring_pts=[(x,y-2.1,1.25),(x+2.1,y,1.25),(x,y+2.1,1.25),(x-2.1,y,1.25)]
+    for i in range(4): beam_between(f'REPL_Station_DiamondBeam_{i}',ring_pts[i],ring_pts[(i+1)%4],0.14,M['steel'],station,vertices=10)
+    for i,(px,py,pz) in enumerate(ring_pts):
+        cube(f'REPL_Station_DockSpine_{i}',(px,py,pz),(0.28,0.28,0.88),M['armor2'],station,0.06)
+        sphere(f'REPL_Station_DockLight_{i}',(px,py,pz+0.92),(0.08,0.08,0.08),M['amber'],station,segments=8,rings=4)
+    for i,a in enumerate(range(0,360,45)):
+        rad=math.radians(a); beam_between(f'REPL_Station_Antenna_{i}',(x+math.cos(rad)*0.45,y+math.sin(rad)*0.45,2.55),(x+math.cos(rad)*0.88,y+math.sin(rad)*0.88,3.15),0.035,M['steel'],station,vertices=6)
+    # Six debris variants.
+    y=-19.0
+    for idx,dx in enumerate([55,58,61,64,67,70]):
+        if idx==0:
+            extruded_outline('REPL_Debris_BrokenHull',[(-0.8,-0.5),(0.5,-0.7),(0.9,0.2),(0.2,0.7),(-0.7,0.4)],0.30,0.64,(dx,y,0),M['wall'],debris)
+            for i in range(4): beam_between(f'REPL_Debris_BrokenRib_{i}',(dx-0.55+i*0.28,y-0.45,0.32),(dx-0.35+i*0.24,y+0.45,0.74),0.035,M['steel'],debris,vertices=6)
+        elif idx==1:
+            cyl('REPL_Debris_EngineWreck',(dx,y,0.62),0.55,1.22,M['armor'],debris,rot=(0,math.radians(90),0),vertices=12)
+            for i in range(8): cube(f'REPL_Debris_EngineBlade_{i}',(dx+0.65,y+math.cos(i*math.pi/4)*0.25,0.62+math.sin(i*math.pi/4)*0.25),(0.05,0.20,0.05),M['steel'],debris,0.01,rot=(i*math.pi/4,0,0))
+        elif idx==2:
+            beam_between('REPL_Debris_AntennaMast',(dx,y,0.20),(dx,y,1.75),0.08,M['steel'],debris,vertices=8)
+            torus('REPL_Debris_AntennaDish',(dx,y-0.08,1.35),0.42,0.06,M['armor'],debris,rot=(math.radians(65),0,0),major_segments=12)
+        elif idx==3:
+            for i in range(4): cube(f'REPL_Debris_Cargo_{i}',(dx+(i%2-0.5)*0.70,y+(i//2-0.5)*0.65,0.55),(0.32,0.28,0.40),M['armor2'],debris,0.05)
+        elif idx==4:
+            beam_between('REPL_Debris_SolarSpine',(dx-0.9,y,0.58),(dx+0.9,y,0.58),0.06,M['steel'],debris,vertices=8)
+            for sx in [-1,1]: cube(f'REPL_Debris_SolarPanel_{sx}',(dx+sx*0.62,y,0.58),(0.42,0.05,0.58),M['cyan'],debris,0.02,rot=(0,math.radians(12*sx),0))
+        else:
+            sphere('REPL_Debris_InfectedCore',(dx,y,0.68),(0.78,0.52,0.58),M['flesh'],debris,segments=10,rings=5)
+            for i,a in enumerate(range(0,360,60)):
+                rad=math.radians(a); taper_between(f'REPL_Debris_InfectedSpike_{i}',(dx+math.cos(rad)*0.48,y+math.sin(rad)*0.35,0.68),(dx+math.cos(rad)*1.08,y+math.sin(rad)*0.75,0.82),0.10,0.01,M['bone'],debris,vertices=6)
+        cube(f'REPL_Debris_WarningPlate_{idx}',(dx,y-0.62,0.45),(0.22,0.035,0.12),M['amber'],debris,0.015)
+    for obj in c.all_objects:
+        if obj.type=='MESH': obj['replacement_asset']=True; obj['collision_hint']='convex_hull'
+    return c
+
+
+def build_destination_arrival_replacements(root):
+    c=coll('REPL_DestinationArrival',root); dock=coll('REPL_DockingStructure',c); infected=coll('REPL_InfectedStructure',c); lights=coll('REPL_LightPylons',c); ship=coll('REPL_DockedShip',c)
+    # Left industrial docking structure.
+    x,y=56.0,-24.0
+    cube('REPL_Dock_Platform',(x,y,0.18),(2.50,1.25,0.18),M['wall'],dock,0.08)
+    torus('REPL_Dock_Collar',(x,y+0.40,1.28),0.92,0.14,M['steel'],dock,rot=(math.radians(90),0,0),major_segments=18)
+    for sx in [-1,1]:
+        beam_between(f'REPL_Dock_GantryPost_{sx}',(x+sx*1.70,y+0.45,0.30),(x+sx*1.70,y+0.45,2.45),0.13,M['armor'],dock,vertices=10)
+        beam_between(f'REPL_Dock_GantryTop_{sx}',(x+sx*1.70,y+0.45,2.40),(x+sx*0.68,y+0.38,2.05),0.11,M['steel'],dock,vertices=10)
+        beam_between(f'REPL_Dock_ClampArm_{sx}',(x+sx*0.82,y+0.28,1.28),(x+sx*0.38,y-0.15,1.05),0.10,M['armor2'],dock,vertices=10)
+        beam_between(f'REPL_Dock_FuelHose_{sx}',(x+sx*1.42,y+0.35,0.55),(x+sx*0.62,y-0.32,0.88),0.045,M['amber'],dock,vertices=8)
+    for i in range(5): cube(f'REPL_Dock_DeckLight_{i}',(x-1.60+i*0.80,y-1.10,0.38),(0.16,0.05,0.035),M['amber'],dock,0.008)
+    # Right infected structure with metal frame and organic overgrowth.
+    x=66.0
+    cube('REPL_Infected_FrameBase',(x,y,0.18),(2.45,1.20,0.18),M['wall'],infected,0.08)
+    torus('REPL_Infected_FrameArch',(x,y+0.35,1.35),1.15,0.13,M['armor'],infected,rot=(math.radians(90),0,0),major_segments=16)
+    for i,(ox,oz,sc) in enumerate([(-1.35,0.75,0.55),(-0.70,1.55,0.48),(0.10,0.90,0.70),(0.85,1.65,0.52),(1.45,0.72,0.62)]):
+        sphere(f'REPL_Infected_Sac_{i}',(x+ox,y-0.42,oz),(sc,sc*0.65,sc*0.80),M['flesh'],infected,segments=10,rings=5)
+        sphere(f'REPL_Infected_Glow_{i}',(x+ox,y-0.78,oz),(sc*0.32,sc*0.12,sc*0.32),M['red'],infected,segments=8,rings=4)
+    for i,a in enumerate(range(0,360,45)):
+        rad=math.radians(a); taper_between(f'REPL_Infected_Tendril_{i}',(x+math.cos(rad)*0.75,y,1.25+math.sin(rad)*0.55),(x+math.cos(rad)*2.35,y-0.20,1.55+math.sin(rad)*1.05),0.12,0.015,M['void'],infected,vertices=6)
+    # Vertical light pylons.
+    for idx,px in enumerate([60.3,62.0]):
+        cube(f'REPL_LightPylon_Base_{idx}',(px,y,0.25),(0.42,0.42,0.25),M['wall'],lights,0.06)
+        beam_between(f'REPL_LightPylon_Mast_{idx}',(px,y,0.45),(px,y,2.55),0.12,M['steel'],lights,vertices=10)
+        for z in [0.85,1.30,1.75,2.20]: cyl(f'REPL_LightPylon_Cell_{idx}_{z}',(px,y, z),0.22,0.30,M['cyan'],lights,vertices=10)
+        for sx in [-1,1]: cube(f'REPL_LightPylon_Amber_{idx}_{sx}',(px+sx*0.38,y,1.18),(0.16,0.08,0.06),M['amber'],lights,0.015)
+    # Docked copy of the player ship.
+    x=61.2; y=-25.2
+    extruded_outline('REPL_DockedPlayerShip_Hull',[(0,-1.35),(0.46,-0.78),(0.78,0.15),(0.62,1.05),(-0.62,1.05),(-0.78,0.15),(-0.46,-0.78)],0.55,0.99,(x,y,0),M['armor'],ship)
+    extruded_outline('REPL_DockedPlayerShip_Cockpit',[(0,-1.18),(0.30,-0.72),(0.38,-0.20),(-0.38,-0.20),(-0.30,-0.72)],0.92,1.20,(x,y,0),M['cyan'],ship)
+    add_ship_engines(ship,x,y+0.86,0.78,0.47)
+    for sx in [-1,1]: beam_between(f'REPL_DockedPlayerShip_Leg_{sx}',(x+sx*0.42,y+0.28,0.60),(x+sx*0.62,y+0.40,0.22),0.07,M['steel'],ship,vertices=8)
+    for obj in c.all_objects:
+        if obj.type=='MESH': obj['replacement_asset']=True; obj['snap_grid_m']=0.25
+    return c
+
+
 def asteroid(name, loc, scale, seed, collection):
     bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2, radius=1.0, location=loc)
     o=bpy.context.object;o.name=name
@@ -835,6 +1167,10 @@ def render_previews(groups):
     def visible(names):
         for c in groups:
             c.hide_render = c.name not in names
+    def place_lights(cx,cy):
+        bpy.data.objects['PREVIEW_Key'].location=(cx-4.0,cy-5.0,9.0)
+        bpy.data.objects['PREVIEW_Amber'].location=(cx+5.0,cy+2.0,6.0)
+        bpy.data.objects['PREVIEW_Rim'].location=(cx-6.0,cy,4.0)
     visible({c.name for c in groups})
     aim_camera((7,-1.5,0.8),(8,-29,17),52)
     scene.render.filepath=os.path.join(PREVIEW,'AssetPack_Overview.png')
@@ -859,6 +1195,31 @@ def render_previews(groups):
     aim_camera((26.3,-3.45,0.95),(26.3,-25.0,13.5),52)
     scene.render.filepath=os.path.join(PREVIEW,'ShipInteriorProps.png')
     bpy.ops.render.render(write_still=True)
+    visible({'ENV_NavigationDataProps'})
+    place_lights(38.0,-3.5)
+    aim_camera((38.0,-3.7,1.0),(38.0,-22.0,11.5),50)
+    scene.render.filepath=os.path.join(PREVIEW,'NavigationDataProps.png')
+    bpy.ops.render.render(write_still=True)
+    visible({'ENV_AdditionalShipProps'})
+    place_lights(42.5,-9.5)
+    aim_camera((42.5,-9.5,1.0),(42.5,-34.0,15.5),50)
+    scene.render.filepath=os.path.join(PREVIEW,'AdditionalShipProps.png')
+    bpy.ops.render.render(write_still=True)
+    visible({'REPL_TutorialLevel1'})
+    place_lights(62.0,-2.0)
+    aim_camera((62.0,-2.0,1.0),(62.0,-23.0,13.0),52)
+    scene.render.filepath=os.path.join(PREVIEW,'TutorialLevel1Replacements.png')
+    bpy.ops.render.render(write_still=True)
+    visible({'REPL_SpaceTravel'})
+    place_lights(63.0,-13.0)
+    aim_camera((63.0,-13.0,1.25),(63.0,-42.0,21.0),50)
+    scene.render.filepath=os.path.join(PREVIEW,'SpaceTravelReplacements.png')
+    bpy.ops.render.render(write_still=True)
+    visible({'REPL_DestinationArrival'})
+    place_lights(61.0,-24.0)
+    aim_camera((61.0,-24.0,1.15),(61.0,-44.0,12.0),52)
+    scene.render.filepath=os.path.join(PREVIEW,'DestinationArrivalReplacements.png')
+    bpy.ops.render.render(write_still=True)
     visible({c.name for c in groups})
 
 
@@ -877,20 +1238,25 @@ def write_docs():
         'walk':{'action':'VOID_Walk_Loop','loop':True},'run':{'action':'VOID_Run_Loop','loop':True},'turn_left':'VOID_Turn_Left_90','turn_right':'VOID_Turn_Right_90','attack':'VOID_Attack_Claw','pounce':'VOID_Attack_Pounce','jump':'VOID_Jump','death':'VOID_Death_Collapse','walk_to_run':'VOID_Walk_To_Run','run_to_walk':'VOID_Run_To_Walk','directional_pose_blend':['VOID_Pose_Turn_Neg45','VOID_Pose_Turn_Zero','VOID_Pose_Turn_Pos45']}},
       'projectiles':{'forward_axis':'-Y','pivot':'center','translation':'game-controlled','assets':['PROJ_Rifle_Ballistic','PROJ_Rifle_ArmorPiercing','PROJ_Energy_PlasmaBolt','PROJ_Rifle_SpentCasing'],'spin_actions':['PROJ_Rifle_Ballistic_Spin','PROJ_Rifle_ArmorPiercing_Spin','PROJ_Energy_PlasmaBolt_Spin']},
       'ship_interior_props':{'snap_grid_m':0.25,'library':'Libraries/ShipInterior_Props.blend','families':['storage','utility','crew','maintenance'],'placement':'append or link the ENV_ShipInteriorProps collection, then move individual named parts as one prop assembly'},
+      'navigation_data_props':{'library':'Libraries/NavigationDataProps.blend','families':['navigation_core','electronic_document'],'navigation_core':'separate gimbal rings support independent rotation','documents':'handheld pickup props facing -Y'},
+      'additional_ship_props':{'library':'Libraries/AdditionalShipProps.blend','families':['navigation_comms','maintenance','science_survival','security'],'snap_grid_m':0.25},
+      'mesh_replacements':{'tutorial_level1':'Libraries/TutorialLevel1_Replacements.blend','space_travel':'Libraries/SpaceTravel_Replacements.blend','destination_arrival':'Libraries/DestinationArrival_Replacements.blend','rule':'all replacement parts are physical meshes; rotatable engine impeller and pickup effect remain separate collections'},
       'modular_rules':{'human':'Enable exactly one base head; face, helmet, chest armor and equipment are optional overlays. All HUM_v1 parts share the same skeleton and origin.','void':'Base body stays enabled; horn, eye cluster, heavy carapace and tail blade are swappable VOID_v1 overlays.','ship':'2 m wall modules and 2 m floor tiles snap on a 0.25 m grid.'},
       'export_notes':['Apply no transforms to armatures before export.','Export deform bones only when supported.','Keep action names unchanged so the animation state map remains valid.','Procedural materials should be baked or replaced with engine PBR textures during integration.']}
     with open(os.path.join(DOCS,'AnimationAndAssembly.json'),'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2)
     readme='''# Dark Sci-Fi Modular Blender Asset Pack\n\n- Blender 5.2 authoring source, metric units, +Z up, -Y forward.\n- Low-poly modular humanoid uses a 7-head heroic proportion and HUM_v1 shared skeleton.\n- The pulse rifle is a multi-part runtime asset with receiver, barrel, muzzle, stock, grip, magazine, optic, rail, energy coils and status lighting.\n- Rifle animation clips include equip-to-aim, breathing aim idle and firing recoil poses for upper-body layering after weapon pickup.\n- Humanoid and void rigs include distinct fall and collapse death actions.\n- Void quadruped is an original low-center, four-legged assault creature with VOID_v1 modular overlays.\n- Ship controls, pilot seat, medical bed and power junction include rounded housings, articulated supports, hydraulics, conduits and emissive instruments.\n- Ship walls and floor tiles use a 2 m module and 0.25 m snap grid.\n- Materials use dark gunmetal, oxidized armor, cold cyan displays, warning amber, desaturated skin and violet-red alien tissue.\n- Animation clips include walk, run, left/right turn, attack, jump, rifle aiming, death, turn interpolation poses, and walk/run transitions.\n- Projectile meshes use a centered pivot and -Y forward axis; gameplay controls their translation.\n\n## Libraries\n\n- `DarkSciFi_ModularAssetPack.blend`: complete source and showcase scene.\n- `Libraries/Humanoid_Modular.blend`: human rig, body parts, clothing, equipment, rifle and actions.\n- `Libraries/Void_Quadruped.blend`: quadruped rig, modular parts, actions.\n- `Libraries/Ship_ModularKit.blend`: walls, controls, medical devices, floor tiles/materials.\n- `Libraries/Space_Asteroids.blend`: four low-poly asteroids and drift-spin actions.\n- `Libraries/Projectile_Meshes.blend`: ballistic, armor-piercing, plasma projectiles and spent casing.\n\nSee `AnimationAndAssembly.json` for clip mapping and blend recommendations.\n'''
     readme=readme.replace('\n\nSee `AnimationAndAssembly.json`','\n- `Libraries/ShipInterior_Props.blend`: cargo, lockers, bunks, galley, workbench, life support, vents, pipe rack, emergency gear and shelving.\n\nSee `AnimationAndAssembly.json`')
+    readme=readme.replace('\n\nSee `AnimationAndAssembly.json`','\n- `Libraries/NavigationDataProps.blend`: navigation core, data slates, holographic clipboard, memory canister and identity chip.\n- `Libraries/AdditionalShipProps.blend`: communications, drone maintenance, fabrication, science, survival and security props.\n\nSee `AnimationAndAssembly.json`')
+    readme=readme.replace('\n\nSee `AnimationAndAssembly.json`','\n- `Libraries/TutorialLevel1_Replacements.blend`: medical terminal, weapon-arm rig, auxiliary engine, magazine, pickup effect and story documents.\n- `Libraries/SpaceTravel_Replacements.blend`: player ship, named ships, station and six debris families.\n- `Libraries/DestinationArrival_Replacements.blend`: docking gantry, infected structure, light pylons and docked player ship.\n\nSee `AnimationAndAssembly.json`')
     with open(os.path.join(DOCS,'README.md'),'w',encoding='utf-8') as f:f.write(readme)
 
 
 def main():
     clean();materials();setup_scene();root=coll('DarkSciFi_ModularAssetPack')
-    hum,ha=build_humanoid(root);void,va=build_void(root);ship=build_ship(root);shipprops=build_ship_interior_props(root);space=build_space(root);projectiles=build_projectiles(root)
+    hum,ha=build_humanoid(root);void,va=build_void(root);ship=build_ship(root);shipprops=build_ship_interior_props(root);navdata=build_navigation_data_props(root);additional=build_additional_ship_props(root);repl_tl=build_tutorial_level1_replacements(root);repl_space=build_space_travel_replacements(root);repl_arrival=build_destination_arrival_replacements(root);space=build_space(root);projectiles=build_projectiles(root)
     camera_and_light();write_docs()
-    save_libraries(root,{'Humanoid_Modular.blend':[hum],'Void_Quadruped.blend':[void],'Ship_ModularKit.blend':[ship],'ShipInterior_Props.blend':[shipprops],'Space_Asteroids.blend':[space],'Projectile_Meshes.blend':[projectiles]})
-    render_previews([hum,void,ship,shipprops,space,projectiles])
+    save_libraries(root,{'Humanoid_Modular.blend':[hum],'Void_Quadruped.blend':[void],'Ship_ModularKit.blend':[ship],'ShipInterior_Props.blend':[shipprops],'NavigationDataProps.blend':[navdata],'AdditionalShipProps.blend':[additional],'TutorialLevel1_Replacements.blend':[repl_tl],'SpaceTravel_Replacements.blend':[repl_space],'DestinationArrival_Replacements.blend':[repl_arrival],'Space_Asteroids.blend':[space],'Projectile_Meshes.blend':[projectiles]})
+    render_previews([hum,void,ship,shipprops,navdata,additional,repl_tl,repl_space,repl_arrival,space,projectiles])
     print('ASSET_PACK_COMPLETE',ROOT)
 
 

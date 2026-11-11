@@ -616,7 +616,15 @@ void Game::PrecacheGameplayMeshes()
 	{
 		const float direction = static_cast<float>(directionIndex) * directionStep;
 		m_ModelLibrary.PrecacheMesh("humanoid_soldier", 18.0f, direction);
+		m_ModelLibrary.PrecacheMesh("humanoid_armed_body", 18.0f, direction);
 		m_ModelLibrary.PrecacheMesh("void_quadruped", 17.0f, direction);
+	}
+	for (int directionIndex = -8; directionIndex < 8; ++directionIndex)
+	{
+		m_ModelLibrary.PrecacheMesh("replacement_weapon_arms",
+			18.0f,
+			0.0f,
+			static_cast<float>(directionIndex) * directionStep);
 	}
 
 	const float wallRotations[] = {0.0f, Pi * 0.5f};
@@ -645,6 +653,17 @@ void Game::PrecacheGameplayMeshes()
 	m_ModelLibrary.PrecacheMesh("ship_prop_shelf", 8.9f);
 	m_ModelLibrary.PrecacheMesh("ship_prop_cable_reel", 22.3f);
 	m_ModelLibrary.PrecacheMesh("ship_prop_ceiling_light", 22.2f);
+	m_ModelLibrary.PrecacheMesh("replacement_medical_terminal", 18.0f);
+	m_ModelLibrary.PrecacheMesh("replacement_medical_hologram", 16.0f);
+	m_ModelLibrary.PrecacheMesh("replacement_aux_engine", 35.0f);
+	m_ModelLibrary.PrecacheMesh("replacement_magazine", 25.0f);
+	m_ModelLibrary.PrecacheMesh("replacement_magazine_effect", 32.0f);
+	m_ModelLibrary.PrecacheMesh("replacement_document_unread", 25.0f);
+	m_ModelLibrary.PrecacheMesh("replacement_document_read", 25.0f);
+	m_ModelLibrary.PrecacheMesh("replacement_docking_structure", 34.0f);
+	m_ModelLibrary.PrecacheMesh("replacement_infected_structure", 32.0f);
+	m_ModelLibrary.PrecacheMesh("replacement_light_pylons", 30.0f);
+	m_ModelLibrary.PrecacheMesh("replacement_docked_player_ship", 30.0f);
 	m_ModelLibrary.PrecacheMesh("humanoid_soldier", 18.0f, 1.57f);
 }
 
@@ -1771,8 +1790,13 @@ void Game::UpdateShip(float deltaSeconds)
 	}
 
 	const WorldPoint debris[] = {
-		{-90.0f, 170.0f}, {85.0f, 290.0f}, {-70.0f, 410.0f}, {55.0f, 520.0f}};
-	for (int i = 0; i < 4; ++i)
+		{-90.0f, 170.0f},
+		{85.0f, 290.0f},
+		{-70.0f, 410.0f},
+		{55.0f, 520.0f},
+		{-180.0f, 345.0f},
+		{175.0f, 465.0f}};
+	for (int i = 0; i < 6; ++i)
 	{
 		float distance = DistanceToSegment(debris[i], m_PreviousShipPosition, m_ShipPosition);
 		if (distance < 34.0f && m_DamageCooldown <= 0.0f)
@@ -2748,7 +2772,17 @@ void Game::RenderInterior()
 	if (m_CurrentShip == 0)
 	{
 		ScreenPoint terminal = WorldToScreen(TerminalPosition.x, TerminalPosition.y, 22.0f);
-		m_Renderer->DrawRect(terminal.x, terminal.y, 22.0f, 34.0f, 0.10f, 0.75f, 0.92f, 0.9f);
+		m_Renderer->DrawSoftShadow(terminal.x, terminal.y - 10.0f, 54.0f, 15.0f, 0.78f);
+		m_ModelLibrary.DrawMesh(
+			m_Renderer, "replacement_medical_terminal", terminal.x, terminal.y, 18.0f);
+		const float hologramPulse = 15.0f + std::sin(m_TotalTime * 4.0f) * 1.0f;
+		m_ModelLibrary.DrawMesh(m_Renderer,
+			"replacement_medical_hologram",
+			terminal.x,
+			terminal.y + 24.0f,
+			hologramPulse,
+			0.0f,
+			m_TotalTime * 0.35f);
 		if (m_Quest == CollectTutorialWeapon)
 		{
 			ScreenPoint weapon = WorldToScreen(TutorialWeaponPosition.x, TutorialWeaponPosition.y, 11.0f);
@@ -2820,96 +2854,6 @@ void Game::DrawFlightControlConsole(float x, float y, bool powered, bool infecte
 		m_Renderer->DrawDiamond(x, y + 26.0f, 112.0f, 45.0f, 0.46f, 0.03f, 0.62f, 0.22f);
 	else if (powered)
 		m_Renderer->DrawDiamond(x, y + 31.0f, 36.0f, 15.0f, 0.08f, 0.72f, 0.86f, 0.30f);
-	return;
-	const float pulse = 0.76f + std::sin(m_TotalTime * 5.0f) * 0.16f;
-	const float signalRed = infected ? 0.72f : (powered ? 0.10f : 0.34f);
-	const float signalGreen = infected ? 0.08f : (powered ? 0.72f : 0.22f);
-	const float signalBlue = infected ? 0.88f : (powered ? 0.84f : 0.25f);
-
-	// Raised pilot chair and armored pedestal.
-	m_Renderer->DrawSoftShadow(x, y - 10.0f, 138.0f, 30.0f, 0.88f);
-	m_Renderer->DrawDiamond(x, y - 1.0f, 134.0f, 47.0f, 0.045f, 0.085f, 0.11f, 1.0f);
-	m_Renderer->DrawRect(x, y + 36.0f, 32.0f, 54.0f, 0.07f, 0.11f, 0.14f, 1.0f);
-	m_Renderer->DrawRect(x, y + 59.0f, 46.0f, 8.0f, 0.14f, 0.21f, 0.24f, 1.0f);
-	m_Renderer->DrawDiamond(x, y + 17.0f, 50.0f, 24.0f, 0.08f, 0.15f, 0.18f, 1.0f);
-
-	// Wraparound side consoles with layered screens and key clusters.
-	for (int side = -1; side <= 1; side += 2)
-	{
-		const float sideX = x + side * 48.0f;
-		m_Renderer->DrawDiamond(sideX, y + 24.0f, 48.0f, 25.0f, 0.065f, 0.13f, 0.16f, 1.0f);
-		m_Renderer->DrawDiamond(sideX,
-			y + 29.0f,
-			37.0f,
-			16.0f,
-			signalRed * 0.48f,
-			signalGreen * 0.58f,
-			signalBlue * 0.62f,
-			powered || infected ? pulse : 0.55f);
-		for (int button = 0; button < 3; ++button)
-			m_Renderer->DrawRect(sideX - 10.0f + button * 10.0f,
-				y + 13.0f,
-				5.0f,
-				4.0f,
-				button == 1 ? 0.92f : signalRed,
-				button == 1 ? 0.46f : signalGreen,
-				signalBlue,
-				0.94f);
-		DrawRotatedRect(m_Renderer,
-			sideX + side * 11.0f,
-			y + 7.0f,
-			5.0f,
-			22.0f,
-			side * 0.24f,
-			0.24f,
-			0.34f,
-			0.37f,
-			1.0f);
-	}
-
-	// Central navigation radar, rotating sweep, status bars, and targeting reticle.
-	m_Renderer->DrawDiamond(x, y + 46.0f, 61.0f, 38.0f, 0.035f, 0.08f, 0.10f, 1.0f);
-	m_Renderer->DrawDiamond(
-		x, y + 46.0f, 49.0f, 30.0f, signalRed * 0.34f, signalGreen * 0.46f, signalBlue * 0.50f, 0.90f);
-	m_Renderer->DrawDiamond(x, y + 46.0f, 28.0f, 17.0f, 0.025f, 0.09f, 0.11f, 0.96f);
-	const float sweepAngle = powered ? m_TotalTime * 1.8f : -0.65f;
-	DrawRotatedRect(m_Renderer,
-		x + std::cos(sweepAngle) * 10.0f,
-		y + 46.0f + std::sin(sweepAngle) * 6.0f,
-		24.0f,
-		2.5f,
-		sweepAngle,
-		signalRed,
-		signalGreen,
-		signalBlue,
-		0.94f);
-	m_Renderer->DrawDiamond(x, y + 46.0f, 7.0f, 7.0f, 0.86f, 0.94f, 0.94f, 1.0f);
-	for (int gauge = -3; gauge <= 3; ++gauge)
-		m_Renderer->DrawRect(x + gauge * 14.0f,
-			y + 2.0f,
-			8.0f,
-			4.0f,
-			gauge == 0 ? 0.94f : signalRed,
-			gauge == 0 ? 0.38f : signalGreen,
-			signalBlue,
-			powered || infected ? 0.94f : 0.48f);
-
-	if (infected)
-	{
-		// Organic-looking infection veins overlay the same console model.
-		for (int vein = -2; vein <= 2; ++vein)
-			DrawRotatedRect(m_Renderer,
-				x + vein * 23.0f,
-				y + 33.0f + std::sin(m_TotalTime * 3.0f + vein) * 3.0f,
-				36.0f,
-				4.0f,
-				0.72f + vein * 0.18f,
-				0.55f,
-				0.04f,
-				0.76f,
-				pulse);
-		m_Renderer->DrawDiamond(x, y + 36.0f, 118.0f, 48.0f, 0.46f, 0.03f, 0.62f, 0.20f);
-	}
 }
 
 void Game::DrawWorldBlock(const Obstacle& obstacle)
@@ -2953,185 +2897,7 @@ void Game::DrawWorldBlock(const Obstacle& obstacle)
 	{
 		m_Renderer->DrawSoftShadow(foot.x + 8.0f, foot.y - 4.0f, 86.0f, 23.0f, 0.82f);
 		m_ModelLibrary.DrawMesh(m_Renderer, resourceMesh, foot.x, foot.y, resourceScale);
-		return;
 	}
-	float width = (obstacle.halfWidth + obstacle.halfHeight) * TileWidth;
-	float topY = foot.y + obstacle.visualHeight;
-	m_Renderer->DrawSoftShadow(foot.x + 10.0f, foot.y - 5.0f, width * 0.90f, 18.0f, 0.85f);
-	if (obstacle.type == HullWall)
-	{
-		m_Renderer->DrawRect(foot.x,
-			foot.y + obstacle.visualHeight * 0.5f,
-			width * 0.72f,
-			obstacle.visualHeight,
-			obstacle.r * 0.70f,
-			obstacle.g * 0.70f,
-			obstacle.b * 0.76f,
-			1.0f);
-		m_Renderer->DrawDiamond(foot.x,
-			topY,
-			width,
-			(obstacle.halfWidth + obstacle.halfHeight) * TileHeight,
-			obstacle.r,
-			obstacle.g,
-			obstacle.b,
-			1.0f);
-		m_Renderer->DrawRect(foot.x,
-			foot.y + obstacle.visualHeight * 0.52f,
-			width * 0.62f,
-			4.0f,
-			0.20f,
-			0.42f,
-			0.48f,
-			0.45f);
-		return;
-	}
-
-	if (obstacle.type == CargoCrate)
-	{
-		m_Renderer->DrawRect(foot.x,
-			foot.y + obstacle.visualHeight * 0.44f,
-			width * 0.76f,
-			obstacle.visualHeight * 0.88f,
-			0.16f,
-			0.19f,
-			0.20f,
-			1.0f);
-		m_Renderer->DrawDiamond(foot.x, topY, width, 27.0f, 0.29f, 0.25f, 0.20f, 1.0f);
-		m_Renderer->DrawRect(foot.x,
-			foot.y + obstacle.visualHeight * 0.48f,
-			6.0f,
-			obstacle.visualHeight * 0.78f,
-			0.62f,
-			0.39f,
-			0.12f,
-			0.92f);
-		m_Renderer->DrawRect(foot.x, topY, width * 0.62f, 3.0f, 0.72f, 0.45f, 0.14f, 0.86f);
-		return;
-	}
-
-	if (obstacle.type == ControlConsole)
-	{
-		m_Renderer->DrawRect(foot.x,
-			foot.y + obstacle.visualHeight * 0.34f,
-			width * 0.54f,
-			obstacle.visualHeight * 0.67f,
-			0.07f,
-			0.12f,
-			0.15f,
-			1.0f);
-		m_Renderer->DrawDiamond(
-			foot.x, topY - 3.0f, width * 0.88f, 26.0f, 0.08f, 0.42f, 0.50f, 1.0f);
-		m_Renderer->DrawRect(foot.x, topY + 1.0f, width * 0.53f, 9.0f, 0.12f, 0.72f, 0.82f, 0.82f);
-		for (int light = -2; light <= 2; ++light)
-			m_Renderer->DrawRect(foot.x + light * 9.0f,
-				topY + 2.0f,
-				4.0f,
-				3.0f,
-				light == 1 ? 0.92f : 0.16f,
-				light == 1 ? 0.25f : 0.78f,
-				0.68f,
-				1.0f);
-		return;
-	}
-
-	if (obstacle.type == MedicalPod)
-	{
-		m_Renderer->DrawRect(foot.x,
-			foot.y + obstacle.visualHeight * 0.46f,
-			width * 0.68f,
-			obstacle.visualHeight * 0.86f,
-			0.12f,
-			0.18f,
-			0.20f,
-			1.0f);
-		m_Renderer->DrawDiamond(
-			foot.x, topY - 2.0f, width * 0.82f, 30.0f, 0.25f, 0.48f, 0.50f, 0.90f);
-		m_Renderer->DrawRect(foot.x, topY - 1.0f, 17.0f, 17.0f, 0.78f, 0.82f, 0.77f, 0.95f);
-		m_Renderer->DrawRect(foot.x, topY - 1.0f, 5.0f, 15.0f, 0.15f, 0.62f, 0.58f, 1.0f);
-		m_Renderer->DrawRect(foot.x, topY - 1.0f, 15.0f, 5.0f, 0.15f, 0.62f, 0.58f, 1.0f);
-		return;
-	}
-
-	if (obstacle.type == CoolantPipe)
-	{
-		for (int pipe = -1; pipe <= 1; pipe += 2)
-		{
-			m_Renderer->DrawRect(foot.x + pipe * width * 0.18f,
-				foot.y + obstacle.visualHeight * 0.48f,
-				11.0f,
-				obstacle.visualHeight * 0.94f,
-				0.11f,
-				0.26f,
-				0.31f,
-				1.0f);
-			m_Renderer->DrawRect(foot.x + pipe * width * 0.18f,
-				topY - 8.0f,
-				17.0f,
-				6.0f,
-				0.26f,
-				0.55f,
-				0.61f,
-				0.95f);
-		}
-		m_Renderer->DrawRect(
-			foot.x, foot.y + 14.0f, width * 0.68f, 8.0f, 0.08f, 0.18f, 0.21f, 1.0f);
-		return;
-	}
-
-	if (obstacle.type == PowerRelay)
-	{
-		float pulse = 0.68f + std::sin(m_TotalTime * 6.0f + obstacle.x) * 0.20f;
-		m_Renderer->DrawRect(foot.x,
-			foot.y + obstacle.visualHeight * 0.48f,
-			width * 0.58f,
-			obstacle.visualHeight * 0.96f,
-			0.08f,
-			0.12f,
-			0.17f,
-			1.0f);
-		m_Renderer->DrawDiamond(foot.x, topY, width * 0.76f, 24.0f, 0.16f, 0.28f, 0.34f, 1.0f);
-		m_Renderer->DrawRect(foot.x,
-			foot.y + obstacle.visualHeight * 0.53f,
-			8.0f,
-			obstacle.visualHeight * 0.62f,
-			0.20f,
-			0.78f,
-			0.92f,
-			pulse);
-		m_Renderer->DrawDiamond(foot.x, topY + 4.0f, 14.0f, 10.0f, 0.32f, 0.88f, 1.0f, pulse);
-		return;
-	}
-
-	// Engine modules use a broad armored housing and a pulsing central coolant core.
-	float enginePulse = 0.55f + std::sin(m_TotalTime * 4.0f) * 0.18f;
-	m_Renderer->DrawRect(foot.x,
-		foot.y + obstacle.visualHeight * 0.43f,
-		width * 0.82f,
-		obstacle.visualHeight * 0.86f,
-		0.07f,
-		0.12f,
-		0.15f,
-		1.0f);
-	m_Renderer->DrawDiamond(foot.x, topY, width, 31.0f, 0.13f, 0.20f, 0.24f, 1.0f);
-	m_Renderer->DrawDiamond(
-		foot.x, topY + 2.0f, width * 0.48f, 18.0f, 0.18f, 0.68f, 0.78f, enginePulse);
-	m_Renderer->DrawRect(foot.x - width * 0.31f,
-		foot.y + obstacle.visualHeight * 0.46f,
-		7.0f,
-		obstacle.visualHeight * 0.64f,
-		0.30f,
-		0.35f,
-		0.36f,
-		1.0f);
-	m_Renderer->DrawRect(foot.x + width * 0.31f,
-		foot.y + obstacle.visualHeight * 0.46f,
-		7.0f,
-		obstacle.visualHeight * 0.64f,
-		0.30f,
-		0.35f,
-		0.36f,
-		1.0f);
 }
 
 void Game::DrawCharacter(const WorldPoint& point,
@@ -3264,7 +3030,7 @@ void Game::DrawCharacter(const WorldPoint& point,
 	m_Renderer->DrawSoftShadow(
 		foot.x + 5.0f, foot.y, enemy ? 46.0f : 34.0f, 14.0f, 0.92f);
 	m_ModelLibrary.DrawMesh(m_Renderer,
-		enemy ? "void_quadruped" : "humanoid_soldier",
+		enemy ? "void_quadruped" : (hasWeapon ? "humanoid_armed_body" : "humanoid_soldier"),
 		renderX,
 		renderY,
 		enemy ? 17.0f : 18.0f,
@@ -3303,42 +3069,23 @@ void Game::DrawCharacter(const WorldPoint& point,
 	if (!hasWeapon)
 		return;
 
-	// Build the aiming pose from actual shoulder-to-hand segments so the rifle stays
-	// seated between both hands instead of floating above the character.
+	// The replacement arm mesh contains the complete shoulder-to-hand aiming pose.
 	const float aimBreathing = std::sin(m_TotalTime * 2.2f) * 0.8f;
 	const float torsoX = foot.x;
 	const float torsoY = foot.y + 21.0f + bob + aimBreathing;
-	const float perpendicularX = -aimScreenY;
-	const float perpendicularY = aimScreenX;
 	const float recoil = m_AttackFlash > 0.0f ? -2.5f : 0.0f;
-	const ScreenPoint rearShoulder = {
-		torsoX + perpendicularX * 4.0f, torsoY + perpendicularY * 2.5f};
-	const ScreenPoint frontShoulder = {
-		torsoX - perpendicularX * 4.0f, torsoY - perpendicularY * 2.5f};
-	const ScreenPoint triggerHand = {
-		torsoX + aimScreenX * (7.0f + recoil), torsoY + aimScreenY * (7.0f + recoil)};
-	const ScreenPoint supportHand = {
-		torsoX + aimScreenX * (14.0f + recoil), torsoY + aimScreenY * (14.0f + recoil)};
-	auto drawArmSegment = [&](const ScreenPoint& shoulder,
-		const ScreenPoint& hand,
-		float red,
-		float green,
-		float blue) {
-		const float dx = hand.x - shoulder.x;
-		const float dy = hand.y - shoulder.y;
-		DrawRotatedRect(m_Renderer,
-			(shoulder.x + hand.x) * 0.5f,
-			(shoulder.y + hand.y) * 0.5f,
-			Length(dx, dy),
-			4.5f,
-			std::atan2(dy, dx),
-			red,
-			green,
-			blue,
-			1.0f);
-	};
-	drawArmSegment(rearShoulder, triggerHand, 0.15f, 0.18f, 0.20f);
-	drawArmSegment(frontShoulder, supportHand, 0.22f, 0.10f, 0.05f);
+	const float rawArmScreenRotation =
+		std::atan2(aimScreenY, aimScreenX) - std::atan2(0.5f, 1.0f);
+	const float armDirectionStep = Pi / 8.0f;
+	const float armScreenRotation =
+		std::round(rawArmScreenRotation / armDirectionStep) * armDirectionStep;
+	m_ModelLibrary.DrawMesh(m_Renderer,
+		"replacement_weapon_arms",
+		torsoX + aimScreenX * recoil,
+		torsoY + aimScreenY * recoil,
+		18.0f,
+		0.0f,
+		armScreenRotation);
 	const float weaponX = torsoX + aimScreenX * (13.0f + recoil);
 	const float weaponY = torsoY + aimScreenY * (13.0f + recoil);
 	m_ModelLibrary.DrawMesh(
@@ -3348,12 +3095,6 @@ void Game::DrawCharacter(const WorldPoint& point,
 		weaponY,
 		22.0f,
 		aimAngle + ModelForwardAxisCorrection);
-	// Hands are drawn after the weapon so the grip reads clearly in the final silhouette.
-	m_Renderer->DrawEllipse(
-		triggerHand.x, triggerHand.y, 5.5f, 5.5f, 0.34f, 0.24f, 0.20f, 1.0f);
-	m_Renderer->DrawEllipse(
-		supportHand.x, supportHand.y, 5.5f, 5.5f, 0.34f, 0.24f, 0.20f, 1.0f);
-
 	if (m_AttackFlash > 0.0f)
 	{
 		const float muzzleX = torsoX + aimScreenX * 27.0f;
@@ -3383,81 +3124,6 @@ void Game::DrawNeutralNpc(const NeutralNpc& npc)
 		ModelForwardAxisCorrection,
 		npc.dead ? npcFacingScreenAngle - Pi * 0.5f : 0.0f,
 		npc.dead ? 0.34f : 1.0f);
-	return;
-	if (npc.dead)
-	{
-		m_Renderer->DrawSoftShadow(foot.x, foot.y, 55.0f, 15.0f, 0.95f);
-		DrawRotatedRect(
-			m_Renderer, foot.x, foot.y + 9.0f, 45.0f, 18.0f, -0.20f, 0.22f, 0.28f, 0.30f, 1.0f);
-		m_Renderer->DrawDiamond(
-			foot.x - 24.0f, foot.y + 14.0f, 18.0f, 15.0f, 0.48f, 0.52f, 0.50f, 1.0f);
-		DrawRotatedRect(m_Renderer,
-			foot.x + 24.0f,
-			foot.y + 4.0f,
-			27.0f,
-			6.0f,
-			0.28f,
-			0.13f,
-			0.17f,
-			0.18f,
-			1.0f);
-		m_Renderer->DrawRect(foot.x - 5.0f, foot.y + 10.0f, 7.0f, 4.0f, 0.52f, 0.06f, 0.05f, 0.75f);
-		return;
-	}
-
-	float tremble = std::sin(m_TotalTime * 28.0f + npc.animationOffset) * 2.2f;
-	m_Renderer->DrawSoftShadow(foot.x, foot.y, 30.0f, 11.0f, 0.85f);
-	DrawRotatedRect(m_Renderer,
-		foot.x - 6.0f + tremble,
-		foot.y + 9.0f,
-		7.0f,
-		20.0f,
-		0.12f,
-		0.12f,
-		0.20f,
-		0.23f,
-		1.0f);
-	DrawRotatedRect(m_Renderer,
-		foot.x + 6.0f + tremble,
-		foot.y + 9.0f,
-		7.0f,
-		20.0f,
-		-0.12f,
-		0.12f,
-		0.20f,
-		0.23f,
-		1.0f);
-	m_Renderer->DrawRect(foot.x + tremble, foot.y + 31.0f, 25.0f, 29.0f, 0.24f, 0.32f, 0.34f, 1.0f);
-	DrawRotatedRect(m_Renderer,
-		foot.x - 12.0f + tremble,
-		foot.y + 35.0f,
-		6.0f,
-		23.0f,
-		-0.55f,
-		0.18f,
-		0.25f,
-		0.27f,
-		1.0f);
-	DrawRotatedRect(m_Renderer,
-		foot.x + 12.0f + tremble,
-		foot.y + 35.0f,
-		6.0f,
-		23.0f,
-		0.55f,
-		0.18f,
-		0.25f,
-		0.27f,
-		1.0f);
-	m_Renderer->DrawDiamond(
-		foot.x + tremble, foot.y + 52.0f, 22.0f, 19.0f, 0.42f, 0.47f, 0.45f, 1.0f);
-	m_Renderer->DrawRect(foot.x + tremble, foot.y + 52.0f, 14.0f, 6.0f, 0.04f, 0.09f, 0.10f, 1.0f);
-	m_Renderer->DrawString(foot.x - 42.0f,
-		foot.y + 67.0f,
-		npc.dialogueId == 0 ? L"통신장교 서윤" : L"정비사 라울",
-		0.66f,
-		0.78f,
-		0.76f,
-		0.85f);
 }
 
 void Game::RenderSpace()
@@ -3502,8 +3168,13 @@ void Game::RenderSpace()
 	}
 
 	const WorldPoint debris[] = {
-		{-90.0f, 170.0f}, {85.0f, 290.0f}, {-70.0f, 410.0f}, {55.0f, 520.0f}};
-	for (int i = 0; i < 4; ++i)
+		{-90.0f, 170.0f},
+		{85.0f, 290.0f},
+		{-70.0f, 410.0f},
+		{55.0f, 520.0f},
+		{-180.0f, 345.0f},
+		{175.0f, 465.0f}};
+	for (int i = 0; i < 6; ++i)
 	{
 		const int debrisIndex = i;
 		CreateSceneActor("SpaceDebris",
@@ -3516,15 +3187,19 @@ void Game::RenderSpace()
 			{
 				float x = (transform.x - m_ShipPosition.x) * 0.72f;
 				float y = (transform.y - m_ShipPosition.y) * 0.72f;
-				m_Renderer->DrawDiamond(x,
+				const char* debrisMeshes[] = {"replacement_debris_hull",
+					"replacement_debris_engine",
+					"replacement_debris_antenna",
+					"replacement_debris_cargo",
+					"replacement_debris_solar",
+					"replacement_debris_infected"};
+				m_ModelLibrary.DrawMesh(m_Renderer,
+					debrisMeshes[debrisIndex],
+					x,
 					y,
-					72.0f + debrisIndex * 8.0f,
-					30.0f + debrisIndex * 5.0f,
-					0.18f,
-					0.21f,
-					0.25f,
-					1.0f);
-				m_Renderer->DrawRect(x + 12.0f, y + 7.0f, 26.0f, 5.0f, 0.65f, 0.12f, 0.10f, 0.65f);
+					34.0f,
+					0.0f,
+					m_TotalTime * (0.08f + debrisIndex * 0.025f));
 			});
 	}
 	for (size_t i = 0; i < m_Asteroids.size(); ++i)
@@ -3558,22 +3233,20 @@ void Game::RenderSpace()
 			m_Renderer->DrawDiamond(
 				fixedX, fixedY, 125.0f, 58.0f, 0.08f, 0.34f, 0.46f, beaconPulse);
 		}
-		if (fixedShipIndex == 2)
-		{
-			m_Renderer->DrawDiamond(fixedX, fixedY + 12.0f, 270.0f, 126.0f,
-				0.08f, 0.15f, 0.22f, 1.0f);
-			m_Renderer->DrawDiamond(fixedX, fixedY + 12.0f, 180.0f, 86.0f,
-				0.12f, 0.48f, 0.58f, 0.92f);
-			m_Renderer->DrawRect(fixedX, fixedY + 55.0f, 34.0f, 150.0f,
-				0.10f, 0.24f, 0.31f, 1.0f);
-		}
-		else
-		{
-			const float scale = fixedShipIndex == 1 ? 2.3f : (fixedShipIndex >= 3 ? 1.65f : 1.8f);
-			const float red = fixedShipIndex == 1 ? 0.32f : (fixedShipIndex == 4 ? 0.34f : 0.20f);
-			const float green = fixedShipIndex == 3 ? 0.62f : (fixedShipIndex == 5 ? 0.38f : 0.48f);
-			DrawShip(fixedX, fixedY + 14.0f, -Pi * 0.5f, scale, red, green, 0.58f);
-		}
+		const char* fixedShipMeshes[] = {"replacement_noctis_ship",
+			"replacement_erebus_ship",
+			"replacement_station",
+			"replacement_cargo_ship",
+			"replacement_cargo_ship",
+			"replacement_patrol_ship"};
+		const float fixedShipScales[] = {34.0f, 38.0f, 43.0f, 32.0f, 32.0f, 33.0f};
+		m_ModelLibrary.DrawMesh(m_Renderer,
+			fixedShipMeshes[fixedShipIndex],
+			fixedX,
+			fixedY + 14.0f,
+			fixedShipScales[fixedShipIndex],
+			0.0f,
+			-Pi * 0.5f - std::atan2(0.5f, 1.0f));
 		m_Renderer->DrawString(
 			fixedX - 54.0f, fixedY + 104.0f, FixedShipName(fixedShipIndex), 0.48f, 0.90f, 0.94f, 1.0f);
 	}
@@ -3589,13 +3262,13 @@ void Game::RenderSpace()
 		shipY,
 		[this](const ActorTransform& transform)
 		{
-			DrawShip(transform.x,
+			m_ModelLibrary.DrawMesh(m_Renderer,
+				"replacement_player_ship",
+				transform.x,
 				transform.y,
-				transform.rotation,
-				transform.scaleX,
-				0.20f,
-				0.67f,
-				0.82f);
+				30.0f * transform.scaleX,
+				0.0f,
+				transform.rotation - std::atan2(0.5f, 1.0f));
 		});
 	playerShip->LocalTransform().rotation = m_ShipAngle;
 	const WorldPoint destinationPosition = FixedShipPosition(m_TravelDestinationShip);
@@ -3881,90 +3554,6 @@ void Game::DrawAsteroid(const Asteroid& asteroid)
 	m_Renderer->DrawSoftShadow(x + 12.0f, y - 12.0f, asteroid.radius * 2.5f, asteroid.radius, 0.92f);
 	m_ModelLibrary.DrawMesh(
 		m_Renderer, meshes[variant], x, y, asteroid.radius * 0.85f, asteroid.rotation);
-	return;
-	float radius = asteroid.radius * 1.45f;
-	ScreenPoint p0 = Rotate(radius, 0.0f, asteroid.rotation, x, y);
-	ScreenPoint p1 = Rotate(radius * 0.25f, radius * 0.78f, asteroid.rotation, x, y);
-	ScreenPoint p2 = Rotate(-radius * 0.82f, radius * 0.38f, asteroid.rotation, x, y);
-	ScreenPoint p3 = Rotate(-radius * 0.62f, -radius * 0.66f, asteroid.rotation, x, y);
-	m_Renderer->DrawSoftShadow(x + 12.0f, y - 12.0f, radius * 1.9f, radius * 0.65f, 0.92f);
-	m_Renderer->DrawQuad(p0, p1, p2, p3, 0.23f, 0.20f, 0.18f, 1.0f);
-	m_Renderer->DrawDiamond(x - radius * 0.18f,
-		y + radius * 0.16f,
-		radius * 0.55f,
-		radius * 0.34f,
-		0.10f,
-		0.09f,
-		0.085f,
-		0.82f);
-	m_Renderer->DrawDiamond(x + radius * 0.24f,
-		y - radius * 0.14f,
-		radius * 0.31f,
-		radius * 0.22f,
-		0.36f,
-		0.30f,
-		0.25f,
-		0.78f);
-}
-
-void Game::DrawShip(float x, float y, float angle, float scale, float r, float g, float b)
-{
-	ScreenPoint nose = Rotate(42.0f * scale, 0.0f, angle, x, y);
-	ScreenPoint shoulderTop = Rotate(4.0f * scale, 15.0f * scale, angle, x, y);
-	ScreenPoint rearTop = Rotate(-30.0f * scale, 12.0f * scale, angle, x, y);
-	ScreenPoint rearBottom = Rotate(-30.0f * scale, -12.0f * scale, angle, x, y);
-	ScreenPoint shoulderBottom = Rotate(4.0f * scale, -15.0f * scale, angle, x, y);
-	ScreenPoint centerRear = Rotate(-13.0f * scale, 0.0f, angle, x, y);
-	m_Renderer->DrawQuad(nose, shoulderTop, centerRear, shoulderBottom, r, g, b, 1.0f);
-	m_Renderer->DrawQuad(
-		shoulderTop, rearTop, centerRear, centerRear, r * 0.62f, g * 0.64f, b * 0.68f, 1.0f);
-	m_Renderer->DrawQuad(
-		centerRear, rearBottom, shoulderBottom, centerRear, r * 0.52f, g * 0.58f, b * 0.63f, 1.0f);
-	// Swept wings and paired engine pods make the silhouette readable while turning.
-	DrawRotatedRect(m_Renderer,
-		x,
-		y,
-		48.0f * scale,
-		9.0f * scale,
-		angle,
-		r * 0.58f,
-		g * 0.62f,
-		b * 0.68f,
-		1.0f);
-	ScreenPoint engineA = Rotate(-24.0f * scale, 17.0f * scale, angle, x, y);
-	ScreenPoint engineB = Rotate(-24.0f * scale, -17.0f * scale, angle, x, y);
-	DrawRotatedRect(m_Renderer,
-		engineA.x,
-		engineA.y,
-		25.0f * scale,
-		8.0f * scale,
-		angle,
-		0.08f,
-		0.18f,
-		0.23f,
-		1.0f);
-	DrawRotatedRect(m_Renderer,
-		engineB.x,
-		engineB.y,
-		25.0f * scale,
-		8.0f * scale,
-		angle,
-		0.08f,
-		0.18f,
-		0.23f,
-		1.0f);
-	ScreenPoint canopy = Rotate(12.0f * scale, 0.0f, angle, x, y);
-	m_Renderer->DrawDiamond(
-		canopy.x, canopy.y, 20.0f * scale, 11.0f * scale, 0.55f, 0.84f, 0.92f, 0.95f);
-	ScreenPoint armor = Rotate(-7.0f * scale, 0.0f, angle, x, y);
-	m_Renderer->DrawDiamond(
-		armor.x, armor.y, 17.0f * scale, 8.0f * scale, r * 1.15f, g * 1.05f, b, 0.95f);
-	ScreenPoint exhaustA = Rotate(-38.0f * scale, 17.0f * scale, angle, x, y);
-	ScreenPoint exhaustB = Rotate(-38.0f * scale, -17.0f * scale, angle, x, y);
-	m_Renderer->DrawDiamond(
-		exhaustA.x, exhaustA.y, 8.0f * scale, 6.0f * scale, 0.20f, 0.78f, 1.0f, 0.82f);
-	m_Renderer->DrawDiamond(
-		exhaustB.x, exhaustB.y, 8.0f * scale, 6.0f * scale, 0.20f, 0.78f, 1.0f, 0.82f);
 }
 
 void Game::RenderFirstLevel()
@@ -4090,76 +3679,16 @@ void Game::RenderFirstLevel()
 			{
 				const ScreenPoint engine = WorldToScreen(transform.x, transform.y, 8.0f);
 				const float rotation = active ? m_TotalTime * (2.4f + engineIndex * 0.12f) : 0.0f;
-				const float glow = active ? 0.72f + std::sin(m_TotalTime * 6.0f + engineIndex) * 0.18f : 0.20f;
-				const float casingRed = active ? 0.08f : 0.17f;
-				const float casingGreen = active ? 0.42f : 0.18f;
-				const float casingBlue = active ? 0.52f : 0.22f;
 				m_Renderer->DrawSoftShadow(engine.x + 12.0f, engine.y - 8.0f, 116.0f, 30.0f, 0.84f);
-				m_ModelLibrary.DrawMesh(m_Renderer, "ship_engine", engine.x, engine.y, 27.0f);
-				m_Renderer->DrawDiamond(engine.x + 32.0f,
-					engine.y + 3.0f,
-					88.0f,
-					46.0f,
-					casingRed * 0.72f,
-					casingGreen * 0.72f,
-					casingBlue * 0.72f,
-					1.0f);
-				for (int housingBand = 0; housingBand < 3; ++housingBand)
-				{
-					const float bandX = engine.x + 18.0f + housingBand * 20.0f;
-					DrawRotatedRect(m_Renderer,
-						bandX,
-						engine.y + 4.0f,
-						6.0f,
-						45.0f - housingBand * 5.0f,
-						0.0f,
-						active ? 0.20f : 0.30f,
-						active ? 0.68f : 0.28f,
-						active ? 0.72f : 0.27f,
-						0.92f);
-				}
-				m_Renderer->DrawDiamond(engine.x - 8.0f,
-					engine.y + 8.0f,
-					108.0f,
-					88.0f,
-					active ? 0.18f : 0.30f,
-					active ? 0.72f : 0.30f,
-					active ? 0.76f : 0.29f,
-					1.0f);
-				m_Renderer->DrawDiamond(engine.x - 8.0f,
-					engine.y + 8.0f,
-					91.0f,
-					72.0f,
-					0.025f,
-					active ? 0.16f : 0.07f,
-					active ? 0.19f : 0.08f,
-					1.0f);
-				for (int bladeIndex = 0; bladeIndex < 12; ++bladeIndex)
-				{
-					const float bladeAngle = rotation + static_cast<float>(bladeIndex) * Pi / 6.0f;
-					const float bladeX = engine.x - 8.0f + std::cos(bladeAngle) * 23.0f;
-					const float bladeY = engine.y + 8.0f + std::sin(bladeAngle) * 17.0f;
-					DrawRotatedRect(m_Renderer,
-						bladeX,
-						bladeY,
-						34.0f,
-						5.5f,
-						bladeAngle,
-						active ? 0.28f : 0.34f,
-						active ? 0.82f : 0.34f,
-						active ? 0.86f : 0.32f,
-						0.94f);
-				}
-				m_Renderer->DrawDiamond(
-					engine.x - 8.0f, engine.y + 8.0f, 29.0f, 25.0f, 0.12f, glow, glow, 1.0f);
-				m_Renderer->DrawDiamond(engine.x - 8.0f,
-					engine.y + 12.0f,
-					12.0f,
-					14.0f,
-					active ? 0.62f : 0.42f,
-					active ? 0.98f : 0.40f,
-					active ? 1.0f : 0.36f,
-					1.0f);
+				m_ModelLibrary.DrawMesh(
+					m_Renderer, "replacement_aux_engine", engine.x, engine.y, 35.0f);
+				m_ModelLibrary.DrawMesh(m_Renderer,
+					"replacement_aux_impeller",
+					engine.x + 31.0f,
+					engine.y - 15.0f,
+					35.0f,
+					0.0f,
+					rotation);
 				m_Renderer->DrawString(engine.x - 61.0f,
 					engine.y + 62.0f,
 					active ? L"보조 엔진 가동" : L"정지된 보조 엔진 [E]",
@@ -4232,11 +3761,12 @@ void Game::RenderFirstLevel()
 								  ? 1.0f
 								  : 1.0f + std::sin(m_TotalTime * 5.0f + animationOffset) * 0.12f;
 				ScreenPoint paper = WorldToScreen(transform.x, transform.y, transform.height);
-				m_ModelLibrary.Draw(m_Renderer,
-					document.read ? "field_document_read" : "field_document",
+				m_ModelLibrary.DrawMesh(m_Renderer,
+					document.read ? "replacement_document_read" :
+						"replacement_document_unread",
 					paper.x,
 					paper.y,
-					pulse);
+					25.0f * pulse);
 			});
 	}
 
@@ -4258,11 +3788,15 @@ void Game::RenderFirstLevel()
 				float pulse = 1.0f + std::sin(m_TotalTime * 4.5f + animationOffset) * 0.08f;
 				ScreenPoint screen = WorldToScreen(transform.x, transform.y, transform.height);
 				m_Renderer->DrawSoftShadow(screen.x, screen.y - 7.0f, 32.0f, 10.0f, 0.70f);
-				m_Renderer->DrawDiamond(
-					screen.x, screen.y + 3.0f, 45.0f * pulse, 20.0f * pulse, 0.08f, 0.68f, 0.82f, 0.24f);
-				m_Renderer->DrawRect(
-					screen.x, screen.y + 22.0f, 4.0f, 34.0f, 0.10f, 0.72f, 0.88f, 0.28f);
-				m_ModelLibrary.Draw(m_Renderer, "ammo_magazine", screen.x, screen.y, pulse);
+				m_ModelLibrary.DrawMesh(
+					m_Renderer, "replacement_magazine", screen.x, screen.y, 25.0f * pulse);
+				m_ModelLibrary.DrawMesh(m_Renderer,
+					"replacement_magazine_effect",
+					screen.x,
+					screen.y,
+					32.0f * pulse,
+					0.0f,
+					m_TotalTime * 0.9f + animationOffset);
 			});
 	}
 
@@ -4397,10 +3931,12 @@ void Game::RenderDestination()
 	int width = m_Renderer->Width();
 	int height = m_Renderer->Height();
 	m_Renderer->DrawDiamond(0.0f, -20.0f, width * 0.86f, height * 0.45f, 0.07f, 0.10f, 0.14f, 1.0f);
-	m_Renderer->DrawRect(-115.0f, 15.0f, 180.0f, 70.0f, 0.08f, 0.28f, 0.34f, 1.0f);
-	m_Renderer->DrawRect(90.0f, 28.0f, 155.0f, 62.0f, 0.24f, 0.05f, 0.30f, 0.95f);
-	m_Renderer->DrawRect(-115.0f, 62.0f, 8.0f, 42.0f, 0.18f, 0.85f, 0.90f, 0.75f);
-	m_Renderer->DrawDiamond(105.0f, 62.0f, 95.0f, 32.0f, 0.36f, 0.08f, 0.48f, 0.75f);
+	m_ModelLibrary.DrawMesh(
+		m_Renderer, "replacement_docking_structure", -115.0f, 15.0f, 34.0f);
+	m_ModelLibrary.DrawMesh(
+		m_Renderer, "replacement_infected_structure", 90.0f, 28.0f, 32.0f);
+	m_ModelLibrary.DrawMesh(
+		m_Renderer, "replacement_light_pylons", -10.0f, 38.0f, 30.0f);
 	Actor* ship = CreateSceneActor("DockedPlayerShip",
 		0.0f,
 		-125.0f,
@@ -4409,13 +3945,13 @@ void Game::RenderDestination()
 		0.0f,
 		[this](const ActorTransform& transform)
 		{
-			DrawShip(transform.x,
+			m_ModelLibrary.DrawMesh(m_Renderer,
+				"replacement_docked_player_ship",
+				transform.x,
 				transform.y,
-				transform.rotation,
-				1.3f * transform.scaleX,
-				0.22f,
-				0.68f,
-				0.82f);
+				30.0f * transform.scaleX,
+				0.0f,
+				transform.rotation - std::atan2(0.5f, 1.0f));
 		});
 	ship->LocalTransform().rotation = Pi * 0.5f;
 	m_SceneGraph.Render();

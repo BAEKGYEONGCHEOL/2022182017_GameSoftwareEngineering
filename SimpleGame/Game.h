@@ -298,7 +298,6 @@ class Game
 	void CreateInteriorPropActors(const std::vector<InteriorPropPlacement>& props);
 	void CreatePersonalShipInteriorActors(const WorldPoint& dockPosition);
 	void DrawAsteroid(const Asteroid& asteroid);
-	void DrawShip(float x, float y, float angle, float scale, float r, float g, float b);
 
 	PrototypeRenderer* m_Renderer;
 	LocalMonitoringServer* m_MonitoringServer;

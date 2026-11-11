@@ -10,6 +10,11 @@ FILES = [
     os.path.join('Libraries', 'Void_Quadruped.blend'),
     os.path.join('Libraries', 'Ship_ModularKit.blend'),
     os.path.join('Libraries', 'ShipInterior_Props.blend'),
+    os.path.join('Libraries', 'NavigationDataProps.blend'),
+    os.path.join('Libraries', 'AdditionalShipProps.blend'),
+    os.path.join('Libraries', 'TutorialLevel1_Replacements.blend'),
+    os.path.join('Libraries', 'SpaceTravel_Replacements.blend'),
+    os.path.join('Libraries', 'DestinationArrival_Replacements.blend'),
     os.path.join('Libraries', 'Space_Asteroids.blend'),
     os.path.join('Libraries', 'Projectile_Meshes.blend'),
 ]
@@ -23,6 +28,11 @@ SKELETAL_EXPECTED = {'Humanoid_Modular.blend', 'Void_Quadruped.blend'}
 EXPECTED_OBJECTS = {
     'Projectile_Meshes.blend': ['PROJ_Rifle_Ballistic', 'PROJ_Rifle_ArmorPiercing', 'PROJ_Energy_PlasmaBolt', 'PROJ_Rifle_SpentCasing'],
     'ShipInterior_Props.blend': ['SHIPPROP_CargoCrate_Body', 'SHIPPROP_Locker_Housing', 'SHIPPROP_Workbench_Top', 'SHIPPROP_Bunk_Frame_0', 'SHIPPROP_Galley_Housing', 'SHIPPROP_AirScrubber_Core', 'SHIPPROP_Vent_Housing', 'SHIPPROP_PipeRack_Backplate', 'SHIPPROP_Emergency_Backplate', 'SHIPPROP_Shelf_Beam_0'],
+    'NavigationDataProps.blend': ['NAV_Core_StellarSphere', 'NAV_Core_GimbalOuter', 'EDOC_RuggedSlate_Frame', 'EDOC_MissionDossier_Frame', 'EDOC_HoloClipboard_Frame', 'EDOC_MemoryCanister_Body', 'EDOC_IdentityChip_Frame'],
+    'AdditionalShipProps.blend': ['ADDPROP_StarChart_Base', 'ADDPROP_CommRelay_Base', 'ADDPROP_DroneCradle_Platform', 'ADDPROP_ToolCart_Body', 'ADDPROP_Fabricator_Housing', 'ADDPROP_Specimen_Glass', 'ADDPROP_WasteRecycler_Body', 'ADDPROP_BatteryRack_Frame', 'ADDPROP_DeconArch_Top', 'ADDPROP_SecurityCamera_Body', 'ADDPROP_SuitRack_Frame', 'ADDPROP_EmergencyNav_Base', 'ADDPROP_SalvageScanner_Body'],
+    'TutorialLevel1_Replacements.blend': ['REPL_MedTerminal_Pedestal', 'RIG_WeaponArms_Standard', 'REPL_Arm_Upper_L', 'REPL_AuxEngine_Core', 'REPL_AuxEngine_ImpellerHub', 'REPL_Magazine_Body', 'REPL_MagPickup_Ring_0', 'REPL_StoryDocument_Unread_Frame', 'REPL_StoryDocument_Read_Frame'],
+    'SpaceTravel_Replacements.blend': ['REPL_PlayerShip_Hull', 'REPL_Noctis_Hull', 'REPL_Erebus_Hull', 'REPL_CargoShip_Bridge', 'REPL_PatrolShip_Hull', 'REPL_Station_Core', 'REPL_Debris_BrokenHull', 'REPL_Debris_EngineWreck', 'REPL_Debris_AntennaMast', 'REPL_Debris_Cargo_0', 'REPL_Debris_SolarPanel_-1', 'REPL_Debris_InfectedCore'],
+    'DestinationArrival_Replacements.blend': ['REPL_Dock_Platform', 'REPL_Dock_Collar', 'REPL_Infected_FrameBase', 'REPL_Infected_Sac_0', 'REPL_LightPylon_Base_0', 'REPL_DockedPlayerShip_Hull'],
 }
 
 
