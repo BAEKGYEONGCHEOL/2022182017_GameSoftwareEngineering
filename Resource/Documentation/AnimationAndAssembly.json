@@ -132,6 +132,24 @@
     "destination_arrival": "Libraries/DestinationArrival_Replacements.blend",
     "rule": "all replacement parts are physical meshes; rotatable engine impeller and pickup effect remain separate collections"
   },
+  "remaining_world_replacements": {
+    "library": "Libraries/RemainingWorld_Replacements.blend",
+    "families": [
+      "tutorial_floor",
+      "infection_traces",
+      "tutorial_records",
+      "navigation_marker",
+      "rescue_signal",
+      "warning_effect",
+      "screen_teal_bar",
+      "cockpit_status",
+      "level1_floor",
+      "corridor_stripe",
+      "space_backdrop_debris",
+      "engine_flames"
+    ],
+    "rule": "all previously drawn diamonds and rectangles are represented by volumetric meshes"
+  },
   "modular_rules": {
     "human": "Enable exactly one base head; face, helmet, chest armor and equipment are optional overlays. All HUM_v1 parts share the same skeleton and origin.",
     "void": "Base body stays enabled; horn, eye cluster, heavy carapace and tail blade are swappable VOID_v1 overlays.",

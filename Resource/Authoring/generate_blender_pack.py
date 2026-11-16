@@ -1030,6 +1030,83 @@ def build_destination_arrival_replacements(root):
     return c
 
 
+def build_remaining_world_replacements(root):
+    c=coll('REPL_RemainingWorldObjects',root); tutorial=coll('REPL_TutorialWorld',c); level1=coll('REPL_Level1World',c); spacefx=coll('REPL_SpaceEffects',c)
+    # Tutorial floor tiles: real thickness, bevel, grooves and alternate service geometry.
+    tile_outline=[(0,-0.95),(0.95,0),(0,0.95),(-0.95,0)]
+    for i,(x,matl) in enumerate([(75.0,M['wall']),(77.2,M['armor']),(79.4,M['trim'])]):
+        extruded_outline(f'REPL_TutorialFloor_Tile_{i}',tile_outline,0.0,0.14,(x,-2.0,0),matl,tutorial)
+        extruded_outline(f'REPL_TutorialFloor_Inset_{i}',[(0,-0.70),(0.70,0),(0,0.70),(-0.70,0)],0.14,0.18,(x,-2.0,0),M['black'],tutorial)
+        for a in range(0,360,90):
+            rad=math.radians(a); cyl(f'REPL_TutorialFloor_Bolt_{i}_{a}',(x+math.cos(rad)*0.55,-2.0+math.sin(rad)*0.55,0.19),0.035,0.025,M['steel'],tutorial,vertices=8)
+    torus('REPL_TutorialFloor_ServiceRing',(79.4,-2.0,0.20),0.38,0.045,M['amber'],tutorial,major_segments=14)
+    # Organic infection traces replace colored diamonds with asymmetrical raised growth.
+    trace_a=[(-0.80,-0.10),(-0.48,-0.42),(-0.08,-0.22),(0.30,-0.58),(0.72,-0.18),(0.46,0.18),(0.78,0.50),(0.20,0.42),(-0.25,0.68),(-0.38,0.28),(-0.86,0.38)]
+    trace_b=[(-0.72,-0.42),(-0.25,-0.56),(0.05,-0.20),(0.48,-0.48),(0.82,-0.05),(0.38,0.22),(0.62,0.62),(0.12,0.50),(-0.28,0.78),(-0.42,0.24),(-0.80,0.08)]
+    for idx,(x,outline,matl,glow) in enumerate([(81.8,trace_a,M['void'],M['red']),(84.0,trace_b,M['flesh'],M['cyan'])]):
+        extruded_outline(f'REPL_InfectionTrace_{idx}',outline,0.02,0.09,(x,-2.0,0),matl,tutorial)
+        for j,(ox,oy) in enumerate(outline[::2]):
+            sphere(f'REPL_InfectionTrace_Node_{idx}_{j}',(x+ox,-2.0+oy,0.12),(0.10,0.08,0.07),glow,tutorial,segments=7,rings=4)
+    # Three distinct tutorial records as physical data modules.
+    for i,x in enumerate([75.0,76.6,78.2]):
+        cube(f'REPL_TutorialRecord_{i}_Frame',(x,-5.0,0.72),(0.52,0.09,0.38),M['armor'],tutorial,0.055)
+        cube(f'REPL_TutorialRecord_{i}_Display',(x,-5.10,0.74),(0.40,0.018,0.26),M['cyan'] if i<2 else M['amber'],tutorial,0.02)
+        cube(f'REPL_TutorialRecord_{i}_DataPort',(x+0.36,-5.11,0.52),(0.09,0.018,0.08),M['steel'],tutorial,0.012)
+        for j in range(i+1): cyl(f'REPL_TutorialRecord_{i}_Key_{j}',(x-0.20+j*0.16,-5.12,0.42),0.028,0.016,M['amber'],tutorial,rot=(math.radians(90),0,0),vertices=8)
+    # Navigation pickup, rescue signal and warning effects use reusable volumetric markers.
+    x=80.2
+    cyl('REPL_NavCoreMarker_Base',(x,-5.0,0.08),0.42,0.12,M['steel'],tutorial,vertices=14)
+    for i,z in enumerate([0.10,0.42,0.78]): torus(f'REPL_NavCoreMarker_Ring_{i}',(x,-5.0,z),0.42-i*0.07,0.025,M['cyan'],tutorial,major_segments=14)
+    sphere('REPL_NavCoreMarker_Core',(x,-5.0,0.52),(0.18,0.18,0.24),M['cyan'],tutorial,segments=8,rings=4)
+    x=82.0
+    cyl('REPL_RescueSignal_Base',(x,-5.0,0.14),0.38,0.22,M['wall'],tutorial,vertices=12)
+    beam_between('REPL_RescueSignal_Mast',(x,-5.0,0.24),(x,-5.0,1.48),0.055,M['steel'],tutorial,vertices=8)
+    for z,r in [(0.72,0.30),(1.12,0.42),(1.48,0.52)]: torus(f'REPL_RescueSignal_Wave_{z}',(x,-5.0,z),r,0.022,M['void'],tutorial,major_segments=14)
+    sphere('REPL_RescueSignal_Emitter',(x,-5.0,1.50),(0.12,0.12,0.12),M['cyan'],tutorial,segments=8,rings=4)
+    x=84.0
+    cyl('REPL_WarningEffect_Base',(x,-5.0,0.10),0.32,0.16,M['wall'],tutorial,vertices=12)
+    cyl('REPL_WarningEffect_Beacon',(x,-5.0,0.52),0.22,0.60,M['red'],tutorial,vertices=12)
+    for i,a in enumerate(range(0,360,45)):
+        rad=math.radians(a); taper_between(f'REPL_WarningEffect_Ray_{i}',(x+math.cos(rad)*0.20,-5.0+math.sin(rad)*0.20,0.52),(x+math.cos(rad)*0.72,-5.0+math.sin(rad)*0.72,0.58),0.035,0.004,M['red'],tutorial,vertices=5)
+    # Screen-fixed teal decoration becomes a segmented emissive instrument with housing.
+    x=86.0
+    cube('REPL_ScreenTealBar_Housing',(x,-5.0,0.90),(0.22,0.10,0.82),M['wall'],tutorial,0.045)
+    for i in range(5): cube(f'REPL_ScreenTealBar_Cell_{i}',(x,-5.11,0.35+i*0.27),(0.12,0.018,0.09),M['cyan'],tutorial,0.012)
+    cube('REPL_ScreenTealBar_Cap',(x,-5.0,1.78),(0.28,0.13,0.08),M['steel'],tutorial,0.025)
+    # Cockpit status overlays: active ring and infection growth are separate meshes.
+    x=88.2
+    torus('REPL_CockpitStatus_ActiveRing',(x,-5.0,0.70),0.55,0.045,M['cyan'],tutorial,rot=(math.radians(90),0,0),major_segments=16)
+    for i,a in enumerate(range(0,360,60)):
+        rad=math.radians(a); taper_between(f'REPL_CockpitStatus_Infection_{i}',(x+math.cos(rad)*0.24,-5.0,0.70+math.sin(rad)*0.24),(x+math.cos(rad)*0.76,-5.0,0.70+math.sin(rad)*0.76),0.08,0.008,M['void'],tutorial,vertices=6)
+    sphere('REPL_CockpitStatus_InfectionCore',(x,-5.0,0.70),(0.28,0.10,0.28),M['red'],tutorial,segments=8,rings=4)
+
+    # Level-one floor family and corridor stripe insert.
+    for i,(x,matl) in enumerate([(75.0,M['armor']),(77.2,M['wall']),(79.4,M['armor2']),(81.6,M['trim'])]):
+        extruded_outline(f'REPL_Level1Floor_Tile_{i}',tile_outline,0.0,0.16,(x,-8.0,0),matl,level1)
+        for s in [-1,1]: beam_between(f'REPL_Level1Floor_Rail_{i}_{s}',(x-0.52,-8.0+s*0.34,0.18),(x+0.52,-8.0+s*0.34,0.18),0.025,M['steel'],level1,vertices=6)
+    extruded_outline('REPL_Level1Corridor_StripeTile',tile_outline,0.0,0.16,(84.0,-8.0,0),M['wall'],level1)
+    for i in range(3):
+        beam_between(f'REPL_Level1Corridor_CyanChannel_{i}',(83.48+i*0.52,-8.42,0.19),(83.48+i*0.52,-7.58,0.19),0.045,M['cyan'],level1,vertices=8)
+    for i in range(4): cyl(f'REPL_Level1Corridor_Fastener_{i}',(84.0+(-0.45 if i%2==0 else 0.45),-8.0+(-0.45 if i<2 else 0.45),0.20),0.035,0.025,M['steel'],level1,vertices=8)
+
+    # Space background decorations become distant debris structures rather than diamonds.
+    asteroid('REPL_SpaceBackdrop_DebrisA',(76.0,-12.0,0.95),(1.25,0.52,0.74),8.4,spacefx)
+    asteroid('REPL_SpaceBackdrop_DebrisB',(79.5,-12.0,1.20),(0.90,0.70,1.18),11.7,spacefx)
+    for i,x in enumerate([76.0,79.5]):
+        for j in range(3): beam_between(f'REPL_SpaceBackdrop_Truss_{i}_{j}',(x-0.50+j*0.35,-12.0,0.45),(x-0.20+j*0.32,-12.0,1.58),0.035,M['steel'],spacefx,vertices=6)
+        cube(f'REPL_SpaceBackdrop_WarningPlate_{i}',(x,-12.58,0.78),(0.28,0.035,0.16),M['amber'],spacefx,0.018)
+    # Personal-ship flame meshes: external and internal plumes are independent.
+    x=83.0; y=-12.0
+    cyl('REPL_EngineFlame_Nozzle',(x,y,0.70),0.34,0.34,M['armor'],spacefx,rot=(math.radians(90),0,0),vertices=12)
+    cone('REPL_EngineFlame_Outer',(x,y+0.72,0.70),0.30,0.035,1.30,M['cyan'],spacefx,rot=(math.radians(90),0,0),vertices=12)
+    cone('REPL_EngineFlame_Inner',(x,y+0.52,0.70),0.17,0.018,0.92,M['amber'],spacefx,rot=(math.radians(90),0,0),vertices=10)
+    for i,a in enumerate(range(0,360,90)):
+        rad=math.radians(a); taper_between(f'REPL_EngineFlame_Lobe_{i}',(x+math.cos(rad)*0.18,y+0.25,0.70+math.sin(rad)*0.18),(x+math.cos(rad)*0.05,y+1.45,0.70+math.sin(rad)*0.05),0.06,0.008,M['cyan'],spacefx,vertices=6)
+    for obj in c.all_objects:
+        if obj.type=='MESH': obj['replacement_asset']=True; obj['snap_grid_m']=0.25
+    return c
+
+
 def asteroid(name, loc, scale, seed, collection):
     bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2, radius=1.0, location=loc)
     o=bpy.context.object;o.name=name
@@ -1220,6 +1297,28 @@ def render_previews(groups):
     aim_camera((61.0,-24.0,1.15),(61.0,-44.0,12.0),52)
     scene.render.filepath=os.path.join(PREVIEW,'DestinationArrivalReplacements.png')
     bpy.ops.render.render(write_still=True)
+    visible({'REPL_RemainingWorldObjects'})
+    bpy.data.collections['REPL_TutorialWorld'].hide_render=False
+    bpy.data.collections['REPL_Level1World'].hide_render=True
+    bpy.data.collections['REPL_SpaceEffects'].hide_render=True
+    place_lights(81.5,-3.7)
+    aim_camera((81.5,-3.7,0.75),(81.5,-25.0,12.5),52)
+    scene.render.filepath=os.path.join(PREVIEW,'RemainingTutorialWorld.png')
+    bpy.ops.render.render(write_still=True)
+    bpy.data.collections['REPL_TutorialWorld'].hide_render=True
+    bpy.data.collections['REPL_Level1World'].hide_render=False
+    place_lights(79.5,-8.0)
+    aim_camera((79.5,-8.0,0.25),(79.5,-22.0,8.5),55)
+    scene.render.filepath=os.path.join(PREVIEW,'RemainingLevel1World.png')
+    bpy.ops.render.render(write_still=True)
+    bpy.data.collections['REPL_Level1World'].hide_render=True
+    bpy.data.collections['REPL_SpaceEffects'].hide_render=False
+    place_lights(79.5,-12.0)
+    aim_camera((79.5,-12.0,0.85),(79.5,-25.0,8.0),55)
+    scene.render.filepath=os.path.join(PREVIEW,'RemainingSpaceEffects.png')
+    bpy.ops.render.render(write_still=True)
+    bpy.data.collections['REPL_TutorialWorld'].hide_render=False
+    bpy.data.collections['REPL_Level1World'].hide_render=False
     visible({c.name for c in groups})
 
 
@@ -1241,6 +1340,7 @@ def write_docs():
       'navigation_data_props':{'library':'Libraries/NavigationDataProps.blend','families':['navigation_core','electronic_document'],'navigation_core':'separate gimbal rings support independent rotation','documents':'handheld pickup props facing -Y'},
       'additional_ship_props':{'library':'Libraries/AdditionalShipProps.blend','families':['navigation_comms','maintenance','science_survival','security'],'snap_grid_m':0.25},
       'mesh_replacements':{'tutorial_level1':'Libraries/TutorialLevel1_Replacements.blend','space_travel':'Libraries/SpaceTravel_Replacements.blend','destination_arrival':'Libraries/DestinationArrival_Replacements.blend','rule':'all replacement parts are physical meshes; rotatable engine impeller and pickup effect remain separate collections'},
+      'remaining_world_replacements':{'library':'Libraries/RemainingWorld_Replacements.blend','families':['tutorial_floor','infection_traces','tutorial_records','navigation_marker','rescue_signal','warning_effect','screen_teal_bar','cockpit_status','level1_floor','corridor_stripe','space_backdrop_debris','engine_flames'],'rule':'all previously drawn diamonds and rectangles are represented by volumetric meshes'},
       'modular_rules':{'human':'Enable exactly one base head; face, helmet, chest armor and equipment are optional overlays. All HUM_v1 parts share the same skeleton and origin.','void':'Base body stays enabled; horn, eye cluster, heavy carapace and tail blade are swappable VOID_v1 overlays.','ship':'2 m wall modules and 2 m floor tiles snap on a 0.25 m grid.'},
       'export_notes':['Apply no transforms to armatures before export.','Export deform bones only when supported.','Keep action names unchanged so the animation state map remains valid.','Procedural materials should be baked or replaced with engine PBR textures during integration.']}
     with open(os.path.join(DOCS,'AnimationAndAssembly.json'),'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2)
@@ -1248,15 +1348,16 @@ def write_docs():
     readme=readme.replace('\n\nSee `AnimationAndAssembly.json`','\n- `Libraries/ShipInterior_Props.blend`: cargo, lockers, bunks, galley, workbench, life support, vents, pipe rack, emergency gear and shelving.\n\nSee `AnimationAndAssembly.json`')
     readme=readme.replace('\n\nSee `AnimationAndAssembly.json`','\n- `Libraries/NavigationDataProps.blend`: navigation core, data slates, holographic clipboard, memory canister and identity chip.\n- `Libraries/AdditionalShipProps.blend`: communications, drone maintenance, fabrication, science, survival and security props.\n\nSee `AnimationAndAssembly.json`')
     readme=readme.replace('\n\nSee `AnimationAndAssembly.json`','\n- `Libraries/TutorialLevel1_Replacements.blend`: medical terminal, weapon-arm rig, auxiliary engine, magazine, pickup effect and story documents.\n- `Libraries/SpaceTravel_Replacements.blend`: player ship, named ships, station and six debris families.\n- `Libraries/DestinationArrival_Replacements.blend`: docking gantry, infected structure, light pylons and docked player ship.\n\nSee `AnimationAndAssembly.json`')
+    readme=readme.replace('\n\nSee `AnimationAndAssembly.json`','\n- `Libraries/RemainingWorld_Replacements.blend`: floor tiles, infection traces, markers, signals, status effects, backdrop debris and engine plumes.\n\nSee `AnimationAndAssembly.json`')
     with open(os.path.join(DOCS,'README.md'),'w',encoding='utf-8') as f:f.write(readme)
 
 
 def main():
     clean();materials();setup_scene();root=coll('DarkSciFi_ModularAssetPack')
-    hum,ha=build_humanoid(root);void,va=build_void(root);ship=build_ship(root);shipprops=build_ship_interior_props(root);navdata=build_navigation_data_props(root);additional=build_additional_ship_props(root);repl_tl=build_tutorial_level1_replacements(root);repl_space=build_space_travel_replacements(root);repl_arrival=build_destination_arrival_replacements(root);space=build_space(root);projectiles=build_projectiles(root)
+    hum,ha=build_humanoid(root);void,va=build_void(root);ship=build_ship(root);shipprops=build_ship_interior_props(root);navdata=build_navigation_data_props(root);additional=build_additional_ship_props(root);repl_tl=build_tutorial_level1_replacements(root);repl_space=build_space_travel_replacements(root);repl_arrival=build_destination_arrival_replacements(root);repl_remaining=build_remaining_world_replacements(root);space=build_space(root);projectiles=build_projectiles(root)
     camera_and_light();write_docs()
-    save_libraries(root,{'Humanoid_Modular.blend':[hum],'Void_Quadruped.blend':[void],'Ship_ModularKit.blend':[ship],'ShipInterior_Props.blend':[shipprops],'NavigationDataProps.blend':[navdata],'AdditionalShipProps.blend':[additional],'TutorialLevel1_Replacements.blend':[repl_tl],'SpaceTravel_Replacements.blend':[repl_space],'DestinationArrival_Replacements.blend':[repl_arrival],'Space_Asteroids.blend':[space],'Projectile_Meshes.blend':[projectiles]})
-    render_previews([hum,void,ship,shipprops,navdata,additional,repl_tl,repl_space,repl_arrival,space,projectiles])
+    save_libraries(root,{'Humanoid_Modular.blend':[hum],'Void_Quadruped.blend':[void],'Ship_ModularKit.blend':[ship],'ShipInterior_Props.blend':[shipprops],'NavigationDataProps.blend':[navdata],'AdditionalShipProps.blend':[additional],'TutorialLevel1_Replacements.blend':[repl_tl],'SpaceTravel_Replacements.blend':[repl_space],'DestinationArrival_Replacements.blend':[repl_arrival],'RemainingWorld_Replacements.blend':[repl_remaining],'Space_Asteroids.blend':[space],'Projectile_Meshes.blend':[projectiles]})
+    render_previews([hum,void,ship,shipprops,navdata,additional,repl_tl,repl_space,repl_arrival,repl_remaining,space,projectiles])
     print('ASSET_PACK_COMPLETE',ROOT)
 
 

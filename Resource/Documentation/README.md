@@ -26,5 +26,6 @@
 - `Libraries/TutorialLevel1_Replacements.blend`: medical terminal, weapon-arm rig, auxiliary engine, magazine, pickup effect and story documents.
 - `Libraries/SpaceTravel_Replacements.blend`: player ship, named ships, station and six debris families.
 - `Libraries/DestinationArrival_Replacements.blend`: docking gantry, infected structure, light pylons and docked player ship.
+- `Libraries/RemainingWorld_Replacements.blend`: floor tiles, infection traces, markers, signals, status effects, backdrop debris and engine plumes.
 
 See `AnimationAndAssembly.json` for clip mapping and blend recommendations.

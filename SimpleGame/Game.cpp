@@ -664,6 +664,32 @@ void Game::PrecacheGameplayMeshes()
 	m_ModelLibrary.PrecacheMesh("replacement_infected_structure", 32.0f);
 	m_ModelLibrary.PrecacheMesh("replacement_light_pylons", 30.0f);
 	m_ModelLibrary.PrecacheMesh("replacement_docked_player_ship", 30.0f);
+	for (int tileIndex = 0; tileIndex < 3; ++tileIndex)
+	{
+		std::ostringstream meshName;
+		meshName << "replacement_tutorial_floor_" << tileIndex;
+		m_ModelLibrary.PrecacheMesh(meshName.str(), 29.0f);
+	}
+	m_ModelLibrary.PrecacheMesh("replacement_infection_trace_0", 68.0f);
+	m_ModelLibrary.PrecacheMesh("replacement_infection_trace_1", 54.0f);
+	m_ModelLibrary.PrecacheMesh("replacement_tutorial_record_0", 18.0f);
+	m_ModelLibrary.PrecacheMesh("replacement_tutorial_record_1", 18.0f);
+	m_ModelLibrary.PrecacheMesh("replacement_tutorial_record_2", 18.0f);
+	m_ModelLibrary.PrecacheMesh("replacement_nav_core_marker", 24.0f);
+	m_ModelLibrary.PrecacheMesh("replacement_rescue_signal", 22.0f);
+	m_ModelLibrary.PrecacheMesh("replacement_warning_effect", 24.0f);
+	m_ModelLibrary.PrecacheMesh("replacement_screen_teal_bar", 22.0f);
+	m_ModelLibrary.PrecacheMesh("replacement_cockpit_status_active", 34.0f);
+	m_ModelLibrary.PrecacheMesh("replacement_cockpit_status_infected", 34.0f);
+	for (int tileIndex = 0; tileIndex < 4; ++tileIndex)
+	{
+		std::ostringstream meshName;
+		meshName << "replacement_level1_floor_" << tileIndex;
+		m_ModelLibrary.PrecacheMesh(meshName.str(), 29.0f);
+	}
+	m_ModelLibrary.PrecacheMesh("replacement_level1_corridor_stripe", 29.0f);
+	m_ModelLibrary.PrecacheMesh("replacement_space_backdrop_a", 78.0f);
+	m_ModelLibrary.PrecacheMesh("replacement_space_backdrop_b", 70.0f);
 	m_ModelLibrary.PrecacheMesh("humanoid_soldier", 18.0f, 1.57f);
 }
 
@@ -2568,37 +2594,18 @@ void Game::RenderInterior()
 			if (std::fabs(p.x) > width * 0.5f + TileWidth ||
 				std::fabs(p.y) > height * 0.5f + TileHeight)
 				continue;
-			float checker = ((x + y) & 1) ? 0.015f : 0.0f;
-			float restored = m_CoreRecovered ? 0.035f : 0.0f;
 			const bool personalShipInterior =
 				std::fabs(static_cast<float>(x) + 28.0f) <= 4.5f &&
 				std::fabs(static_cast<float>(y) + 28.0f) <= 4.5f;
 			const bool dockingPassage = !personalShipInterior &&
 				((y >= -30 && y <= -26 && x >= -28 && x <= -20) ||
 					(x >= -22 && x <= -18 && y >= -28 && y <= -13));
-			float floorRed = 0.075f + checker;
-			float floorGreen = 0.105f + restored;
-			float floorBlue = 0.13f + restored;
-			if (dockingPassage)
-			{
-				floorRed = 0.10f + checker;
-				floorGreen = 0.145f;
-				floorBlue = 0.16f;
-			}
-			if (personalShipInterior)
-			{
-				floorRed = 0.055f + checker;
-				floorGreen = 0.17f;
-				floorBlue = 0.205f;
-			}
-			m_Renderer->DrawDiamond(p.x,
-				p.y,
-				TileWidth - 2.0f,
-				TileHeight - 1.0f,
-				floorRed,
-				floorGreen,
-				floorBlue,
-				1.0f);
+			const char* floorMesh = personalShipInterior
+				? "replacement_tutorial_floor_2"
+				: dockingPassage ? "replacement_tutorial_floor_1" :
+					((x + y) & 1) ? "replacement_tutorial_floor_0" :
+						"replacement_tutorial_floor_1";
+			m_ModelLibrary.DrawMesh(m_Renderer, floorMesh, p.x, p.y, 29.0f);
 		}
 	}
 
@@ -2642,10 +2649,10 @@ void Game::RenderInterior()
 
 	ScreenPoint infestationA = WorldToScreen(9.0f, 9.3f, 2.0f);
 	ScreenPoint infestationB = WorldToScreen(6.1f, 7.7f, 1.0f);
-	m_Renderer->DrawDiamond(
-		infestationA.x, infestationA.y, 165.0f, 58.0f, 0.28f, 0.04f, 0.38f, 0.78f);
-	m_Renderer->DrawDiamond(
-		infestationB.x, infestationB.y, 125.0f, 42.0f, 0.10f, 0.28f, 0.33f, 0.62f);
+	m_ModelLibrary.DrawMesh(
+		m_Renderer, "replacement_infection_trace_0", infestationA.x, infestationA.y, 68.0f);
+	m_ModelLibrary.DrawMesh(
+		m_Renderer, "replacement_infection_trace_1", infestationB.x, infestationB.y, 54.0f);
 
 	for (size_t i = 0; i < m_Obstacles.size(); ++i)
 	{
@@ -2794,25 +2801,32 @@ void Game::RenderInterior()
 		{
 			ScreenPoint record = WorldToScreen(
 				TutorialRecordPositions[recordIndex].x, TutorialRecordPositions[recordIndex].y, 5.0f);
-			m_Renderer->DrawDiamond(record.x,
+			const char* recordMeshes[] = {"replacement_tutorial_record_0",
+				"replacement_tutorial_record_1",
+				"replacement_tutorial_record_2"};
+			m_ModelLibrary.DrawMesh(m_Renderer,
+				recordMeshes[recordIndex],
+				record.x,
 				record.y,
-				24.0f,
-				12.0f,
-				m_TutorialRecordsRead[recordIndex] ? 0.18f : 0.75f,
-				0.58f,
-				0.18f,
-				0.95f);
+				18.0f,
+				0.0f,
+				m_TutorialRecordsRead[recordIndex] ? Pi : 0.0f,
+				m_TutorialRecordsRead[recordIndex] ? 0.72f : 1.0f);
 		}
 		ScreenPoint core = WorldToScreen(CorePosition.x, CorePosition.y, 18.0f);
 		if (!m_CoreRecovered)
-			m_Renderer->DrawDiamond(core.x,
+		{
+			const float corePulse = AllEnemiesDefeated()
+				? 1.0f + std::sin(m_TotalTime * 5.0f) * 0.08f
+				: 0.90f;
+			m_ModelLibrary.DrawMesh(m_Renderer,
+				"replacement_nav_core_marker",
+				core.x,
 				core.y,
-				34.0f,
-				25.0f,
-				0.10f,
-				0.85f,
-				0.94f,
-				AllEnemiesDefeated() ? 1.0f : 0.45f);
+				24.0f * corePulse,
+				0.0f,
+				m_TotalTime * 0.35f);
+		}
 	}
 	ScreenPoint cockpit = WorldToScreen(CockpitPosition.x, CockpitPosition.y, 24.0f);
 	DrawFlightControlConsole(cockpit.x, cockpit.y, m_NoctisSystemsOnline, false);
@@ -2827,14 +2841,30 @@ void Game::RenderInterior()
 	{
 		ScreenPoint signal = WorldToScreen(SignalPosition.x, SignalPosition.y, 12.0f);
 		if (m_CoreRecovered && !m_SignalChecked)
-			m_Renderer->DrawDiamond(signal.x, signal.y, 30.0f, 18.0f, 0.52f, 0.12f, 0.62f, 0.85f);
+		{
+			const float signalPulse = 1.0f + std::sin(m_TotalTime * 4.5f) * 0.10f;
+			m_ModelLibrary.DrawMesh(m_Renderer,
+				"replacement_rescue_signal",
+				signal.x,
+				signal.y,
+				22.0f * signalPulse);
+		}
 	}
 
-	float pulse = 0.62f + 0.22f * std::sin(m_TotalTime * 4.0f);
 	ScreenPoint warningLight = WorldToScreen(-10.5f, -10.5f, 55.0f);
-	m_Renderer->DrawDiamond(
-		warningLight.x, warningLight.y, 42.0f, 18.0f, 0.85f, 0.04f, 0.05f, pulse);
-	m_Renderer->DrawRect(width * 0.42f, -height * 0.27f, 12.0f, 42.0f, 0.12f, 0.60f, 0.75f, 0.55f);
+	const float warningPulse = 1.0f + 0.12f * std::sin(m_TotalTime * 4.0f);
+	m_ModelLibrary.DrawMesh(m_Renderer,
+		"replacement_warning_effect",
+		warningLight.x,
+		warningLight.y,
+		24.0f * warningPulse,
+		0.0f,
+		m_TotalTime * 0.22f);
+	m_ModelLibrary.DrawMesh(m_Renderer,
+		"replacement_screen_teal_bar",
+		width * 0.42f,
+		-height * 0.27f,
+		22.0f);
 }
 
 void Game::SetDialogue(
@@ -2851,9 +2881,21 @@ void Game::DrawFlightControlConsole(float x, float y, bool powered, bool infecte
 	m_ModelLibrary.DrawMesh(m_Renderer, "ship_pilot_seat", x, y, 24.0f);
 	m_ModelLibrary.DrawMesh(m_Renderer, "ship_console", x, y + 10.0f, 24.0f);
 	if (infected)
-		m_Renderer->DrawDiamond(x, y + 26.0f, 112.0f, 45.0f, 0.46f, 0.03f, 0.62f, 0.22f);
+		m_ModelLibrary.DrawMesh(m_Renderer,
+			"replacement_cockpit_status_infected",
+			x,
+			y + 26.0f,
+			34.0f,
+			0.0f,
+			m_TotalTime * 0.16f);
 	else if (powered)
-		m_Renderer->DrawDiamond(x, y + 31.0f, 36.0f, 15.0f, 0.08f, 0.72f, 0.86f, 0.30f);
+		m_ModelLibrary.DrawMesh(m_Renderer,
+			"replacement_cockpit_status_active",
+			x,
+			y + 31.0f,
+			34.0f,
+			0.0f,
+			m_TotalTime * 0.35f);
 }
 
 void Game::DrawWorldBlock(const Obstacle& obstacle)
@@ -3133,10 +3175,20 @@ void Game::RenderSpace()
 	int width = m_Renderer->Width();
 	int height = m_Renderer->Height();
 	m_Renderer->DrawSpaceBackground(m_TotalTime, m_ShipPosition.x, m_ShipPosition.y);
-	m_Renderer->DrawDiamond(
-		width * 0.37f, height * 0.34f, 310.0f, 185.0f, 0.08f, 0.13f, 0.23f, 0.75f);
-	m_Renderer->DrawDiamond(
-		width * 0.37f, height * 0.34f, 255.0f, 145.0f, 0.16f, 0.24f, 0.39f, 0.32f);
+	m_ModelLibrary.DrawMesh(m_Renderer,
+		"replacement_space_backdrop_a",
+		width * 0.33f,
+		height * 0.31f,
+		78.0f,
+		0.0f,
+		m_TotalTime * 0.015f);
+	m_ModelLibrary.DrawMesh(m_Renderer,
+		"replacement_space_backdrop_b",
+		width * 0.43f,
+		height * 0.37f,
+		70.0f,
+		0.0f,
+		-m_TotalTime * 0.012f);
 
 	const WorldPoint boundaryWorld[] = {{SpaceBoundaryCenter.x, SpaceBoundaryCenter.y - SpaceBoundaryHalfHeight},
 		{SpaceBoundaryCenter.x + SpaceBoundaryHalfWidth, SpaceBoundaryCenter.y},
@@ -3305,26 +3357,21 @@ void Game::RenderSpace()
 			shipY - 0.1f,
 			[this, flameLength, flicker](const ActorTransform& transform)
 			{
-				DrawRotatedRect(m_Renderer,
+				const float flameScale = (flameLength + flicker) * 0.56f;
+				m_ModelLibrary.DrawMesh(m_Renderer,
+					"replacement_engine_flame_outer",
 					transform.x,
 					transform.y,
-					flameLength + flicker,
-					17.0f,
-					transform.rotation,
-					0.08f,
-					0.45f,
-					1.0f,
-					0.42f);
-				DrawRotatedRect(m_Renderer,
-					transform.x + std::cos(transform.rotation) * 7.0f,
-					transform.y + std::sin(transform.rotation) * 7.0f,
-					flameLength * 0.62f,
-					7.0f,
-					transform.rotation,
-					0.72f,
-					0.94f,
-					1.0f,
-					0.82f);
+					flameScale,
+					0.0f,
+					transform.rotation - Pi * 0.5f);
+				m_ModelLibrary.DrawMesh(m_Renderer,
+					"replacement_engine_flame_inner",
+					transform.x + std::cos(transform.rotation) * 4.0f,
+					transform.y + std::sin(transform.rotation) * 4.0f,
+					flameScale * 0.72f,
+					0.0f,
+					transform.rotation - Pi * 0.5f);
 			},
 			playerShip);
 		exhaust->SetSortOrder(shipY - 0.1f);
@@ -3571,38 +3618,27 @@ void Game::RenderFirstLevel()
 			std::fabs(screen.y) > screenHeight * 0.5f + 110.0f)
 			continue;
 
-		float roomLight = tile.type == 2 ? 0.018f : 0.0f;
 		const bool personalShipInterior =
 			std::fabs(tile.position.x + 57.0f) <= 4.5f &&
 			std::fabs(tile.position.y + 57.0f) <= 4.5f;
 		const bool dockingPassage = !personalShipInterior && tile.type == 1 &&
 			tile.position.x < -31.0f && tile.position.y < -43.0f;
-		float floorRed = 0.050f + tile.variation + roomLight;
-		float floorGreen = 0.078f + tile.variation + roomLight;
-		float floorBlue = 0.098f + tile.variation + roomLight;
-		if (dockingPassage)
-		{
-			floorRed = 0.105f + tile.variation;
-			floorGreen = 0.135f + tile.variation;
-			floorBlue = 0.145f + tile.variation;
-		}
-		if (personalShipInterior)
-		{
-			floorRed = 0.050f + tile.variation;
-			floorGreen = 0.175f + tile.variation;
-			floorBlue = 0.215f + tile.variation;
-		}
-		m_Renderer->DrawDiamond(screen.x,
+		const bool hasCorridorStripe = tile.type == 1 &&
+			(static_cast<int>(tile.position.x + tile.position.y) & 3) == 0;
+		const int floorVariant = personalShipInterior
+			? 3
+			: dockingPassage ? 2 :
+				(static_cast<int>(tile.position.x + tile.position.y) & 3);
+		const char* floorMeshes[] = {"replacement_level1_floor_0",
+			"replacement_level1_floor_1",
+			"replacement_level1_floor_2",
+			"replacement_level1_floor_3"};
+		m_ModelLibrary.DrawMesh(m_Renderer,
+			hasCorridorStripe ? "replacement_level1_corridor_stripe" :
+				floorMeshes[floorVariant],
+			screen.x,
 			screen.y,
-			TileWidth - 2.0f,
-			TileHeight - 1.0f,
-			floorRed,
-			floorGreen,
-			floorBlue,
-			1.0f);
-		if (tile.type == 1 && (static_cast<int>(tile.position.x + tile.position.y) & 3) == 0)
-			m_Renderer->DrawDiamond(
-				screen.x, screen.y + 1.0f, 21.0f, 7.0f, 0.10f, 0.42f, 0.46f, 0.42f);
+			29.0f);
 	}
 
 	for (size_t index = 0; index < m_FirstLevelWallVisuals.size(); ++index)

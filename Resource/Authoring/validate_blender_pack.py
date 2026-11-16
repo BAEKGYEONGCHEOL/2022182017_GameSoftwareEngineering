@@ -15,6 +15,7 @@ FILES = [
     os.path.join('Libraries', 'TutorialLevel1_Replacements.blend'),
     os.path.join('Libraries', 'SpaceTravel_Replacements.blend'),
     os.path.join('Libraries', 'DestinationArrival_Replacements.blend'),
+    os.path.join('Libraries', 'RemainingWorld_Replacements.blend'),
     os.path.join('Libraries', 'Space_Asteroids.blend'),
     os.path.join('Libraries', 'Projectile_Meshes.blend'),
 ]
@@ -33,6 +34,7 @@ EXPECTED_OBJECTS = {
     'TutorialLevel1_Replacements.blend': ['REPL_MedTerminal_Pedestal', 'RIG_WeaponArms_Standard', 'REPL_Arm_Upper_L', 'REPL_AuxEngine_Core', 'REPL_AuxEngine_ImpellerHub', 'REPL_Magazine_Body', 'REPL_MagPickup_Ring_0', 'REPL_StoryDocument_Unread_Frame', 'REPL_StoryDocument_Read_Frame'],
     'SpaceTravel_Replacements.blend': ['REPL_PlayerShip_Hull', 'REPL_Noctis_Hull', 'REPL_Erebus_Hull', 'REPL_CargoShip_Bridge', 'REPL_PatrolShip_Hull', 'REPL_Station_Core', 'REPL_Debris_BrokenHull', 'REPL_Debris_EngineWreck', 'REPL_Debris_AntennaMast', 'REPL_Debris_Cargo_0', 'REPL_Debris_SolarPanel_-1', 'REPL_Debris_InfectedCore'],
     'DestinationArrival_Replacements.blend': ['REPL_Dock_Platform', 'REPL_Dock_Collar', 'REPL_Infected_FrameBase', 'REPL_Infected_Sac_0', 'REPL_LightPylon_Base_0', 'REPL_DockedPlayerShip_Hull'],
+    'RemainingWorld_Replacements.blend': ['REPL_TutorialFloor_Tile_0', 'REPL_InfectionTrace_0', 'REPL_InfectionTrace_1', 'REPL_TutorialRecord_0_Frame', 'REPL_TutorialRecord_1_Frame', 'REPL_TutorialRecord_2_Frame', 'REPL_NavCoreMarker_Core', 'REPL_RescueSignal_Mast', 'REPL_WarningEffect_Beacon', 'REPL_ScreenTealBar_Housing', 'REPL_CockpitStatus_ActiveRing', 'REPL_CockpitStatus_InfectionCore', 'REPL_Level1Floor_Tile_0', 'REPL_Level1Corridor_StripeTile', 'REPL_SpaceBackdrop_DebrisA', 'REPL_SpaceBackdrop_DebrisB', 'REPL_EngineFlame_Outer', 'REPL_EngineFlame_Inner'],
 }
 
 
