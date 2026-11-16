@@ -272,7 +272,7 @@ float DistanceToSegment(
 	return Length(point.x - closestX, point.y - closestY);
 }
 
-bool ResolveObstacleMesh(ObstacleType type, const char*& meshName, float& scale)
+bool ResolveObstacleMesh(InteriorObjectType type, const char*& meshName, float& scale)
 {
 	meshName = NULL;
 	scale = 19.0f;
