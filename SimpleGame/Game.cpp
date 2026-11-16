@@ -22,6 +22,11 @@ const float Pi = 3.1415926535f;
 const float ModelForwardAxisCorrection = Pi * 0.5f;
 const float TileWidth = 64.0f;
 const float TileHeight = 32.0f;
+// The modular floor and wall assets are authored as two-metre modules, while
+// one gameplay grid cell occupies a 64 x 32 isometric diamond.  A scale of 16
+// maps those modules to exactly one cell; larger values make adjacent modules
+// overlap and expose incorrectly sorted faces as cracks.
+const float ShipModuleMeshScale = 16.0f;
 const WorldPoint TerminalPosition = {-16.0f, -15.0f};
 const WorldPoint TutorialWeaponPosition = {-10.0f, -14.0f};
 const WorldPoint TutorialRecordPositions[] = {
@@ -630,8 +635,8 @@ void Game::PrecacheGameplayMeshes()
 	const float wallRotations[] = {0.0f, Pi * 0.5f};
 	for (int rotationIndex = 0; rotationIndex < 2; ++rotationIndex)
 	{
-		m_ModelLibrary.PrecacheMesh("ship_wall", 19.0f, wallRotations[rotationIndex]);
-		m_ModelLibrary.PrecacheMesh("ship_wall", 20.0f, wallRotations[rotationIndex]);
+		m_ModelLibrary.PrecacheMesh(
+			"ship_wall", ShipModuleMeshScale, wallRotations[rotationIndex]);
 	}
 
 	m_ModelLibrary.PrecacheMesh("ship_console", 24.0f);
@@ -668,7 +673,7 @@ void Game::PrecacheGameplayMeshes()
 	{
 		std::ostringstream meshName;
 		meshName << "replacement_tutorial_floor_" << tileIndex;
-		m_ModelLibrary.PrecacheMesh(meshName.str(), 29.0f);
+		m_ModelLibrary.PrecacheMesh(meshName.str(), ShipModuleMeshScale);
 	}
 	m_ModelLibrary.PrecacheMesh("replacement_infection_trace_0", 68.0f);
 	m_ModelLibrary.PrecacheMesh("replacement_infection_trace_1", 54.0f);
@@ -685,9 +690,9 @@ void Game::PrecacheGameplayMeshes()
 	{
 		std::ostringstream meshName;
 		meshName << "replacement_level1_floor_" << tileIndex;
-		m_ModelLibrary.PrecacheMesh(meshName.str(), 29.0f);
+		m_ModelLibrary.PrecacheMesh(meshName.str(), ShipModuleMeshScale);
 	}
-	m_ModelLibrary.PrecacheMesh("replacement_level1_corridor_stripe", 29.0f);
+	m_ModelLibrary.PrecacheMesh("replacement_level1_corridor_stripe", ShipModuleMeshScale);
 	m_ModelLibrary.PrecacheMesh("replacement_space_backdrop_a", 78.0f);
 	m_ModelLibrary.PrecacheMesh("replacement_space_backdrop_b", 70.0f);
 	m_ModelLibrary.PrecacheMesh("humanoid_soldier", 18.0f, 1.57f);
@@ -2605,7 +2610,8 @@ void Game::RenderInterior()
 				: dockingPassage ? "replacement_tutorial_floor_1" :
 					((x + y) & 1) ? "replacement_tutorial_floor_0" :
 						"replacement_tutorial_floor_1";
-			m_ModelLibrary.DrawMesh(m_Renderer, floorMesh, p.x, p.y, 29.0f);
+			m_ModelLibrary.DrawMesh(
+				m_Renderer, floorMesh, p.x, p.y, ShipModuleMeshScale);
 		}
 	}
 
@@ -2640,8 +2646,12 @@ void Game::RenderInterior()
 							WorldToScreen(transform.x, transform.y, transform.height);
 						m_Renderer->DrawSoftShadow(
 							wall.x + 8.0f, wall.y - 4.0f, 62.0f, 18.0f, 0.82f);
-						m_ModelLibrary.DrawMesh(
-							m_Renderer, "ship_wall", wall.x, wall.y, 19.0f, wallRotation);
+						m_ModelLibrary.DrawMesh(m_Renderer,
+							"ship_wall",
+							wall.x,
+							wall.y,
+							ShipModuleMeshScale,
+							wallRotation);
 					});
 			}
 		}
@@ -3638,7 +3648,7 @@ void Game::RenderFirstLevel()
 				floorMeshes[floorVariant],
 			screen.x,
 			screen.y,
-			29.0f);
+			ShipModuleMeshScale);
 	}
 
 	for (size_t index = 0; index < m_FirstLevelWallVisuals.size(); ++index)
@@ -3676,8 +3686,12 @@ void Game::RenderFirstLevel()
 					const ScreenPoint wall =
 						WorldToScreen(transform.x, transform.y, transform.height);
 					m_Renderer->DrawSoftShadow(wall.x, wall.y, 52.0f, 16.0f, 0.76f);
-					m_ModelLibrary.DrawMesh(
-						m_Renderer, "ship_wall", wall.x, wall.y, 20.0f, wallRotation);
+					m_ModelLibrary.DrawMesh(m_Renderer,
+						"ship_wall",
+						wall.x,
+						wall.y,
+						ShipModuleMeshScale,
+						wallRotation);
 				});
 		}
 	}
