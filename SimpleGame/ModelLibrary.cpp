@@ -2,11 +2,17 @@
 #include "ModelLibrary.h"
 
 #include <fstream>
+#include <algorithm>
+#include <cmath>
 #include <sstream>
 
 bool ModelLibrary::Load()
 {
 	m_Models.clear();
+	m_Meshes.clear();
+	m_StaticMeshCache.clear();
+	m_DynamicMeshScratch.clear();
+	m_StaticMeshCache.reserve(128);
 
 	const char* paths[] = {
 		"./Data/Models.txt",
@@ -17,15 +23,190 @@ bool ModelLibrary::Load()
 	for (int index = 0; index < 3; ++index)
 	{
 		if (LoadFile(paths[index]))
-			return true;
+			break;
 	}
+	const char* meshPaths[] = {"./Data/RuntimeMeshes.txt",
+		"./SimpleGame/Data/RuntimeMeshes.txt",
+		"../../SimpleGame/Data/RuntimeMeshes.txt"};
+	for (int index = 0; index < 3; ++index)
+		if (LoadMeshFile(meshPaths[index]))
+			break;
+	return !m_Models.empty() || !m_Meshes.empty();
+}
 
-	return false;
+void ModelLibrary::DrawMesh(PrototypeRenderer* renderer,
+	const std::string& meshName,
+	float x,
+	float y,
+	float scale,
+	float rotation,
+	float screenRotation,
+	float heightScale,
+	float localRotation,
+	float localPivotX,
+	float localPivotY) const
+{
+	auto mesh = m_Meshes.find(meshName);
+	if (mesh == m_Meshes.end())
+		return;
+
+	const bool flattenedCorpse = heightScale < 0.5f;
+	const bool fixedLevelCorpse = meshName == "humanoid_soldier" &&
+		rotation == 1.57f && screenRotation == 0.0f && localRotation == 0.0f;
+	const bool sharedCharacterPose =
+		(meshName == "humanoid_soldier" || meshName == "humanoid_armed_body" ||
+			meshName == "void_quadruped") &&
+		screenRotation == 0.0f && heightScale == 1.0f && localRotation == 0.0f;
+	const bool cacheReplacementProjection =
+		meshName.compare(0, 12, "replacement_") == 0 &&
+		((rotation == 0.0f && screenRotation == 0.0f && localRotation == 0.0f) ||
+			meshName == "replacement_weapon_arms");
+	bool cacheStaticProjection =
+		meshName.compare(0, 5, "ship_") == 0 ||
+		cacheReplacementProjection || flattenedCorpse || fixedLevelCorpse ||
+		sharedCharacterPose;
+	if (cacheStaticProjection)
+	{
+		for (size_t cacheIndex = 0; cacheIndex < m_StaticMeshCache.size(); ++cacheIndex)
+		{
+			const CachedMeshProjection& cached = m_StaticMeshCache[cacheIndex];
+			if (cached.meshName == meshName && cached.scale == scale &&
+				cached.rotation == rotation && cached.screenRotation == screenRotation &&
+				cached.heightScale == heightScale && cached.localRotation == localRotation &&
+				cached.localPivotX == localPivotX && cached.localPivotY == localPivotY)
+			{
+				if (renderer != NULL)
+					renderer->DrawTriangles(cached.triangles, x, y);
+				return;
+			}
+		}
+	}
+	if (m_StaticMeshCache.size() >= 256)
+		cacheStaticProjection = false;
+
+	const float cosine = std::cos(rotation);
+	const float sine = std::sin(rotation);
+	const float screenCosine = std::cos(screenRotation);
+	const float screenSine = std::sin(screenRotation);
+	const float localCosine = std::cos(localRotation);
+	const float localSine = std::sin(localRotation);
+	std::vector<ColoredTriangle>* renderTriangles = &m_DynamicMeshScratch;
+	if (cacheStaticProjection)
+	{
+		CachedMeshProjection cached = {};
+		cached.meshName = meshName;
+		cached.scale = scale;
+		cached.rotation = rotation;
+		cached.screenRotation = screenRotation;
+		cached.heightScale = heightScale;
+		cached.localRotation = localRotation;
+		cached.localPivotX = localPivotX;
+		cached.localPivotY = localPivotY;
+		m_StaticMeshCache.push_back(cached);
+		renderTriangles = &m_StaticMeshCache.back().triangles;
+	}
+	renderTriangles->clear();
+	renderTriangles->reserve(mesh->second.size());
+	const float baseX = cacheStaticProjection ? 0.0f : x;
+	const float baseY = cacheStaticProjection ? 0.0f : y;
+	for (const MeshTriangle& triangle : mesh->second)
+	{
+		ColoredTriangle rendered = {};
+		float rotatedPositions[9] = {};
+		for (int vertex = 0; vertex < 3; ++vertex)
+		{
+			const float sourceX = triangle.positions[vertex * 3];
+			const float sourceY = triangle.positions[vertex * 3 + 1];
+			const float localZ = triangle.positions[vertex * 3 + 2];
+			const float pivotOffsetX = sourceX - localPivotX;
+			const float pivotOffsetY = sourceY - localPivotY;
+			const float localX = localPivotX +
+				pivotOffsetX * localCosine - pivotOffsetY * localSine;
+			const float localY = localPivotY +
+				pivotOffsetX * localSine + pivotOffsetY * localCosine;
+			const float rotatedX = localX * cosine - localY * sine;
+			const float rotatedY = localX * sine + localY * cosine;
+			rotatedPositions[vertex * 3] = rotatedX;
+			rotatedPositions[vertex * 3 + 1] = rotatedY;
+			rotatedPositions[vertex * 3 + 2] = localZ;
+			const float projectedX = (rotatedX - rotatedY) * scale;
+			// Match Game::WorldToScreen: increasing world X + Y moves toward the
+			// lower half of the isometric plane, while positive height moves upward.
+			// The previous positive planar term mirrored every mesh vertically, so
+			// diagonal facing appeared opposite to its movement/aim direction.
+			const float projectedY =
+				-(rotatedX + rotatedY) * scale * 0.5f + localZ * scale * heightScale;
+			rendered.points[vertex] = {
+				baseX + projectedX * screenCosine - projectedY * screenSine,
+				baseY + projectedX * screenSine + projectedY * screenCosine};
+			rendered.depth += rendered.points[vertex].y;
+		}
+		rendered.depth /= 3.0f;
+		const float edgeOneX = rotatedPositions[3] - rotatedPositions[0];
+		const float edgeOneY = rotatedPositions[4] - rotatedPositions[1];
+		const float edgeOneZ = rotatedPositions[5] - rotatedPositions[2];
+		const float edgeTwoX = rotatedPositions[6] - rotatedPositions[0];
+		const float edgeTwoY = rotatedPositions[7] - rotatedPositions[1];
+		const float edgeTwoZ = rotatedPositions[8] - rotatedPositions[2];
+		float normalX = edgeOneY * edgeTwoZ - edgeOneZ * edgeTwoY;
+		float normalY = edgeOneZ * edgeTwoX - edgeOneX * edgeTwoZ;
+		float normalZ = edgeOneX * edgeTwoY - edgeOneY * edgeTwoX;
+		const float normalLength =
+			std::sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ);
+		float light = 0.72f;
+		if (normalLength > 0.00001f)
+		{
+			normalX /= normalLength;
+			normalY /= normalLength;
+			normalZ /= normalLength;
+			const float diffuse = std::max(
+				0.0f, normalX * -0.35f + normalY * -0.45f + normalZ * 0.82f);
+			light = 0.56f + diffuse * 0.44f;
+		}
+		rendered.red = std::min(1.0f, triangle.red * light);
+		rendered.green = std::min(1.0f, triangle.green * light);
+		rendered.blue = std::min(1.0f, triangle.blue * light);
+		rendered.alpha = 1.0f;
+		renderTriangles->push_back(rendered);
+	}
+	std::sort(renderTriangles->begin(),
+		renderTriangles->end(),
+		[](const ColoredTriangle& left, const ColoredTriangle& right) {
+			return left.depth < right.depth;
+		});
+
+	if (renderer != NULL)
+	{
+		renderer->DrawTriangles(
+			*renderTriangles, cacheStaticProjection ? x : 0.0f, cacheStaticProjection ? y : 0.0f);
+	}
+}
+
+void ModelLibrary::PrecacheMesh(const std::string& meshName,
+	float scale,
+	float rotation,
+	float screenRotation,
+	float heightScale,
+	float localRotation,
+	float localPivotX,
+	float localPivotY) const
+{
+	DrawMesh(NULL,
+		meshName,
+		0.0f,
+		0.0f,
+		scale,
+		rotation,
+		screenRotation,
+		heightScale,
+		localRotation,
+		localPivotX,
+		localPivotY);
 }
 
 bool ModelLibrary::IsLoaded() const
 {
-	return !m_Models.empty();
+	return !m_Models.empty() || !m_Meshes.empty();
 }
 
 void ModelLibrary::Draw(
@@ -128,4 +309,70 @@ bool ModelLibrary::LoadFile(const char* path)
 	}
 
 	return !m_Models.empty();
+}
+
+bool ModelLibrary::LoadMeshFile(const char* path)
+{
+	std::ifstream file(path);
+	if (!file.is_open())
+		return false;
+	std::string currentMesh;
+	std::string line;
+	while (std::getline(file, line))
+	{
+		if (line.empty() || line[0] == '#')
+			continue;
+		std::istringstream stream(line);
+		std::string command;
+		stream >> command;
+		if (command == "mesh")
+		{
+			stream >> currentMesh;
+			m_Meshes[currentMesh] = std::vector<MeshTriangle>();
+			continue;
+		}
+		if (command != "tri" || currentMesh.empty())
+			continue;
+		MeshTriangle triangle = {};
+		bool valid = true;
+		for (int value = 0; value < 9; ++value)
+			valid = valid && static_cast<bool>(stream >> triangle.positions[value]);
+		valid = valid && static_cast<bool>(stream >> triangle.red >> triangle.green >> triangle.blue);
+		if (valid)
+			m_Meshes[currentMesh].push_back(triangle);
+	}
+	for (auto& meshEntry : m_Meshes)
+	{
+		const bool preserveModelOrigin = meshEntry.first == "void_claw_left" ||
+			meshEntry.first == "void_claw_right";
+		float minimumX = 1.0e9f;
+		float maximumX = -1.0e9f;
+		float minimumY = 1.0e9f;
+		float maximumY = -1.0e9f;
+		float minimumZ = 1.0e9f;
+		for (const MeshTriangle& triangle : meshEntry.second)
+		{
+			for (int vertex = 0; vertex < 3; ++vertex)
+			{
+				minimumX = std::min(minimumX, triangle.positions[vertex * 3]);
+				maximumX = std::max(maximumX, triangle.positions[vertex * 3]);
+				minimumY = std::min(minimumY, triangle.positions[vertex * 3 + 1]);
+				maximumY = std::max(maximumY, triangle.positions[vertex * 3 + 1]);
+				minimumZ = std::min(minimumZ, triangle.positions[vertex * 3 + 2]);
+			}
+		}
+		const float centerX = preserveModelOrigin ? 0.0f : (minimumX + maximumX) * 0.5f;
+		const float centerY = preserveModelOrigin ? 0.0f : (minimumY + maximumY) * 0.5f;
+		const float baseZ = preserveModelOrigin ? 0.0f : minimumZ;
+		for (MeshTriangle& triangle : meshEntry.second)
+		{
+			for (int vertex = 0; vertex < 3; ++vertex)
+			{
+				triangle.positions[vertex * 3] -= centerX;
+				triangle.positions[vertex * 3 + 1] -= centerY;
+				triangle.positions[vertex * 3 + 2] -= baseZ;
+			}
+		}
+	}
+	return !m_Meshes.empty();
 }
