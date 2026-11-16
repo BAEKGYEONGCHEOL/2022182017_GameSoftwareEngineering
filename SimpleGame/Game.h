@@ -238,6 +238,14 @@ class Game
 	void SetDialogue(const std::wstring& dialogue, const WorldPoint& speakerPosition, float seconds);
 	bool CanMoveTo(float x, float y, float radius = 0.28f) const;
 	bool OverlapsObstacle(float x, float y, float radius, const Obstacle& obstacle) const;
+	Obstacle BuildMeshCollision(float x,
+		float y,
+		const std::string& meshName,
+		float scale,
+		float rotation,
+		float fallbackHalfWidth,
+		float fallbackHalfHeight) const;
+	Obstacle BuildObstacleCollision(const Obstacle& obstacle) const;
 	bool IsBlockedByInteriorProps(float x,
 		float y,
 		float radius,

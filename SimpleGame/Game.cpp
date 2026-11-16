@@ -22,6 +22,9 @@ const float Pi = 3.1415926535f;
 const float ModelForwardAxisCorrection = Pi * 0.5f;
 const float TileWidth = 64.0f;
 const float TileHeight = 32.0f;
+const float FloorMeshScale = TileWidth / 1.9f;
+const float WallMeshScale = TileWidth * 0.25f;
+const float WallMeshHeightScale = 1.5f;
 const WorldPoint TerminalPosition = {-16.0f, -15.0f};
 const WorldPoint TutorialWeaponPosition = {-10.0f, -14.0f};
 const WorldPoint TutorialRecordPositions[] = {
@@ -267,6 +270,44 @@ float DistanceToSegment(
 	float closestX = segmentStart.x + segmentX * projection;
 	float closestY = segmentStart.y + segmentY * projection;
 	return Length(point.x - closestX, point.y - closestY);
+}
+
+bool ResolveObstacleMesh(ObstacleType type, const char*& meshName, float& scale)
+{
+	meshName = NULL;
+	scale = 19.0f;
+	switch (type)
+	{
+		case HullWall:
+			meshName = "ship_wall_clean";
+			scale = WallMeshScale;
+			break;
+		case ControlConsole:
+			meshName = "ship_console";
+			scale = 24.0f;
+			break;
+		case MedicalPod:
+			meshName = "ship_medbed";
+			scale = 23.0f;
+			break;
+		case PowerRelay:
+			meshName = "ship_power";
+			scale = 21.0f;
+			break;
+		case EngineModule:
+			meshName = "ship_engine";
+			scale = 23.0f;
+			break;
+		case CoolantPipe:
+			meshName = "ship_prop_pipe_rack";
+			scale = 9.1f;
+			break;
+		case CargoCrate:
+			meshName = "ship_prop_cargo";
+			scale = 13.4f;
+			break;
+	}
+	return meshName != NULL;
 }
 
 void BuildPersonalShipFixtures(const WorldPoint& dockPosition, Obstacle* fixtures)
@@ -630,8 +671,11 @@ void Game::PrecacheGameplayMeshes()
 	const float wallRotations[] = {0.0f, Pi * 0.5f};
 	for (int rotationIndex = 0; rotationIndex < 2; ++rotationIndex)
 	{
-		m_ModelLibrary.PrecacheMesh("ship_wall", 19.0f, wallRotations[rotationIndex]);
-		m_ModelLibrary.PrecacheMesh("ship_wall", 20.0f, wallRotations[rotationIndex]);
+		m_ModelLibrary.PrecacheMesh("ship_wall_clean",
+			WallMeshScale,
+			wallRotations[rotationIndex],
+			0.0f,
+			WallMeshHeightScale);
 	}
 
 	m_ModelLibrary.PrecacheMesh("ship_console", 24.0f);
@@ -668,7 +712,7 @@ void Game::PrecacheGameplayMeshes()
 	{
 		std::ostringstream meshName;
 		meshName << "replacement_tutorial_floor_" << tileIndex;
-		m_ModelLibrary.PrecacheMesh(meshName.str(), 29.0f);
+		m_ModelLibrary.PrecacheMesh(meshName.str(), FloorMeshScale);
 	}
 	m_ModelLibrary.PrecacheMesh("replacement_infection_trace_0", 68.0f);
 	m_ModelLibrary.PrecacheMesh("replacement_infection_trace_1", 54.0f);
@@ -685,9 +729,9 @@ void Game::PrecacheGameplayMeshes()
 	{
 		std::ostringstream meshName;
 		meshName << "replacement_level1_floor_" << tileIndex;
-		m_ModelLibrary.PrecacheMesh(meshName.str(), 29.0f);
+		m_ModelLibrary.PrecacheMesh(meshName.str(), FloorMeshScale);
 	}
-	m_ModelLibrary.PrecacheMesh("replacement_level1_corridor_stripe", 29.0f);
+	m_ModelLibrary.PrecacheMesh("replacement_level1_corridor_stripe", FloorMeshScale);
 	m_ModelLibrary.PrecacheMesh("replacement_space_backdrop_a", 78.0f);
 	m_ModelLibrary.PrecacheMesh("replacement_space_backdrop_b", 70.0f);
 	m_ModelLibrary.PrecacheMesh("humanoid_soldier", 18.0f, 1.57f);
@@ -1145,7 +1189,7 @@ void Game::UpdateLevelSurvivors(float deltaSeconds)
 			}
 		}
 
-		if (!survivor.armed || survivor.fireCooldown > 0.0f)
+		if (!survivor.armed)
 			continue;
 
 		WorldPoint nearestEnemy = m_Player;
@@ -1257,7 +1301,13 @@ void Game::UpdateLevelSurvivors(float deltaSeconds)
 			(target.x - survivor.position.x) / targetDistance,
 			(target.y - survivor.position.y) / targetDistance,
 		};
+		// Aiming is independent from the firing cooldown. Keep both the character
+		// and its weapon facing the tracked target while moving or recovering
+		// between shots; only projectile creation waits for the cooldown.
 		survivor.aimDirection = direction;
+		if (survivor.fireCooldown > 0.0f)
+			continue;
+
 		m_Projectiles.push_back({survivor.position,
 			survivor.position,
 			{direction.x * 8.5f, direction.y * 8.5f},
@@ -1513,6 +1563,50 @@ bool Game::OverlapsObstacle(
 	return deltaX * deltaX + deltaY * deltaY < radius * radius;
 }
 
+Obstacle Game::BuildMeshCollision(float x,
+	float y,
+	const std::string& meshName,
+	float scale,
+	float rotation,
+	float fallbackHalfWidth,
+	float fallbackHalfHeight) const
+{
+	float meshHalfWidth = 0.0f;
+	float meshHalfHeight = 0.0f;
+	if (m_ModelLibrary.GetMeshHalfExtents(
+			meshName, rotation, meshHalfWidth, meshHalfHeight))
+	{
+		const float modelToWorldScale = scale / (TileWidth * 0.5f);
+		fallbackHalfWidth = std::max(0.08f, meshHalfWidth * modelToWorldScale);
+		fallbackHalfHeight = std::max(0.08f, meshHalfHeight * modelToWorldScale);
+	}
+
+	return {x,
+		y,
+		fallbackHalfWidth,
+		fallbackHalfHeight,
+		0.0f,
+		0.0f,
+		0.0f,
+		0.0f,
+		CargoCrate};
+}
+
+Obstacle Game::BuildObstacleCollision(const Obstacle& obstacle) const
+{
+	const char* meshName = NULL;
+	float scale = 1.0f;
+	if (!ResolveObstacleMesh(obstacle.type, meshName, scale))
+		return obstacle;
+	return BuildMeshCollision(obstacle.x,
+		obstacle.y,
+		meshName,
+		scale,
+		0.0f,
+		obstacle.halfWidth,
+		obstacle.halfHeight);
+}
+
 bool Game::IsBlockedByInteriorProps(float x,
 	float y,
 	float radius,
@@ -1521,15 +1615,13 @@ bool Game::IsBlockedByInteriorProps(float x,
 	for (size_t propIndex = 0; propIndex < props.size(); ++propIndex)
 	{
 		const InteriorPropPlacement& prop = props[propIndex];
-		const Obstacle collision = {prop.position.x,
+		const Obstacle collision = BuildMeshCollision(prop.position.x,
 			prop.position.y,
+			prop.meshName,
+			prop.scale,
+			prop.rotation,
 			prop.halfWidth,
-			prop.halfHeight,
-			0.0f,
-			0.0f,
-			0.0f,
-			0.0f,
-			CargoCrate};
+			prop.halfHeight);
 		if (OverlapsObstacle(x, y, radius, collision))
 			return true;
 	}
@@ -1550,70 +1642,61 @@ bool Game::IsBlockedByInteriorFixture(
 	BuildPersonalShipFixtures(dockPosition, personalShipFixtures);
 	for (size_t fixtureIndex = 0; fixtureIndex < 5; ++fixtureIndex)
 	{
-		if (OverlapsObstacle(x, y, radius, personalShipFixtures[fixtureIndex]))
+		if (OverlapsObstacle(
+				x, y, radius, BuildObstacleCollision(personalShipFixtures[fixtureIndex])))
 			return true;
 	}
 
-	const Obstacle personalShipCockpit = {dockPosition.x,
+	const Obstacle personalShipCockpit = BuildMeshCollision(dockPosition.x,
 		dockPosition.y + 3.0f,
+		"ship_console",
+		24.0f,
+		0.0f,
 		0.72f,
-		0.58f,
-		42.0f,
-		0.12f,
-		0.42f,
-		0.52f,
-		ControlConsole};
+		0.58f);
 	if (OverlapsObstacle(x, y, radius, personalShipCockpit))
 		return true;
 
 	if (!firstLevel)
 	{
-		const Obstacle terminal = {TerminalPosition.x,
+		const Obstacle terminal = BuildMeshCollision(TerminalPosition.x,
 			TerminalPosition.y,
+			"replacement_medical_terminal",
+			18.0f,
+			0.0f,
 			0.62f,
-			0.50f,
-			32.0f,
-			0.10f,
-			0.36f,
-			0.46f,
-			ControlConsole};
-		const Obstacle cockpit = {CockpitPosition.x,
+			0.50f);
+		const Obstacle cockpit = BuildMeshCollision(CockpitPosition.x,
 			CockpitPosition.y,
+			"ship_console",
+			24.0f,
+			0.0f,
 			0.72f,
-			0.58f,
-			42.0f,
-			0.12f,
-			0.42f,
-			0.52f,
-			ControlConsole};
+			0.58f);
 		return OverlapsObstacle(x, y, radius, terminal) ||
 			OverlapsObstacle(x, y, radius, cockpit);
 	}
 
 	for (int engineIndex = 0; engineIndex < 4; ++engineIndex)
 	{
-		const Obstacle engine = {m_LevelEnginePositions[engineIndex].x,
+		const Obstacle engine = BuildMeshCollision(m_LevelEnginePositions[engineIndex].x,
 			m_LevelEnginePositions[engineIndex].y,
+			"replacement_aux_engine",
+			35.0f,
+			0.0f,
 			0.68f,
-			0.58f,
-			45.0f,
-			0.12f,
-			0.34f,
-			0.42f,
-			EngineModule};
+			0.58f);
 		if (OverlapsObstacle(x, y, radius, engine))
 			return true;
 	}
 
-	const Obstacle levelControl = {m_LevelControlPosition.x,
+	const Obstacle levelControl = BuildMeshCollision(m_LevelControlPosition.x,
 		m_LevelControlPosition.y,
+		"ship_console",
+		24.0f,
+		0.0f,
 		0.72f,
-		0.56f,
-		40.0f,
-		0.10f,
-		0.38f,
-		0.48f,
-		ControlConsole};
+		0.56f);
 	return OverlapsObstacle(x, y, radius, levelControl);
 }
 
@@ -2605,7 +2688,7 @@ void Game::RenderInterior()
 				: dockingPassage ? "replacement_tutorial_floor_1" :
 					((x + y) & 1) ? "replacement_tutorial_floor_0" :
 						"replacement_tutorial_floor_1";
-			m_ModelLibrary.DrawMesh(m_Renderer, floorMesh, p.x, p.y, 29.0f);
+			m_ModelLibrary.DrawMesh(m_Renderer, floorMesh, p.x, p.y, FloorMeshScale);
 		}
 	}
 
@@ -2640,8 +2723,14 @@ void Game::RenderInterior()
 							WorldToScreen(transform.x, transform.y, transform.height);
 						m_Renderer->DrawSoftShadow(
 							wall.x + 8.0f, wall.y - 4.0f, 62.0f, 18.0f, 0.82f);
-						m_ModelLibrary.DrawMesh(
-							m_Renderer, "ship_wall", wall.x, wall.y, 19.0f, wallRotation);
+						m_ModelLibrary.DrawMesh(m_Renderer,
+							"ship_wall_clean",
+							wall.x,
+							wall.y,
+							WallMeshScale,
+							wallRotation,
+							0.0f,
+							WallMeshHeightScale);
 					});
 			}
 		}
@@ -2778,7 +2867,7 @@ void Game::RenderInterior()
 
 	if (m_CurrentShip == 0)
 	{
-		ScreenPoint terminal = WorldToScreen(TerminalPosition.x, TerminalPosition.y, 22.0f);
+		ScreenPoint terminal = WorldToScreen(TerminalPosition.x, TerminalPosition.y);
 		m_Renderer->DrawSoftShadow(terminal.x, terminal.y - 10.0f, 54.0f, 15.0f, 0.78f);
 		m_ModelLibrary.DrawMesh(
 			m_Renderer, "replacement_medical_terminal", terminal.x, terminal.y, 18.0f);
@@ -2799,8 +2888,8 @@ void Game::RenderInterior()
 		}
 		for (int recordIndex = 0; recordIndex < 3; ++recordIndex)
 		{
-			ScreenPoint record = WorldToScreen(
-				TutorialRecordPositions[recordIndex].x, TutorialRecordPositions[recordIndex].y, 5.0f);
+			ScreenPoint record = WorldToScreen(TutorialRecordPositions[recordIndex].x,
+				TutorialRecordPositions[recordIndex].y);
 			const char* recordMeshes[] = {"replacement_tutorial_record_0",
 				"replacement_tutorial_record_1",
 				"replacement_tutorial_record_2"};
@@ -2813,7 +2902,7 @@ void Game::RenderInterior()
 				m_TutorialRecordsRead[recordIndex] ? Pi : 0.0f,
 				m_TutorialRecordsRead[recordIndex] ? 0.72f : 1.0f);
 		}
-		ScreenPoint core = WorldToScreen(CorePosition.x, CorePosition.y, 18.0f);
+		ScreenPoint core = WorldToScreen(CorePosition.x, CorePosition.y);
 		if (!m_CoreRecovered)
 		{
 			const float corePulse = AllEnemiesDefeated()
@@ -2828,7 +2917,7 @@ void Game::RenderInterior()
 				m_TotalTime * 0.35f);
 		}
 	}
-	ScreenPoint cockpit = WorldToScreen(CockpitPosition.x, CockpitPosition.y, 24.0f);
+	ScreenPoint cockpit = WorldToScreen(CockpitPosition.x, CockpitPosition.y);
 	DrawFlightControlConsole(cockpit.x, cockpit.y, m_NoctisSystemsOnline, false);
 	m_Renderer->DrawString(cockpit.x - 75.0f,
 		cockpit.y + 92.0f,
@@ -2839,7 +2928,7 @@ void Game::RenderInterior()
 		0.95f);
 	if (m_CurrentShip == 0)
 	{
-		ScreenPoint signal = WorldToScreen(SignalPosition.x, SignalPosition.y, 12.0f);
+		ScreenPoint signal = WorldToScreen(SignalPosition.x, SignalPosition.y);
 		if (m_CoreRecovered && !m_SignalChecked)
 		{
 			const float signalPulse = 1.0f + std::sin(m_TotalTime * 4.5f) * 0.10f;
@@ -2851,7 +2940,7 @@ void Game::RenderInterior()
 		}
 	}
 
-	ScreenPoint warningLight = WorldToScreen(-10.5f, -10.5f, 55.0f);
+	ScreenPoint warningLight = WorldToScreen(-10.5f, -10.5f);
 	const float warningPulse = 1.0f + 0.12f * std::sin(m_TotalTime * 4.0f);
 	m_ModelLibrary.DrawMesh(m_Renderer,
 		"replacement_warning_effect",
@@ -2860,10 +2949,12 @@ void Game::RenderInterior()
 		24.0f * warningPulse,
 		0.0f,
 		m_TotalTime * 0.22f);
+	const ScreenPoint statusInstrument =
+		WorldToScreen(CockpitPosition.x + 1.6f, CockpitPosition.y - 0.2f);
 	m_ModelLibrary.DrawMesh(m_Renderer,
 		"replacement_screen_teal_bar",
-		width * 0.42f,
-		-height * 0.27f,
+		statusInstrument.x,
+		statusInstrument.y,
 		22.0f);
 }
 
@@ -2902,42 +2993,17 @@ void Game::DrawWorldBlock(const Obstacle& obstacle)
 {
 	ScreenPoint foot = WorldToScreen(obstacle.x, obstacle.y);
 	const char* resourceMesh = NULL;
-	float resourceScale = 19.0f;
-	if (obstacle.type == HullWall)
-		resourceMesh = "ship_wall";
-	else if (obstacle.type == ControlConsole)
-	{
-		resourceMesh = "ship_console";
-		resourceScale = 24.0f;
-	}
-	else if (obstacle.type == MedicalPod)
-	{
-		resourceMesh = "ship_medbed";
-		resourceScale = 23.0f;
-	}
-	else if (obstacle.type == PowerRelay)
-	{
-		resourceMesh = "ship_power";
-		resourceScale = 21.0f;
-	}
-	else if (obstacle.type == EngineModule)
-	{
-		resourceMesh = "ship_engine";
-		resourceScale = 23.0f;
-	}
-	else if (obstacle.type == CoolantPipe)
-	{
-		resourceMesh = "ship_prop_pipe_rack";
-		resourceScale = 9.1f;
-	}
-	else if (obstacle.type == CargoCrate)
-	{
-		resourceMesh = "ship_prop_cargo";
-		resourceScale = 13.4f;
-	}
+	float resourceScale = 1.0f;
+	ResolveObstacleMesh(obstacle.type, resourceMesh, resourceScale);
 	if (resourceMesh != NULL)
 	{
-		m_Renderer->DrawSoftShadow(foot.x + 8.0f, foot.y - 4.0f, 86.0f, 23.0f, 0.82f);
+		const Obstacle collision = BuildObstacleCollision(obstacle);
+		const float shadowWidth =
+			(collision.halfWidth + collision.halfHeight) * TileWidth * 0.86f;
+		const float shadowHeight = std::max(8.0f,
+			(collision.halfWidth + collision.halfHeight) * TileHeight * 0.32f);
+		m_Renderer->DrawSoftShadow(
+			foot.x, foot.y - 2.0f, shadowWidth, shadowHeight, 0.82f);
 		m_ModelLibrary.DrawMesh(m_Renderer, resourceMesh, foot.x, foot.y, resourceScale);
 	}
 }
@@ -3535,10 +3601,19 @@ void Game::CreateInteriorPropActors(const std::vector<InteriorPropPlacement>& pr
 			{
 				const ScreenPoint screen =
 					WorldToScreen(transform.x, transform.y, transform.height);
+				const Obstacle collision = BuildMeshCollision(transform.x,
+					transform.y,
+					prop.meshName,
+					prop.scale,
+					prop.rotation,
+					prop.halfWidth,
+					prop.halfHeight);
 				const float shadowWidth =
-					(prop.halfWidth + prop.halfHeight) * TileWidth * 0.86f;
+					(collision.halfWidth + collision.halfHeight) * TileWidth * 0.86f;
+				const float shadowHeight = std::max(8.0f,
+					(collision.halfWidth + collision.halfHeight) * TileHeight * 0.32f);
 				m_Renderer->DrawSoftShadow(
-					screen.x + 7.0f, screen.y - 4.0f, shadowWidth, 20.0f, 0.80f);
+					screen.x, screen.y - 2.0f, shadowWidth, shadowHeight, 0.80f);
 				m_ModelLibrary.DrawMesh(m_Renderer,
 					prop.meshName,
 					screen.x,
@@ -3580,7 +3655,7 @@ void Game::CreatePersonalShipInteriorActors(const WorldPoint& dockPosition)
 		dockPosition.x + dockPosition.y + 3.0f,
 		[this](const ActorTransform& transform)
 		{
-			const ScreenPoint cockpit = WorldToScreen(transform.x, transform.y, 17.0f);
+			const ScreenPoint cockpit = WorldToScreen(transform.x, transform.y);
 			DrawFlightControlConsole(cockpit.x, cockpit.y, true, false);
 			m_Renderer->DrawString(cockpit.x - 61.0f,
 				cockpit.y + 78.0f,
@@ -3638,7 +3713,7 @@ void Game::RenderFirstLevel()
 				floorMeshes[floorVariant],
 			screen.x,
 			screen.y,
-			29.0f);
+			FloorMeshScale);
 	}
 
 	for (size_t index = 0; index < m_FirstLevelWallVisuals.size(); ++index)
@@ -3676,8 +3751,14 @@ void Game::RenderFirstLevel()
 					const ScreenPoint wall =
 						WorldToScreen(transform.x, transform.y, transform.height);
 					m_Renderer->DrawSoftShadow(wall.x, wall.y, 52.0f, 16.0f, 0.76f);
-					m_ModelLibrary.DrawMesh(
-						m_Renderer, "ship_wall", wall.x, wall.y, 20.0f, wallRotation);
+					m_ModelLibrary.DrawMesh(m_Renderer,
+						"ship_wall_clean",
+						wall.x,
+						wall.y,
+						WallMeshScale,
+						wallRotation,
+						0.0f,
+						WallMeshHeightScale);
 				});
 		}
 	}
@@ -3713,7 +3794,7 @@ void Game::RenderFirstLevel()
 			enginePosition.x + enginePosition.y,
 			[this, active, engineIndex](const ActorTransform& transform)
 			{
-				const ScreenPoint engine = WorldToScreen(transform.x, transform.y, 8.0f);
+				const ScreenPoint engine = WorldToScreen(transform.x, transform.y);
 				const float rotation = active ? m_TotalTime * (2.4f + engineIndex * 0.12f) : 0.0f;
 				m_Renderer->DrawSoftShadow(engine.x + 12.0f, engine.y - 8.0f, 116.0f, 30.0f, 0.84f);
 				m_ModelLibrary.DrawMesh(
@@ -3745,7 +3826,7 @@ void Game::RenderFirstLevel()
 		m_LevelControlPosition.x + m_LevelControlPosition.y,
 		[this, enginesActive, departureReady](const ActorTransform& transform)
 		{
-			const ScreenPoint control = WorldToScreen(transform.x, transform.y, 14.0f);
+			const ScreenPoint control = WorldToScreen(transform.x, transform.y);
 			DrawFlightControlConsole(control.x, control.y, enginesActive, !enginesActive);
 			m_Renderer->DrawString(control.x - 75.0f,
 				control.y + 92.0f,
@@ -3788,7 +3869,7 @@ void Game::RenderFirstLevel()
 		CreateSceneActor("StoryDocument",
 			document.position.x,
 			document.position.y,
-			7.0f,
+			0.0f,
 			8,
 			document.position.x + document.position.y,
 			[this, document, animationOffset](const ActorTransform& transform)
@@ -3816,7 +3897,7 @@ void Game::RenderFirstLevel()
 		CreateSceneActor("AmmoMagazine",
 			magazine.position.x,
 			magazine.position.y,
-			8.0f,
+			0.0f,
 			2,
 			magazine.position.x + magazine.position.y,
 			[this, animationOffset](const ActorTransform& transform)

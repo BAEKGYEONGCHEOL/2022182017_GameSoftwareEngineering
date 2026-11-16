@@ -86,7 +86,7 @@ bool Game::CanMoveTo(float x, float y, float radius) const
 		return false;
 	for (size_t i = 0; i < m_Obstacles.size(); ++i)
 	{
-		const Obstacle& obstacle = m_Obstacles[i];
+		const Obstacle obstacle = BuildObstacleCollision(m_Obstacles[i]);
 		if (OverlapsObstacle(x, y, radius, obstacle))
 			return false;
 	}

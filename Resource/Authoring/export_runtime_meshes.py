@@ -18,6 +18,7 @@ GROUPS = {
     "void_claw_left": lambda name: (name.startswith("VOID_Blade_Fore_") or name.startswith("VOID_Scythe_")) and name.endswith("_L"),
     "void_claw_right": lambda name: (name.startswith("VOID_Blade_Fore_") or name.startswith("VOID_Scythe_")) and name.endswith("_R"),
     "ship_wall": lambda name: name.startswith("SHIP_Wall_Ribbed") or name.startswith("SHIP_Wall_Rib_"),
+    "ship_wall_clean": lambda name: name == "SHIP_Wall_Solid_2m",
     "ship_console": lambda name: name.startswith("SHIP_Console_"),
     "ship_medbed": lambda name: name.startswith("SHIP_MedBed_") or name.startswith("SHIP_MedScanner_"),
     "ship_power": lambda name: name.startswith("SHIP_Device_Power") or name.startswith("SHIP_PowerJunction_"),
@@ -70,9 +71,9 @@ GROUPS = {
     "replacement_infected_structure": lambda name: name.startswith("REPL_Infected_"),
     "replacement_light_pylons": lambda name: name.startswith("REPL_LightPylon_"),
     "replacement_docked_player_ship": lambda name: name.startswith("REPL_DockedPlayerShip_") or name.startswith("REPL_DockedShip_Engine_") or name.startswith("REPL_DockedShip_Glow_"),
-    "replacement_tutorial_floor_0": lambda name: name.startswith("REPL_TutorialFloor_Tile_0") or name.startswith("REPL_TutorialFloor_Inset_0") or name.startswith("REPL_TutorialFloor_Bolt_0_"),
-    "replacement_tutorial_floor_1": lambda name: name.startswith("REPL_TutorialFloor_Tile_1") or name.startswith("REPL_TutorialFloor_Inset_1") or name.startswith("REPL_TutorialFloor_Bolt_1_"),
-    "replacement_tutorial_floor_2": lambda name: name.startswith("REPL_TutorialFloor_Tile_2") or name.startswith("REPL_TutorialFloor_Inset_2") or name.startswith("REPL_TutorialFloor_Bolt_2_") or name == "REPL_TutorialFloor_ServiceRing",
+    "replacement_tutorial_floor_0": lambda name: name == "REPL_TutorialFloor_Tile_0",
+    "replacement_tutorial_floor_1": lambda name: name == "REPL_TutorialFloor_Tile_1",
+    "replacement_tutorial_floor_2": lambda name: name == "REPL_TutorialFloor_Tile_2",
     "replacement_infection_trace_0": lambda name: name.startswith("REPL_InfectionTrace_0") or name.startswith("REPL_InfectionTrace_Node_0_"),
     "replacement_infection_trace_1": lambda name: name.startswith("REPL_InfectionTrace_1") or name.startswith("REPL_InfectionTrace_Node_1_"),
     "replacement_tutorial_record_0": lambda name: name.startswith("REPL_TutorialRecord_0_"),
@@ -84,10 +85,10 @@ GROUPS = {
     "replacement_screen_teal_bar": lambda name: name.startswith("REPL_ScreenTealBar_"),
     "replacement_cockpit_status_active": lambda name: name == "REPL_CockpitStatus_ActiveRing",
     "replacement_cockpit_status_infected": lambda name: name.startswith("REPL_CockpitStatus_Infection"),
-    "replacement_level1_floor_0": lambda name: name.startswith("REPL_Level1Floor_Tile_0") or name.startswith("REPL_Level1Floor_Rail_0_"),
-    "replacement_level1_floor_1": lambda name: name.startswith("REPL_Level1Floor_Tile_1") or name.startswith("REPL_Level1Floor_Rail_1_"),
-    "replacement_level1_floor_2": lambda name: name.startswith("REPL_Level1Floor_Tile_2") or name.startswith("REPL_Level1Floor_Rail_2_"),
-    "replacement_level1_floor_3": lambda name: name.startswith("REPL_Level1Floor_Tile_3") or name.startswith("REPL_Level1Floor_Rail_3_"),
+    "replacement_level1_floor_0": lambda name: name == "REPL_Level1Floor_Tile_0",
+    "replacement_level1_floor_1": lambda name: name == "REPL_Level1Floor_Tile_1",
+    "replacement_level1_floor_2": lambda name: name == "REPL_Level1Floor_Tile_2",
+    "replacement_level1_floor_3": lambda name: name == "REPL_Level1Floor_Tile_3",
     "replacement_level1_corridor_stripe": lambda name: name.startswith("REPL_Level1Corridor_"),
     "replacement_space_backdrop_a": lambda name: name == "REPL_SpaceBackdrop_DebrisA" or name.startswith("REPL_SpaceBackdrop_Truss_0_") or name == "REPL_SpaceBackdrop_WarningPlate_0",
     "replacement_space_backdrop_b": lambda name: name == "REPL_SpaceBackdrop_DebrisB" or name.startswith("REPL_SpaceBackdrop_Truss_1_") or name == "REPL_SpaceBackdrop_WarningPlate_1",
@@ -114,6 +115,8 @@ with open(OUTPUT, "w", encoding="utf-8") as output:
             mesh.calc_loop_triangles()
             matrix = source.matrix_world
             for triangle in mesh.loop_triangles:
+                if ("_floor_" in group_name or group_name == "replacement_level1_corridor_stripe") and triangle.normal.z < 0.5:
+                    continue
                 material = None
                 if triangle.material_index < len(source.data.materials):
                     material = source.data.materials[triangle.material_index]

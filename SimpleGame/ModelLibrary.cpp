@@ -10,6 +10,7 @@ bool ModelLibrary::Load()
 {
 	m_Models.clear();
 	m_Meshes.clear();
+	m_MeshBounds.clear();
 	m_StaticMeshCache.clear();
 	m_DynamicMeshScratch.clear();
 	m_StaticMeshCache.reserve(128);
@@ -204,6 +205,24 @@ void ModelLibrary::PrecacheMesh(const std::string& meshName,
 		localPivotY);
 }
 
+bool ModelLibrary::GetMeshHalfExtents(const std::string& meshName,
+	float rotation,
+	float& halfWidth,
+	float& halfHeight) const
+{
+	const auto bounds = m_MeshBounds.find(meshName);
+	if (bounds == m_MeshBounds.end())
+		return false;
+
+	const float absoluteCosine = std::fabs(std::cos(rotation));
+	const float absoluteSine = std::fabs(std::sin(rotation));
+	halfWidth = bounds->second.halfWidth * absoluteCosine +
+		bounds->second.halfHeight * absoluteSine;
+	halfHeight = bounds->second.halfWidth * absoluteSine +
+		bounds->second.halfHeight * absoluteCosine;
+	return true;
+}
+
 bool ModelLibrary::IsLoaded() const
 {
 	return !m_Models.empty() || !m_Meshes.empty();
@@ -364,6 +383,9 @@ bool ModelLibrary::LoadMeshFile(const char* path)
 		const float centerX = preserveModelOrigin ? 0.0f : (minimumX + maximumX) * 0.5f;
 		const float centerY = preserveModelOrigin ? 0.0f : (minimumY + maximumY) * 0.5f;
 		const float baseZ = preserveModelOrigin ? 0.0f : minimumZ;
+		m_MeshBounds[meshEntry.first] = {
+			std::max(std::fabs(minimumX - centerX), std::fabs(maximumX - centerX)),
+			std::max(std::fabs(minimumY - centerY), std::fabs(maximumY - centerY))};
 		for (MeshTriangle& triangle : meshEntry.second)
 		{
 			for (int vertex = 0; vertex < 3; ++vertex)

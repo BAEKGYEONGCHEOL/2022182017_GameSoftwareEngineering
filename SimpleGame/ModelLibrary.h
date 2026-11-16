@@ -63,6 +63,10 @@ class ModelLibrary
 		float localRotation = 0.0f,
 		float localPivotX = 0.0f,
 		float localPivotY = 0.0f) const;
+	bool GetMeshHalfExtents(const std::string& meshName,
+		float rotation,
+		float& halfWidth,
+		float& halfHeight) const;
 
   private:
 	struct CachedMeshProjection
@@ -77,11 +81,17 @@ class ModelLibrary
 		float localPivotY;
 		std::vector<ColoredTriangle> triangles;
 	};
+	struct MeshBounds
+	{
+		float halfWidth;
+		float halfHeight;
+	};
 
 	bool LoadFile(const char* path);
 	bool LoadMeshFile(const char* path);
 	std::unordered_map<std::string, std::vector<ModelPrimitive>> m_Models;
 	std::unordered_map<std::string, std::vector<MeshTriangle>> m_Meshes;
+	std::unordered_map<std::string, MeshBounds> m_MeshBounds;
 	mutable std::vector<CachedMeshProjection> m_StaticMeshCache;
 	mutable std::vector<ColoredTriangle> m_DynamicMeshScratch;
 };
