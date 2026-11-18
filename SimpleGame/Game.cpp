@@ -22,7 +22,9 @@ const float Pi = 3.1415926535f;
 const float ModelForwardAxisCorrection = Pi * 0.5f;
 const float TileWidth = 64.0f;
 const float TileHeight = 32.0f;
-const float FloorMeshScale = (TileWidth - 1.0f) / 1.9f;
+const float FloorMeshRotation = Pi * 0.25f;
+const float FloorMeshSourceWidthAfterRotation = 1.9f * 1.41421356237f;
+const float FloorMeshScale = (TileWidth - 1.0f) / FloorMeshSourceWidthAfterRotation;
 const float WallMeshScale = (TileWidth - 1.0f) * 0.25f;
 const float WallMeshHeightScale = 1.5f;
 const float WallInteriorInset = 0.04f;
@@ -713,7 +715,8 @@ void Game::PrecacheGameplayMeshes()
 	{
 		std::ostringstream meshName;
 		meshName << "replacement_tutorial_floor_" << tileIndex;
-		m_ModelLibrary.PrecacheMesh(meshName.str(), FloorMeshScale);
+		m_ModelLibrary.PrecacheMesh(
+			meshName.str(), FloorMeshScale, FloorMeshRotation);
 	}
 	m_ModelLibrary.PrecacheMesh("replacement_infection_trace_0", 68.0f);
 	m_ModelLibrary.PrecacheMesh("replacement_infection_trace_1", 54.0f);
@@ -730,9 +733,12 @@ void Game::PrecacheGameplayMeshes()
 	{
 		std::ostringstream meshName;
 		meshName << "replacement_level1_floor_" << tileIndex;
-		m_ModelLibrary.PrecacheMesh(meshName.str(), FloorMeshScale);
+		m_ModelLibrary.PrecacheMesh(
+			meshName.str(), FloorMeshScale, FloorMeshRotation);
 	}
-	m_ModelLibrary.PrecacheMesh("replacement_level1_corridor_stripe", FloorMeshScale);
+	m_ModelLibrary.PrecacheMesh("replacement_level1_corridor_stripe",
+		FloorMeshScale,
+		FloorMeshRotation);
 	m_ModelLibrary.PrecacheMesh("replacement_space_backdrop_a", 78.0f);
 	m_ModelLibrary.PrecacheMesh("replacement_space_backdrop_b", 70.0f);
 	m_ModelLibrary.PrecacheMesh("humanoid_soldier", 18.0f, 1.57f);
@@ -2688,7 +2694,12 @@ void Game::RenderInterior()
 				? "replacement_tutorial_floor_2"
 				: dockingPassage ? "replacement_tutorial_floor_1" :
 					"replacement_tutorial_floor_0";
-			m_ModelLibrary.DrawMesh(m_Renderer, floorMesh, p.x, p.y, FloorMeshScale);
+			m_ModelLibrary.DrawMesh(m_Renderer,
+				floorMesh,
+				p.x,
+				p.y,
+				FloorMeshScale,
+				FloorMeshRotation);
 		}
 	}
 
@@ -3712,7 +3723,8 @@ void Game::RenderFirstLevel()
 			floorMeshes[floorVariant],
 			screen.x,
 			screen.y,
-			FloorMeshScale);
+			FloorMeshScale,
+			FloorMeshRotation);
 	}
 
 	for (size_t index = 0; index < m_FirstLevelWallVisuals.size(); ++index)
