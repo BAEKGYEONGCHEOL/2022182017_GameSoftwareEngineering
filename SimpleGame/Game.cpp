@@ -22,9 +22,10 @@ const float Pi = 3.1415926535f;
 const float ModelForwardAxisCorrection = Pi * 0.5f;
 const float TileWidth = 64.0f;
 const float TileHeight = 32.0f;
-const float FloorMeshScale = TileWidth / 1.9f;
-const float WallMeshScale = TileWidth * 0.25f;
+const float FloorMeshScale = (TileWidth - 1.0f) / 1.9f;
+const float WallMeshScale = (TileWidth - 1.0f) * 0.25f;
 const float WallMeshHeightScale = 1.5f;
+const float WallInteriorInset = 0.04f;
 const WorldPoint TerminalPosition = {-16.0f, -15.0f};
 const WorldPoint TutorialWeaponPosition = {-10.0f, -14.0f};
 const WorldPoint TutorialRecordPositions[] = {
@@ -2686,8 +2687,7 @@ void Game::RenderInterior()
 			const char* floorMesh = personalShipInterior
 				? "replacement_tutorial_floor_2"
 				: dockingPassage ? "replacement_tutorial_floor_1" :
-					((x + y) & 1) ? "replacement_tutorial_floor_0" :
-						"replacement_tutorial_floor_1";
+					"replacement_tutorial_floor_0";
 			m_ModelLibrary.DrawMesh(m_Renderer, floorMesh, p.x, p.y, FloorMeshScale);
 		}
 	}
@@ -2713,8 +2713,10 @@ void Game::RenderInterior()
 					continue;
 				}
 
-				const float wallX = static_cast<float>(x) + static_cast<float>(offsetX) * 0.5f;
-				const float wallY = static_cast<float>(y) + static_cast<float>(offsetY) * 0.5f;
+				const float wallX = static_cast<float>(x) +
+					static_cast<float>(offsetX) * (0.5f + WallInteriorInset);
+				const float wallY = static_cast<float>(y) +
+					static_cast<float>(offsetY) * (0.5f + WallInteriorInset);
 				const float wallRotation = offsetX != 0 ? Pi * 0.5f : 0.0f;
 				CreateSceneActor("HullWall", wallX, wallY, 0.0f, 1, wallX + wallY,
 					[this, wallRotation](const ActorTransform& transform)
@@ -3698,19 +3700,16 @@ void Game::RenderFirstLevel()
 			std::fabs(tile.position.y + 57.0f) <= 4.5f;
 		const bool dockingPassage = !personalShipInterior && tile.type == 1 &&
 			tile.position.x < -31.0f && tile.position.y < -43.0f;
-		const bool hasCorridorStripe = tile.type == 1 &&
-			(static_cast<int>(tile.position.x + tile.position.y) & 3) == 0;
 		const int floorVariant = personalShipInterior
 			? 3
 			: dockingPassage ? 2 :
-				(static_cast<int>(tile.position.x + tile.position.y) & 3);
+				tile.type == 2 ? 1 : 0;
 		const char* floorMeshes[] = {"replacement_level1_floor_0",
 			"replacement_level1_floor_1",
 			"replacement_level1_floor_2",
 			"replacement_level1_floor_3"};
 		m_ModelLibrary.DrawMesh(m_Renderer,
-			hasCorridorStripe ? "replacement_level1_corridor_stripe" :
-				floorMeshes[floorVariant],
+			floorMeshes[floorVariant],
 			screen.x,
 			screen.y,
 			FloorMeshScale);
@@ -3730,8 +3729,10 @@ void Game::RenderFirstLevel()
 				continue;
 			}
 
-			const float wallX = position.x + static_cast<float>(offsetX) * 0.5f;
-			const float wallY = position.y + static_cast<float>(offsetY) * 0.5f;
+			const float wallX = position.x +
+				static_cast<float>(offsetX) * (0.5f + WallInteriorInset);
+			const float wallY = position.y +
+				static_cast<float>(offsetY) * (0.5f + WallInteriorInset);
 			const ScreenPoint wallScreen = WorldToScreen(wallX, wallY);
 			if (std::fabs(wallScreen.x) > screenWidth * 0.5f + 120.0f ||
 				std::fabs(wallScreen.y) > screenHeight * 0.5f + 120.0f)
