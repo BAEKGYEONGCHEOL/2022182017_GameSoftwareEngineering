@@ -91,6 +91,7 @@ void ModelLibrary::DrawMesh(PrototypeRenderer* renderer,
 	const float screenSine = std::sin(screenRotation);
 	const float localCosine = std::cos(localRotation);
 	const float localSine = std::sin(localRotation);
+	const bool cullBackFaces = meshName == "ship_wall_clean";
 	std::vector<ColoredTriangle>* renderTriangles = &m_DynamicMeshScratch;
 	if (cacheStaticProjection)
 	{
@@ -143,6 +144,16 @@ void ModelLibrary::DrawMesh(PrototypeRenderer* renderer,
 			rendered.depth += rendered.points[vertex].y;
 		}
 		rendered.depth /= 3.0f;
+		if (cullBackFaces)
+		{
+			const float signedScreenArea =
+				(rendered.points[1].x - rendered.points[0].x) *
+					(rendered.points[2].y - rendered.points[0].y) -
+				(rendered.points[1].y - rendered.points[0].y) *
+					(rendered.points[2].x - rendered.points[0].x);
+			if (signedScreenArea >= -0.0001f)
+				continue;
+		}
 		const float edgeOneX = rotatedPositions[3] - rotatedPositions[0];
 		const float edgeOneY = rotatedPositions[4] - rotatedPositions[1];
 		const float edgeOneZ = rotatedPositions[5] - rotatedPositions[2];
