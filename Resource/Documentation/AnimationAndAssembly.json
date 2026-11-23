@@ -113,7 +113,7 @@
       "navigation_core",
       "electronic_document"
     ],
-    "navigation_core": "separate gimbal rings support independent rotation",
+    "navigation_core": "three concentric nested pivots rotate about the stellar sphere on local Z/Y/X axes",
     "documents": "handheld pickup props facing -Y"
   },
   "additional_ship_props": {
@@ -130,7 +130,7 @@
     "tutorial_level1": "Libraries/TutorialLevel1_Replacements.blend",
     "space_travel": "Libraries/SpaceTravel_Replacements.blend",
     "destination_arrival": "Libraries/DestinationArrival_Replacements.blend",
-    "rule": "all replacement parts are physical meshes; rotatable engine impeller and pickup effect remain separate collections"
+    "rule": "all replacement parts are physical meshes; auxiliary impeller uses a concentric local-X pivot; player craft is a shuttle silhouette and the station uses habitat rings, radial docks and solar wings"
   },
   "remaining_world_replacements": {
     "library": "Libraries/RemainingWorld_Replacements.blend",

@@ -3,7 +3,7 @@ import math
 import os
 import sys
 import json
-from mathutils import Vector
+from mathutils import Vector, Matrix
 
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -187,6 +187,40 @@ def join_objects(name, objects, collection):
     result.name = name
     move_to(result, collection)
     return result
+
+
+def rotation_pivot(name, location, collection, axis, children=()):
+    """Create an exportable empty whose origin is the mechanical rotation centre."""
+    pivot = bpy.data.objects.new(name, None)
+    collection.objects.link(pivot)
+    pivot.location = location
+    pivot.empty_display_type = 'CIRCLE'
+    pivot.empty_display_size = 0.28
+    pivot.rotation_mode = 'XYZ'
+    bpy.context.view_layer.update()
+    pivot['pivot_role'] = 'mechanical_rotation'
+    pivot['rotation_axis'] = axis
+    pivot['pivot_space'] = 'local'
+    for obj in children:
+        world = obj.matrix_world.copy()
+        obj.parent = pivot
+        obj.matrix_parent_inverse = Matrix.Identity(4)
+        obj.matrix_basis = pivot.matrix_world.inverted() @ world
+    return pivot
+
+
+def add_loop_rotation(pivot, action_name, axis_index, frames=48):
+    pivot.rotation_euler = (0, 0, 0)
+    pivot.keyframe_insert('rotation_euler', frame=1, index=axis_index)
+    pivot.rotation_euler[axis_index] = math.tau
+    pivot.keyframe_insert('rotation_euler', frame=frames + 1, index=axis_index)
+    action = pivot.animation_data.action
+    action.name = action_name
+    action.use_fake_user = True
+    action['loop'] = True
+    action['mechanical_rotation'] = True
+    action['interpolation'] = 'LINEAR_RUNTIME_RECOMMENDED'
+    return action
 
 
 def make_armature(name, bones, collection, x=0):
@@ -594,6 +628,13 @@ def build_ship(root):
         cube(f'SHIP_Floor_GrateBar_{i}',(3.6-0.72+i*0.24,-4.0,0.075),(0.065,0.72,0.018),M['steel'],floors,0.01)
     for i in range(6):
         cube(f'SHIP_Floor_HazardStripe_{i}',(5.8-0.82+i*0.32,-4.0,0.078),(0.11,0.80,0.016),M['amber'] if i%2==0 else M['black'],floors,0.006,rot=(0,0,math.radians(12)))
+    # The complete control deck tilts around a real hinge line instead of each
+    # panel rotating around an arbitrary mesh origin.
+    console_rotating = [o for o in controls.objects if o.name.startswith('SHIP_Console_') and not any(
+        token in o.name for token in ('Base', 'Support', 'SideHousing'))]
+    console_pivot = rotation_pivot('PIVOT_SHIP_Console',(3.7,-2.28,0.78),controls,'LOCAL_X',console_rotating)
+    console_pivot['rotation_limit_deg'] = (-12.0, 28.0)
+    console_pivot['default_angle_deg'] = 8.0
     for obj in c.all_objects:
         if obj.type=='MESH': obj['snap_grid_m']=0.25
     return c
@@ -737,10 +778,20 @@ def build_navigation_data_props(root):
         rad=math.radians(a); px=x+math.cos(rad)*0.84; py=y+math.sin(rad)*0.84
         cube(f'NAV_Core_ServicePod_{i}',(px,py,0.60),(0.24,0.20,0.25),M['armor2'] if i%2 else M['wall'],nav,0.045,rot=(0,0,rad))
         cube(f'NAV_Core_Status_{i}',(px-math.sin(rad)*0.21,py+math.cos(rad)*0.21,0.66),(0.08,0.015,0.035),M['amber'] if i%3==0 else M['cyan'],nav,0.006,rot=(0,0,rad))
-    sphere('NAV_Core_StellarSphere',(x,y,1.55),(0.48,0.48,0.48),M['cyan'],nav,segments=16,rings=8)
-    torus('NAV_Core_GimbalOuter',(x,y,1.55),0.84,0.075,M['armor'],nav,rot=(math.radians(90),0,0),major_segments=20)
-    torus('NAV_Core_GimbalMiddle',(x,y,1.55),0.66,0.055,M['steel'],nav,rot=(0,math.radians(90),0),major_segments=20)
-    torus('NAV_Core_GimbalInner',(x,y,1.55),0.54,0.035,M['amber'],nav,rot=(math.radians(58),math.radians(22),math.radians(18)),major_segments=20)
+    stellar=sphere('NAV_Core_StellarSphere',(x,y,1.55),(0.48,0.48,0.48),M['cyan'],nav,segments=16,rings=8)
+    outer=torus('NAV_Core_GimbalOuter',(x,y,1.55),0.84,0.075,M['armor'],nav,rot=(math.radians(90),0,0),major_segments=20)
+    middle=torus('NAV_Core_GimbalMiddle',(x,y,1.55),0.66,0.055,M['steel'],nav,rot=(0,math.radians(90),0),major_segments=20)
+    inner=torus('NAV_Core_GimbalInner',(x,y,1.55),0.54,0.035,M['amber'],nav,rot=(math.radians(58),math.radians(22),math.radians(18)),major_segments=20)
+    # Nested, concentric gimbal pivots. Each ring now rotates about the stellar
+    # sphere rather than its mesh bounds or the world origin.
+    p_outer=rotation_pivot('PIVOT_NAV_GimbalOuter',(x,y,1.55),nav,'LOCAL_Z',[outer])
+    p_middle=rotation_pivot('PIVOT_NAV_GimbalMiddle',(x,y,1.55),nav,'LOCAL_Y',[middle])
+    p_inner=rotation_pivot('PIVOT_NAV_GimbalInner',(x,y,1.55),nav,'LOCAL_X',[inner,stellar])
+    middle_world=p_middle.matrix_world.copy(); p_middle.parent=p_outer; p_middle.matrix_parent_inverse=Matrix.Identity(4); p_middle.matrix_basis=p_outer.matrix_world.inverted() @ middle_world
+    inner_world=p_inner.matrix_world.copy(); p_inner.parent=p_middle; p_inner.matrix_parent_inverse=Matrix.Identity(4); p_inner.matrix_basis=p_middle.matrix_world.inverted() @ inner_world
+    add_loop_rotation(p_outer,'NAV_Core_GimbalOuter_Spin',2,120)
+    add_loop_rotation(p_middle,'NAV_Core_GimbalMiddle_Spin',1,90)
+    add_loop_rotation(p_inner,'NAV_Core_GimbalInner_Spin',0,64)
     for sx in [-1,1]:
         beam_between(f'NAV_Core_Arch_{sx}',(x+sx*0.78,y,0.72),(x+sx*0.86,y,1.75),0.09,M['armor'],nav,vertices=10)
         sphere(f'NAV_Core_Bearing_{sx}',(x+sx*0.85,y,1.55),(0.16,0.16,0.16),M['steel'],nav,segments=10,rings=5)
@@ -898,9 +949,15 @@ def build_tutorial_level1_replacements(root):
     for i,ox in enumerate([-0.62,-0.20,0.22,0.64]): torus(f'REPL_AuxEngine_Band_{i}',(x+ox,y,0.90),0.62,0.085,M['steel'],level1,rot=(0,math.radians(90),0),major_segments=16)
     for sy in [-1,1]: beam_between(f'REPL_AuxEngine_Pipe_{sy}',(x-0.55,y+sy*0.50,0.62),(x+0.52,y+sy*0.50,0.62),0.045,M['cyan'],level1,vertices=8)
     impeller=coll('REPL_AuxEngine_Impeller',level1)
-    cyl('REPL_AuxEngine_ImpellerHub',(x+0.88,y,0.90),0.18,0.28,M['steel'],impeller,rot=(0,math.radians(90),0),vertices=12)
+    rotor_center=(x+1.02,y,0.90)
+    rotor_parts=[]
+    rotor_parts.append(cyl('REPL_AuxEngine_ImpellerHub',rotor_center,0.18,0.28,M['steel'],impeller,rot=(0,math.radians(90),0),vertices=12))
     for i in range(10):
-        a=math.radians(i*36); cube(f'REPL_AuxEngine_Blade_{i}',(x+1.02,y+math.cos(a)*0.28,0.90+math.sin(a)*0.28),(0.045,0.24,0.07),M['armor2'],impeller,0.02,rot=(a,0,0))
+        a=math.radians(i*36)
+        rotor_parts.append(cube(f'REPL_AuxEngine_Blade_{i}',(rotor_center[0],y+math.cos(a)*0.34,0.90+math.sin(a)*0.34),(0.045,0.27,0.075),M['armor2'],impeller,0.02,rot=(a,0,0)))
+    rotor_pivot=rotation_pivot('PIVOT_REPL_AuxEngine_Impeller',rotor_center,impeller,'LOCAL_X',rotor_parts)
+    rotor_pivot['rotation_direction']='clockwise_viewed_from_positive_x'
+    add_loop_rotation(rotor_pivot,'REPL_AuxEngine_Impeller_Spin',0,36)
     # Magazine, pickup-effect geometry and document states.
     x=65.0
     extruded_outline('REPL_Magazine_Body',[(-0.24,-0.42),(0.20,-0.38),(0.30,0.32),(-0.18,0.42)],0.30,1.10,(x,y,0),M['armor'],level1)
@@ -928,12 +985,26 @@ def add_ship_engines(collection,x,y,z,spacing,material=None):
 
 def build_space_travel_replacements(root):
     c=coll('REPL_SpaceTravel',root); ships=coll('REPL_Ships',c); station=coll('REPL_Station',c); debris=coll('REPL_Debris',c)
-    # Player ship.
+    # Player shuttle: long pressure hull, glazed flight deck, aerodynamic lifting
+    # surfaces, tail planes and paired drive pods replace the old flat diamond.
     x,y=55.0,-8.0
-    extruded_outline('REPL_PlayerShip_Hull',[(0,-1.35),(0.46,-0.78),(0.78,0.15),(0.62,1.05),(-0.62,1.05),(-0.78,0.15),(-0.46,-0.78)],0.42,0.86,(x,y,0),M['armor'],ships)
-    extruded_outline('REPL_PlayerShip_Cockpit',[(0,-1.18),(0.30,-0.72),(0.38,-0.20),(-0.38,-0.20),(-0.30,-0.72)],0.78,1.08,(x,y,0),M['cyan'],ships)
-    add_ship_engines(ships,x,y+0.86,0.64,0.47)
-    torus('REPL_PlayerShip_DockingCollar',(x,y+0.18,0.64),0.24,0.055,M['steel'],ships,rot=(math.radians(90),0,0),major_segments=12)
+    extruded_outline('REPL_PlayerShip_Hull',[(0,-2.35),(0.42,-2.05),(0.66,-1.25),(0.72,0.85),(0.52,1.68),(-0.52,1.68),(-0.72,0.85),(-0.66,-1.25),(-0.42,-2.05)],0.38,0.92,(x,y,0),M['medical'],ships)
+    extruded_outline('REPL_PlayerShip_Belly',[(-0.48,-1.55),(0.48,-1.55),(0.58,1.35),(-0.58,1.35)],0.22,0.48,(x,y,0),M['wall'],ships)
+    extruded_outline('REPL_PlayerShip_Cockpit',[(0,-2.22),(0.34,-1.90),(0.43,-1.18),(-0.43,-1.18),(-0.34,-1.90)],0.82,1.16,(x,y,0),M['cyan'],ships)
+    for sx in [-1,1]:
+        wing=[(sx*px,py) for px,py in [(0,-0.70),(1.82,0.08),(1.58,0.72),(0,0.52)]]
+        tail=[(sx*px,py) for px,py in [(0,0.72),(0.92,1.30),(0.72,1.56),(0,1.30)]]
+        extruded_outline(f'REPL_PlayerShip_Wing_{sx}',wing,0.43,0.58,(x+sx*0.53,y,0),M['armor'],ships)
+        extruded_outline(f'REPL_PlayerShip_TailPlane_{sx}',tail,0.56,0.68,(x+sx*0.42,y,0),M['armor2'],ships)
+        cyl(f'REPL_PlayerShip_EnginePod_{sx}',(x+sx*0.73,y+0.82,0.55),0.27,1.42,M['armor'],ships,rot=(math.radians(90),0,0),vertices=16)
+        cyl(f'REPL_PlayerShip_EngineNozzle_{sx}',(x+sx*0.73,y+1.56,0.55),0.23,0.18,M['black'],ships,rot=(math.radians(90),0,0),vertices=14)
+        cyl(f'REPL_PlayerShip_EngineGlow_{sx}',(x+sx*0.73,y+1.66,0.55),0.15,0.035,M['cyan'],ships,rot=(math.radians(90),0,0),vertices=14)
+        for iy in [-0.72,-0.18,0.36,0.90]:
+            cube(f'REPL_PlayerShip_HullPanel_{sx}_{iy}',(x+sx*0.665,y+iy,0.68),(0.018,0.20,0.13),M['trim'],ships,0.008)
+    extruded_outline('REPL_PlayerShip_DorsalFin',[(-0.06,0.28),(0.06,0.28),(0.05,1.58),(-0.05,1.12)],0.84,1.55,(x,y,0),M['armor2'],ships)
+    for i,wy in enumerate([-1.78,-1.52,-1.26]):
+        cube(f'REPL_PlayerShip_CockpitWindow_{i}',(x+(i-1)*0.22,y+wy,1.075),(0.16,0.025,0.085),M['cyan'],ships,0.015)
+    torus('REPL_PlayerShip_DockingCollar',(x,y+0.28,0.68),0.29,0.055,M['steel'],ships,rot=(math.radians(90),0,0),major_segments=16)
     # Noctis stealth ship.
     x=59.0
     extruded_outline('REPL_Noctis_Hull',[(0,-1.90),(0.26,-1.15),(0.92,0.28),(0.48,1.35),(0,1.05),(-0.48,1.35),(-0.92,0.28),(-0.26,-1.15)],0.40,0.72,(x,y,0),M['black'],ships)
@@ -954,15 +1025,26 @@ def build_space_travel_replacements(root):
     extruded_outline('REPL_PatrolShip_Hull',[(0,-1.45),(0.52,-0.62),(0.78,0.36),(0.38,1.08),(-0.38,1.08),(-0.78,0.36),(-0.52,-0.62)],0.40,0.78,(x,y,0),M['steel'],ships)
     for sx in [-1,1]: beam_between(f'REPL_PatrolShip_Wing_{sx}',(x+sx*0.34,y,0.62),(x+sx*1.05,y+0.55,0.62),0.10,M['armor'],ships,vertices=8)
     add_ship_engines(ships,x,y+0.98,0.58,0.36)
-    # Giant station with diamond ring and vertical core.
+    # Giant orbital station: concentric habitat rings around a reinforced spindle,
+    # radial dock arms, solar wings and antenna crown.
     x,y=63.0,-14.0
-    cyl('REPL_Station_Core',(x,y,1.30),0.62,2.60,M['wall'],station,vertices=14)
-    for z in [0.35,1.00,1.65,2.25]: cyl(f'REPL_Station_HabRing_{z}',(x,y,z),1.05,0.18,M['armor'],station,vertices=16)
-    ring_pts=[(x,y-2.1,1.25),(x+2.1,y,1.25),(x,y+2.1,1.25),(x-2.1,y,1.25)]
-    for i in range(4): beam_between(f'REPL_Station_DiamondBeam_{i}',ring_pts[i],ring_pts[(i+1)%4],0.14,M['steel'],station,vertices=10)
+    cyl('REPL_Station_Core',(x,y,1.65),0.56,3.30,M['wall'],station,vertices=20)
+    for z,r in [(0.30,0.78),(0.82,1.22),(1.52,1.54),(2.22,1.20),(2.82,0.82)]:
+        torus(f'REPL_Station_HabRing_{z}',(x,y,z),r,0.18,M['armor'],station,major_segments=24,minor_segments=8)
+        cyl(f'REPL_Station_CoreCollar_{z}',(x,y,z),0.70,0.16,M['steel'],station,vertices=18)
+    for i,a in enumerate(range(0,360,45)):
+        rad=math.radians(a); ex=x+math.cos(rad)*1.52; ey=y+math.sin(rad)*1.52
+        beam_between(f'REPL_Station_RadialSpoke_{i}',(x+math.cos(rad)*0.55,y+math.sin(rad)*0.55,1.52),(ex,ey,1.52),0.075,M['steel'],station,vertices=10)
+        cube(f'REPL_Station_HabPod_{i}',(x+math.cos(rad)*1.58,y+math.sin(rad)*1.58,1.52),(0.32,0.19,0.22),M['medical'] if i%2 else M['armor2'],station,0.045,rot=(0,0,rad))
+    ring_pts=[(x,y-2.35,1.10),(x+2.35,y,1.10),(x,y+2.35,1.10),(x-2.35,y,1.10)]
     for i,(px,py,pz) in enumerate(ring_pts):
-        cube(f'REPL_Station_DockSpine_{i}',(px,py,pz),(0.28,0.28,0.88),M['armor2'],station,0.06)
-        sphere(f'REPL_Station_DockLight_{i}',(px,py,pz+0.92),(0.08,0.08,0.08),M['amber'],station,segments=8,rings=4)
+        beam_between(f'REPL_Station_DockSpine_{i}',(x,y,1.10),(px,py,pz),0.15,M['armor2'],station,vertices=12)
+        cube(f'REPL_Station_DockHead_{i}',(px,py,pz),(0.34,0.34,0.32),M['wall'],station,0.07)
+        sphere(f'REPL_Station_DockLight_{i}',(px,py,pz+0.38),(0.08,0.08,0.08),M['amber'],station,segments=8,rings=4)
+    for sx in [-1,1]:
+        beam_between(f'REPL_Station_SolarBoom_{sx}',(x+sx*0.58,y,2.34),(x+sx*2.48,y,2.34),0.075,M['steel'],station,vertices=10)
+        for ix in range(3):
+            cube(f'REPL_Station_SolarPanel_{sx}_{ix}',(x+sx*(1.05+ix*0.62),y,2.34),(0.27,0.06,0.58),M['cyan'],station,0.025)
     for i,a in enumerate(range(0,360,45)):
         rad=math.radians(a); beam_between(f'REPL_Station_Antenna_{i}',(x+math.cos(rad)*0.45,y+math.sin(rad)*0.45,2.55),(x+math.cos(rad)*0.88,y+math.sin(rad)*0.88,3.15),0.035,M['steel'],station,vertices=6)
     # Six debris variants.
@@ -1292,6 +1374,12 @@ def render_previews(groups):
     aim_camera((63.0,-13.0,1.25),(63.0,-42.0,21.0),50)
     scene.render.filepath=os.path.join(PREVIEW,'SpaceTravelReplacements.png')
     bpy.ops.render.render(write_still=True)
+    bpy.data.collections['REPL_Debris'].hide_render=True
+    place_lights(61.5,-10.5)
+    aim_camera((61.5,-10.5,1.15),(61.5,-31.0,15.0),54)
+    scene.render.filepath=os.path.join(PREVIEW,'RefinedSpacecraftAndStation.png')
+    bpy.ops.render.render(write_still=True)
+    bpy.data.collections['REPL_Debris'].hide_render=False
     visible({'REPL_DestinationArrival'})
     place_lights(61.0,-24.0)
     aim_camera((61.0,-24.0,1.15),(61.0,-44.0,12.0),52)
@@ -1337,9 +1425,9 @@ def write_docs():
         'walk':{'action':'VOID_Walk_Loop','loop':True},'run':{'action':'VOID_Run_Loop','loop':True},'turn_left':'VOID_Turn_Left_90','turn_right':'VOID_Turn_Right_90','attack':'VOID_Attack_Claw','pounce':'VOID_Attack_Pounce','jump':'VOID_Jump','death':'VOID_Death_Collapse','walk_to_run':'VOID_Walk_To_Run','run_to_walk':'VOID_Run_To_Walk','directional_pose_blend':['VOID_Pose_Turn_Neg45','VOID_Pose_Turn_Zero','VOID_Pose_Turn_Pos45']}},
       'projectiles':{'forward_axis':'-Y','pivot':'center','translation':'game-controlled','assets':['PROJ_Rifle_Ballistic','PROJ_Rifle_ArmorPiercing','PROJ_Energy_PlasmaBolt','PROJ_Rifle_SpentCasing'],'spin_actions':['PROJ_Rifle_Ballistic_Spin','PROJ_Rifle_ArmorPiercing_Spin','PROJ_Energy_PlasmaBolt_Spin']},
       'ship_interior_props':{'snap_grid_m':0.25,'library':'Libraries/ShipInterior_Props.blend','families':['storage','utility','crew','maintenance'],'placement':'append or link the ENV_ShipInteriorProps collection, then move individual named parts as one prop assembly'},
-      'navigation_data_props':{'library':'Libraries/NavigationDataProps.blend','families':['navigation_core','electronic_document'],'navigation_core':'separate gimbal rings support independent rotation','documents':'handheld pickup props facing -Y'},
+      'navigation_data_props':{'library':'Libraries/NavigationDataProps.blend','families':['navigation_core','electronic_document'],'navigation_core':'three concentric nested pivots rotate about the stellar sphere on local Z/Y/X axes','documents':'handheld pickup props facing -Y'},
       'additional_ship_props':{'library':'Libraries/AdditionalShipProps.blend','families':['navigation_comms','maintenance','science_survival','security'],'snap_grid_m':0.25},
-      'mesh_replacements':{'tutorial_level1':'Libraries/TutorialLevel1_Replacements.blend','space_travel':'Libraries/SpaceTravel_Replacements.blend','destination_arrival':'Libraries/DestinationArrival_Replacements.blend','rule':'all replacement parts are physical meshes; rotatable engine impeller and pickup effect remain separate collections'},
+      'mesh_replacements':{'tutorial_level1':'Libraries/TutorialLevel1_Replacements.blend','space_travel':'Libraries/SpaceTravel_Replacements.blend','destination_arrival':'Libraries/DestinationArrival_Replacements.blend','rule':'all replacement parts are physical meshes; auxiliary impeller uses a concentric local-X pivot; player craft is a shuttle silhouette and the station uses habitat rings, radial docks and solar wings'},
       'remaining_world_replacements':{'library':'Libraries/RemainingWorld_Replacements.blend','families':['tutorial_floor','infection_traces','tutorial_records','navigation_marker','rescue_signal','warning_effect','screen_teal_bar','cockpit_status','level1_floor','corridor_stripe','space_backdrop_debris','engine_flames'],'rule':'all previously drawn diamonds and rectangles are represented by volumetric meshes'},
       'modular_rules':{'human':'Enable exactly one base head; face, helmet, chest armor and equipment are optional overlays. All HUM_v1 parts share the same skeleton and origin.','void':'Base body stays enabled; horn, eye cluster, heavy carapace and tail blade are swappable VOID_v1 overlays.','ship':'2 m wall modules and 2 m floor tiles snap on a 0.25 m grid.'},
       'export_notes':['Apply no transforms to armatures before export.','Export deform bones only when supported.','Keep action names unchanged so the animation state map remains valid.','Procedural materials should be baked or replaced with engine PBR textures during integration.']}

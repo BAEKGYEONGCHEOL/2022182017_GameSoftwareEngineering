@@ -2,12 +2,12 @@
   "status": "PASS",
   "files": {
     "DarkSciFi_ModularAssetPack.blend": {
-      "size_bytes": 687356,
-      "objects": 960,
-      "meshes": 953,
+      "size_bytes": 731614,
+      "objects": 1014,
+      "meshes": 1002,
       "armatures": 3,
       "materials": 24,
-      "actions": 35,
+      "actions": 39,
       "action_names": [
         "HUM_Aim_Rifle_Enter",
         "HUM_Aim_Rifle_Fire",
@@ -24,9 +24,13 @@
         "HUM_Turn_Right_90",
         "HUM_Walk_Loop",
         "HUM_Walk_To_Run",
+        "NAV_Core_GimbalInner_Spin",
+        "NAV_Core_GimbalMiddle_Spin",
+        "NAV_Core_GimbalOuter_Spin",
         "PROJ_Energy_PlasmaBolt_Spin",
         "PROJ_Rifle_ArmorPiercing_Spin",
         "PROJ_Rifle_Ballistic_Spin",
+        "REPL_AuxEngine_Impeller_Spin",
         "SPACE_Asteroid_A_DriftSpin",
         "SPACE_Asteroid_B_DriftSpin",
         "SPACE_Asteroid_C_DriftSpin",
@@ -51,7 +55,7 @@
       "status": "PASS"
     },
     "Libraries/Humanoid_Modular.blend": {
-      "size_bytes": 140268,
+      "size_bytes": 140483,
       "objects": 73,
       "meshes": 72,
       "armatures": 1,
@@ -80,7 +84,7 @@
       "status": "PASS"
     },
     "Libraries/Void_Quadruped.blend": {
-      "size_bytes": 114205,
+      "size_bytes": 114040,
       "objects": 50,
       "meshes": 49,
       "armatures": 1,
@@ -107,8 +111,8 @@
       "status": "PASS"
     },
     "Libraries/Ship_ModularKit.blend": {
-      "size_bytes": 171769,
-      "objects": 181,
+      "size_bytes": 172247,
+      "objects": 182,
       "meshes": 181,
       "armatures": 0,
       "materials": 14,
@@ -120,7 +124,7 @@
       "status": "PASS"
     },
     "Libraries/ShipInterior_Props.blend": {
-      "size_bytes": 141998,
+      "size_bytes": 141989,
       "objects": 128,
       "meshes": 128,
       "armatures": 0,
@@ -133,20 +137,24 @@
       "status": "PASS"
     },
     "Libraries/NavigationDataProps.blend": {
-      "size_bytes": 123694,
-      "objects": 75,
+      "size_bytes": 125159,
+      "objects": 78,
       "meshes": 75,
       "armatures": 0,
       "materials": 9,
-      "actions": 0,
-      "action_names": [],
+      "actions": 3,
+      "action_names": [
+        "NAV_Core_GimbalInner_Spin",
+        "NAV_Core_GimbalMiddle_Spin",
+        "NAV_Core_GimbalOuter_Spin"
+      ],
       "skeletal_mesh_parts": 0,
       "missing_required_actions": [],
       "missing_required_objects": [],
       "status": "PASS"
     },
     "Libraries/AdditionalShipProps.blend": {
-      "size_bytes": 136081,
+      "size_bytes": 135781,
       "objects": 90,
       "meshes": 90,
       "armatures": 0,
@@ -159,24 +167,26 @@
       "status": "PASS"
     },
     "Libraries/TutorialLevel1_Replacements.blend": {
-      "size_bytes": 117511,
-      "objects": 64,
+      "size_bytes": 118612,
+      "objects": 65,
       "meshes": 63,
       "armatures": 1,
       "materials": 10,
-      "actions": 0,
-      "action_names": [],
+      "actions": 1,
+      "action_names": [
+        "REPL_AuxEngine_Impeller_Spin"
+      ],
       "skeletal_mesh_parts": 9,
       "missing_required_actions": [],
       "missing_required_objects": [],
       "status": "PASS"
     },
     "Libraries/SpaceTravel_Replacements.blend": {
-      "size_bytes": 129047,
-      "objects": 95,
-      "meshes": 95,
+      "size_bytes": 163787,
+      "objects": 144,
+      "meshes": 144,
       "armatures": 0,
-      "materials": 11,
+      "materials": 12,
       "actions": 0,
       "action_names": [],
       "skeletal_mesh_parts": 0,
@@ -185,7 +195,7 @@
       "status": "PASS"
     },
     "Libraries/DestinationArrival_Replacements.blend": {
-      "size_bytes": 112178,
+      "size_bytes": 113277,
       "objects": 59,
       "meshes": 59,
       "armatures": 0,
@@ -198,7 +208,7 @@
       "status": "PASS"
     },
     "Libraries/RemainingWorld_Replacements.blend": {
-      "size_bytes": 146762,
+      "size_bytes": 146542,
       "objects": 121,
       "meshes": 121,
       "armatures": 0,
@@ -211,7 +221,7 @@
       "status": "PASS"
     },
     "Libraries/Space_Asteroids.blend": {
-      "size_bytes": 77335,
+      "size_bytes": 77333,
       "objects": 16,
       "meshes": 16,
       "armatures": 0,
@@ -229,7 +239,7 @@
       "status": "PASS"
     },
     "Libraries/Projectile_Meshes.blend": {
-      "size_bytes": 75980,
+      "size_bytes": 76000,
       "objects": 4,
       "meshes": 4,
       "armatures": 0,
