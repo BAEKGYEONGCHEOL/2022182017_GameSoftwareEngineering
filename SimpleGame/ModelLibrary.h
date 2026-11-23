@@ -54,7 +54,8 @@ class ModelLibrary
 		float heightScale = 1.0f,
 		float localRotation = 0.0f,
 		float localPivotX = 0.0f,
-		float localPivotY = 0.0f) const;
+		float localPivotY = 0.0f,
+		bool rotateAroundVisualCenter = false) const;
 	void PrecacheMesh(const std::string& meshName,
 		float scale = 1.0f,
 		float rotation = 0.0f,
@@ -62,7 +63,8 @@ class ModelLibrary
 		float heightScale = 1.0f,
 		float localRotation = 0.0f,
 		float localPivotX = 0.0f,
-		float localPivotY = 0.0f) const;
+		float localPivotY = 0.0f,
+		bool rotateAroundVisualCenter = false) const;
 	bool GetMeshHalfExtents(const std::string& meshName,
 		float rotation,
 		float& halfWidth,
@@ -79,12 +81,14 @@ class ModelLibrary
 		float localRotation;
 		float localPivotX;
 		float localPivotY;
+		bool rotateAroundVisualCenter;
 		std::vector<ColoredTriangle> triangles;
 	};
 	struct MeshBounds
 	{
 		float halfWidth;
 		float halfHeight;
+		float visualCenterHeight;
 	};
 
 	bool LoadFile(const char* path);

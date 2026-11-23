@@ -45,7 +45,8 @@ void ModelLibrary::DrawMesh(PrototypeRenderer* renderer,
 	float heightScale,
 	float localRotation,
 	float localPivotX,
-	float localPivotY) const
+	float localPivotY,
+	bool rotateAroundVisualCenter) const
 {
 	auto mesh = m_Meshes.find(meshName);
 	if (mesh == m_Meshes.end())
@@ -74,7 +75,8 @@ void ModelLibrary::DrawMesh(PrototypeRenderer* renderer,
 			if (cached.meshName == meshName && cached.scale == scale &&
 				cached.rotation == rotation && cached.screenRotation == screenRotation &&
 				cached.heightScale == heightScale && cached.localRotation == localRotation &&
-				cached.localPivotX == localPivotX && cached.localPivotY == localPivotY)
+				cached.localPivotX == localPivotX && cached.localPivotY == localPivotY &&
+				cached.rotateAroundVisualCenter == rotateAroundVisualCenter)
 			{
 				if (renderer != NULL)
 					renderer->DrawTriangles(cached.triangles, x, y);
@@ -104,6 +106,7 @@ void ModelLibrary::DrawMesh(PrototypeRenderer* renderer,
 		cached.localRotation = localRotation;
 		cached.localPivotX = localPivotX;
 		cached.localPivotY = localPivotY;
+		cached.rotateAroundVisualCenter = rotateAroundVisualCenter;
 		m_StaticMeshCache.push_back(cached);
 		renderTriangles = &m_StaticMeshCache.back().triangles;
 	}
@@ -111,6 +114,31 @@ void ModelLibrary::DrawMesh(PrototypeRenderer* renderer,
 	renderTriangles->reserve(mesh->second.size());
 	const float baseX = cacheStaticProjection ? 0.0f : x;
 	const float baseY = cacheStaticProjection ? 0.0f : y;
+	float screenPivotX = 0.0f;
+	float screenPivotY = 0.0f;
+	if (rotateAroundVisualCenter)
+	{
+		// Screen-space rotation must use the projected volume center. Rotating
+		// around the ground anchor makes tall meshes orbit instead of spin.
+		const auto bounds = m_MeshBounds.find(meshName);
+		if (bounds != m_MeshBounds.end())
+		{
+			const float pivotOffsetX = -localPivotX;
+			const float pivotOffsetY = -localPivotY;
+			const float localCenterX = localPivotX +
+				pivotOffsetX * localCosine - pivotOffsetY * localSine;
+			const float localCenterY = localPivotY +
+				pivotOffsetX * localSine + pivotOffsetY * localCosine;
+			const float rotatedCenterX =
+				localCenterX * cosine - localCenterY * sine;
+			const float rotatedCenterY =
+				localCenterX * sine + localCenterY * cosine;
+			screenPivotX = (rotatedCenterX - rotatedCenterY) * scale;
+			screenPivotY =
+				-(rotatedCenterX + rotatedCenterY) * scale * 0.5f +
+				bounds->second.visualCenterHeight * scale * heightScale;
+		}
+	}
 	for (const MeshTriangle& triangle : mesh->second)
 	{
 		ColoredTriangle rendered = {};
@@ -138,9 +166,11 @@ void ModelLibrary::DrawMesh(PrototypeRenderer* renderer,
 			// diagonal facing appeared opposite to its movement/aim direction.
 			const float projectedY =
 				-(rotatedX + rotatedY) * scale * 0.5f + localZ * scale * heightScale;
+			const float pivotRelativeX = projectedX - screenPivotX;
+			const float pivotRelativeY = projectedY - screenPivotY;
 			rendered.points[vertex] = {
-				baseX + projectedX * screenCosine - projectedY * screenSine,
-				baseY + projectedX * screenSine + projectedY * screenCosine};
+				baseX + pivotRelativeX * screenCosine - pivotRelativeY * screenSine,
+				baseY + pivotRelativeX * screenSine + pivotRelativeY * screenCosine};
 			rendered.depth += rendered.points[vertex].y;
 		}
 		rendered.depth /= 3.0f;
@@ -201,7 +231,8 @@ void ModelLibrary::PrecacheMesh(const std::string& meshName,
 	float heightScale,
 	float localRotation,
 	float localPivotX,
-	float localPivotY) const
+	float localPivotY,
+	bool rotateAroundVisualCenter) const
 {
 	DrawMesh(NULL,
 		meshName,
@@ -213,7 +244,8 @@ void ModelLibrary::PrecacheMesh(const std::string& meshName,
 		heightScale,
 		localRotation,
 		localPivotX,
-		localPivotY);
+		localPivotY,
+		rotateAroundVisualCenter);
 }
 
 bool ModelLibrary::GetMeshHalfExtents(const std::string& meshName,
@@ -380,6 +412,7 @@ bool ModelLibrary::LoadMeshFile(const char* path)
 		float minimumY = 1.0e9f;
 		float maximumY = -1.0e9f;
 		float minimumZ = 1.0e9f;
+		float maximumZ = -1.0e9f;
 		for (const MeshTriangle& triangle : meshEntry.second)
 		{
 			for (int vertex = 0; vertex < 3; ++vertex)
@@ -389,6 +422,7 @@ bool ModelLibrary::LoadMeshFile(const char* path)
 				minimumY = std::min(minimumY, triangle.positions[vertex * 3 + 1]);
 				maximumY = std::max(maximumY, triangle.positions[vertex * 3 + 1]);
 				minimumZ = std::min(minimumZ, triangle.positions[vertex * 3 + 2]);
+				maximumZ = std::max(maximumZ, triangle.positions[vertex * 3 + 2]);
 			}
 		}
 		const float centerX = preserveModelOrigin ? 0.0f : (minimumX + maximumX) * 0.5f;
@@ -396,7 +430,9 @@ bool ModelLibrary::LoadMeshFile(const char* path)
 		const float baseZ = preserveModelOrigin ? 0.0f : minimumZ;
 		m_MeshBounds[meshEntry.first] = {
 			std::max(std::fabs(minimumX - centerX), std::fabs(maximumX - centerX)),
-			std::max(std::fabs(minimumY - centerY), std::fabs(maximumY - centerY))};
+			std::max(std::fabs(minimumY - centerY), std::fabs(maximumY - centerY)),
+			preserveModelOrigin ? (minimumZ + maximumZ) * 0.5f :
+				(maximumZ - minimumZ) * 0.5f};
 		for (MeshTriangle& triangle : meshEntry.second)
 		{
 			for (int vertex = 0; vertex < 3; ++vertex)

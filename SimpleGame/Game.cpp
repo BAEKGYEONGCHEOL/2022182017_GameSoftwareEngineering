@@ -2854,6 +2854,191 @@ void Game::RenderInterior()
 				DrawLevelSurvivor(placedSurvivor, i);
 			});
 	}
+
+	if (m_CurrentShip == 0)
+	{
+		CreateSceneActor("MedicalTerminal",
+			TerminalPosition.x,
+			TerminalPosition.y,
+			0.0f,
+			1,
+			TerminalPosition.x + TerminalPosition.y,
+			[this](const ActorTransform& transform)
+			{
+				const ScreenPoint terminal = WorldToScreen(transform.x, transform.y);
+				m_Renderer->DrawSoftShadow(
+					terminal.x, terminal.y - 2.0f, 54.0f, 15.0f, 0.78f);
+				m_ModelLibrary.DrawMesh(m_Renderer,
+					"replacement_medical_terminal",
+					terminal.x,
+					terminal.y,
+					18.0f);
+				const float hologramPulse =
+					15.0f + std::sin(m_TotalTime * 4.0f) * 1.0f;
+				m_ModelLibrary.DrawMesh(m_Renderer,
+					"replacement_medical_hologram",
+					terminal.x,
+					terminal.y + 24.0f,
+					hologramPulse,
+					0.0f,
+					m_TotalTime * 0.35f);
+			});
+
+		if (m_Quest == CollectTutorialWeapon)
+		{
+			CreateSceneActor("TutorialWeaponPickup",
+				TutorialWeaponPosition.x,
+				TutorialWeaponPosition.y,
+				11.0f,
+				1,
+				TutorialWeaponPosition.x + TutorialWeaponPosition.y,
+				[this](const ActorTransform& transform)
+				{
+					const ScreenPoint weapon =
+						WorldToScreen(transform.x, transform.y, transform.height);
+					m_Renderer->DrawSoftShadow(
+						weapon.x, weapon.y - 10.0f, 60.0f, 16.0f, 0.65f);
+					m_ModelLibrary.DrawMesh(m_Renderer,
+						"pulse_rifle_mesh",
+						weapon.x,
+						weapon.y,
+						38.0f * (1.0f + std::sin(m_TotalTime * 4.0f) * 0.08f));
+				});
+		}
+
+		for (int recordIndex = 0; recordIndex < 3; ++recordIndex)
+		{
+			const WorldPoint recordPosition = TutorialRecordPositions[recordIndex];
+			CreateSceneActor("TutorialRecord",
+				recordPosition.x,
+				recordPosition.y,
+				0.0f,
+				1,
+				recordPosition.x + recordPosition.y,
+				[this, recordIndex](const ActorTransform& transform)
+				{
+					const char* recordMeshes[] = {
+						"replacement_tutorial_record_0",
+						"replacement_tutorial_record_1",
+						"replacement_tutorial_record_2"};
+					const ScreenPoint record = WorldToScreen(transform.x, transform.y);
+					m_ModelLibrary.DrawMesh(m_Renderer,
+						recordMeshes[recordIndex],
+						record.x,
+						record.y,
+						18.0f,
+						0.0f,
+						m_TutorialRecordsRead[recordIndex] ? Pi : 0.0f,
+						m_TutorialRecordsRead[recordIndex] ? 0.72f : 1.0f);
+				});
+		}
+
+		if (!m_CoreRecovered)
+		{
+			CreateSceneActor("NavigationCore",
+				CorePosition.x,
+				CorePosition.y,
+				0.0f,
+				1,
+				CorePosition.x + CorePosition.y,
+				[this](const ActorTransform& transform)
+				{
+					const ScreenPoint core = WorldToScreen(transform.x, transform.y);
+					const float corePulse = AllEnemiesDefeated()
+						? 1.0f + std::sin(m_TotalTime * 5.0f) * 0.08f
+						: 0.90f;
+					m_ModelLibrary.DrawMesh(m_Renderer,
+						"replacement_nav_core_marker",
+						core.x,
+						core.y,
+						24.0f * corePulse,
+						0.0f,
+						m_TotalTime * 0.35f,
+						1.0f,
+						0.0f,
+						0.0f,
+						0.0f,
+						true);
+				});
+		}
+
+		if (m_CoreRecovered && !m_SignalChecked)
+		{
+			CreateSceneActor("RescueSignal",
+				SignalPosition.x,
+				SignalPosition.y,
+				0.0f,
+				1,
+				SignalPosition.x + SignalPosition.y,
+				[this](const ActorTransform& transform)
+				{
+					const ScreenPoint signal = WorldToScreen(transform.x, transform.y);
+					const float signalPulse =
+						1.0f + std::sin(m_TotalTime * 4.5f) * 0.10f;
+					m_ModelLibrary.DrawMesh(m_Renderer,
+						"replacement_rescue_signal",
+						signal.x,
+						signal.y,
+						22.0f * signalPulse);
+				});
+		}
+	}
+
+	CreateSceneActor("NoctisFlightControl",
+		CockpitPosition.x,
+		CockpitPosition.y,
+		0.0f,
+		1,
+		CockpitPosition.x + CockpitPosition.y,
+		[this](const ActorTransform& transform)
+		{
+			const ScreenPoint cockpit = WorldToScreen(transform.x, transform.y);
+			DrawFlightControlConsole(cockpit.x, cockpit.y, m_NoctisSystemsOnline, false);
+			m_Renderer->DrawString(cockpit.x - 75.0f,
+				cockpit.y + 92.0f,
+				L"노크티스 항법 제어 장치",
+				m_NoctisSystemsOnline ? 0.28f : 0.70f,
+				m_NoctisSystemsOnline ? 0.88f : 0.36f,
+				m_NoctisSystemsOnline ? 0.92f : 0.34f,
+				0.95f);
+		});
+
+	CreateSceneActor("WarningLight",
+		-10.5f,
+		-10.5f,
+		0.0f,
+		1,
+		-21.0f,
+		[this](const ActorTransform& transform)
+		{
+			const ScreenPoint warningLight = WorldToScreen(transform.x, transform.y);
+			const float warningPulse =
+				1.0f + 0.12f * std::sin(m_TotalTime * 4.0f);
+			m_ModelLibrary.DrawMesh(m_Renderer,
+				"replacement_warning_effect",
+				warningLight.x,
+				warningLight.y,
+				24.0f * warningPulse,
+				0.0f,
+				m_TotalTime * 0.22f);
+		});
+
+	CreateSceneActor("CockpitStatusInstrument",
+		CockpitPosition.x + 1.6f,
+		CockpitPosition.y - 0.2f,
+		0.0f,
+		1,
+		CockpitPosition.x + CockpitPosition.y + 1.4f,
+		[this](const ActorTransform& transform)
+		{
+			const ScreenPoint statusInstrument = WorldToScreen(transform.x, transform.y);
+			m_ModelLibrary.DrawMesh(m_Renderer,
+				"replacement_screen_teal_bar",
+				statusInstrument.x,
+				statusInstrument.y,
+				22.0f);
+		});
+
 	for (size_t i = 0; i < m_Projectiles.size(); ++i)
 	{
 		const Projectile projectile = m_Projectiles[i];
@@ -2877,98 +3062,6 @@ void Game::RenderInterior()
 		m_SceneGraph.TransformTimeMs(),
 		m_SceneGraph.SortTimeMs(),
 		m_SceneGraph.ActorRenderTimeMs());
-
-	if (m_CurrentShip == 0)
-	{
-		ScreenPoint terminal = WorldToScreen(TerminalPosition.x, TerminalPosition.y);
-		m_Renderer->DrawSoftShadow(terminal.x, terminal.y - 10.0f, 54.0f, 15.0f, 0.78f);
-		m_ModelLibrary.DrawMesh(
-			m_Renderer, "replacement_medical_terminal", terminal.x, terminal.y, 18.0f);
-		const float hologramPulse = 15.0f + std::sin(m_TotalTime * 4.0f) * 1.0f;
-		m_ModelLibrary.DrawMesh(m_Renderer,
-			"replacement_medical_hologram",
-			terminal.x,
-			terminal.y + 24.0f,
-			hologramPulse,
-			0.0f,
-			m_TotalTime * 0.35f);
-		if (m_Quest == CollectTutorialWeapon)
-		{
-			ScreenPoint weapon = WorldToScreen(TutorialWeaponPosition.x, TutorialWeaponPosition.y, 11.0f);
-			m_Renderer->DrawSoftShadow(weapon.x, weapon.y - 10.0f, 60.0f, 16.0f, 0.65f);
-			m_ModelLibrary.DrawMesh(m_Renderer, "pulse_rifle_mesh", weapon.x, weapon.y,
-				38.0f * (1.0f + std::sin(m_TotalTime * 4.0f) * 0.08f));
-		}
-		for (int recordIndex = 0; recordIndex < 3; ++recordIndex)
-		{
-			ScreenPoint record = WorldToScreen(TutorialRecordPositions[recordIndex].x,
-				TutorialRecordPositions[recordIndex].y);
-			const char* recordMeshes[] = {"replacement_tutorial_record_0",
-				"replacement_tutorial_record_1",
-				"replacement_tutorial_record_2"};
-			m_ModelLibrary.DrawMesh(m_Renderer,
-				recordMeshes[recordIndex],
-				record.x,
-				record.y,
-				18.0f,
-				0.0f,
-				m_TutorialRecordsRead[recordIndex] ? Pi : 0.0f,
-				m_TutorialRecordsRead[recordIndex] ? 0.72f : 1.0f);
-		}
-		ScreenPoint core = WorldToScreen(CorePosition.x, CorePosition.y);
-		if (!m_CoreRecovered)
-		{
-			const float corePulse = AllEnemiesDefeated()
-				? 1.0f + std::sin(m_TotalTime * 5.0f) * 0.08f
-				: 0.90f;
-			m_ModelLibrary.DrawMesh(m_Renderer,
-				"replacement_nav_core_marker",
-				core.x,
-				core.y,
-				24.0f * corePulse,
-				0.0f,
-				m_TotalTime * 0.35f);
-		}
-	}
-	ScreenPoint cockpit = WorldToScreen(CockpitPosition.x, CockpitPosition.y);
-	DrawFlightControlConsole(cockpit.x, cockpit.y, m_NoctisSystemsOnline, false);
-	m_Renderer->DrawString(cockpit.x - 75.0f,
-		cockpit.y + 92.0f,
-		L"노크티스 항법 제어 장치",
-		m_NoctisSystemsOnline ? 0.28f : 0.70f,
-		m_NoctisSystemsOnline ? 0.88f : 0.36f,
-		m_NoctisSystemsOnline ? 0.92f : 0.34f,
-		0.95f);
-	if (m_CurrentShip == 0)
-	{
-		ScreenPoint signal = WorldToScreen(SignalPosition.x, SignalPosition.y);
-		if (m_CoreRecovered && !m_SignalChecked)
-		{
-			const float signalPulse = 1.0f + std::sin(m_TotalTime * 4.5f) * 0.10f;
-			m_ModelLibrary.DrawMesh(m_Renderer,
-				"replacement_rescue_signal",
-				signal.x,
-				signal.y,
-				22.0f * signalPulse);
-		}
-	}
-
-	ScreenPoint warningLight = WorldToScreen(-10.5f, -10.5f);
-	const float warningPulse = 1.0f + 0.12f * std::sin(m_TotalTime * 4.0f);
-	m_ModelLibrary.DrawMesh(m_Renderer,
-		"replacement_warning_effect",
-		warningLight.x,
-		warningLight.y,
-		24.0f * warningPulse,
-		0.0f,
-		m_TotalTime * 0.22f);
-	const ScreenPoint statusInstrument =
-		WorldToScreen(CockpitPosition.x + 1.6f, CockpitPosition.y - 0.2f);
-	m_ModelLibrary.DrawMesh(m_Renderer,
-		"replacement_screen_teal_bar",
-		statusInstrument.x,
-		statusInstrument.y,
-		22.0f);
 }
 
 void Game::SetDialogue(
@@ -2981,9 +3074,9 @@ void Game::SetDialogue(
 
 void Game::DrawFlightControlConsole(float x, float y, bool powered, bool infected)
 {
-	m_Renderer->DrawSoftShadow(x, y - 9.0f, 148.0f, 34.0f, 0.86f);
+	m_Renderer->DrawSoftShadow(x, y - 2.0f, 148.0f, 34.0f, 0.86f);
 	m_ModelLibrary.DrawMesh(m_Renderer, "ship_pilot_seat", x, y, 24.0f);
-	m_ModelLibrary.DrawMesh(m_Renderer, "ship_console", x, y + 10.0f, 24.0f);
+	m_ModelLibrary.DrawMesh(m_Renderer, "ship_console", x, y, 24.0f);
 	if (infected)
 		m_ModelLibrary.DrawMesh(m_Renderer,
 			"replacement_cockpit_status_infected",
@@ -2991,7 +3084,12 @@ void Game::DrawFlightControlConsole(float x, float y, bool powered, bool infecte
 			y + 26.0f,
 			34.0f,
 			0.0f,
-			m_TotalTime * 0.16f);
+			m_TotalTime * 0.16f,
+			1.0f,
+			0.0f,
+			0.0f,
+			0.0f,
+			true);
 	else if (powered)
 		m_ModelLibrary.DrawMesh(m_Renderer,
 			"replacement_cockpit_status_active",
@@ -2999,7 +3097,12 @@ void Game::DrawFlightControlConsole(float x, float y, bool powered, bool infecte
 			y + 31.0f,
 			34.0f,
 			0.0f,
-			m_TotalTime * 0.35f);
+			m_TotalTime * 0.35f,
+			1.0f,
+			0.0f,
+			0.0f,
+			0.0f,
+			true);
 }
 
 void Game::DrawWorldBlock(const Obstacle& obstacle)
@@ -3377,7 +3480,12 @@ void Game::RenderSpace()
 			fixedY + 14.0f,
 			fixedShipScales[fixedShipIndex],
 			0.0f,
-			-Pi * 0.5f - std::atan2(0.5f, 1.0f));
+			-Pi * 0.5f - std::atan2(0.5f, 1.0f),
+			1.0f,
+			0.0f,
+			0.0f,
+			0.0f,
+			true);
 		m_Renderer->DrawString(
 			fixedX - 54.0f, fixedY + 104.0f, FixedShipName(fixedShipIndex), 0.48f, 0.90f, 0.94f, 1.0f);
 	}
@@ -3399,7 +3507,12 @@ void Game::RenderSpace()
 				transform.y,
 				30.0f * transform.scaleX,
 				0.0f,
-				transform.rotation - std::atan2(0.5f, 1.0f));
+				transform.rotation - std::atan2(0.5f, 1.0f),
+				1.0f,
+				0.0f,
+				0.0f,
+				0.0f,
+				true);
 		});
 	playerShip->LocalTransform().rotation = m_ShipAngle;
 	const WorldPoint destinationPosition = FixedShipPosition(m_TravelDestinationShip);
@@ -3649,7 +3762,7 @@ void Game::CreatePersonalShipInteriorActors(const WorldPoint& dockPosition)
 			fixture.x,
 			fixture.y,
 			0.0f,
-			2,
+			1,
 			fixture.x + fixture.y,
 			[this, fixture](const ActorTransform& transform)
 			{
@@ -3664,7 +3777,7 @@ void Game::CreatePersonalShipInteriorActors(const WorldPoint& dockPosition)
 		dockPosition.x,
 		dockPosition.y + 3.0f,
 		0.0f,
-		3,
+		1,
 		dockPosition.x + dockPosition.y + 3.0f,
 		[this](const ActorTransform& transform)
 		{
@@ -3803,7 +3916,7 @@ void Game::RenderFirstLevel()
 			enginePosition.x,
 			enginePosition.y,
 			0.0f,
-			2,
+			1,
 			enginePosition.x + enginePosition.y,
 			[this, active, engineIndex](const ActorTransform& transform)
 			{
@@ -3818,7 +3931,12 @@ void Game::RenderFirstLevel()
 					engine.y - 15.0f,
 					35.0f,
 					0.0f,
-					rotation);
+					rotation,
+					1.0f,
+					0.0f,
+					0.0f,
+					0.0f,
+					true);
 				m_Renderer->DrawString(engine.x - 61.0f,
 					engine.y + 62.0f,
 					active ? L"보조 엔진 가동" : L"정지된 보조 엔진 [E]",
@@ -3835,7 +3953,7 @@ void Game::RenderFirstLevel()
 		m_LevelControlPosition.x,
 		m_LevelControlPosition.y,
 		0.0f,
-		2,
+		1,
 		m_LevelControlPosition.x + m_LevelControlPosition.y,
 		[this, enginesActive, departureReady](const ActorTransform& transform)
 		{
@@ -3883,7 +4001,7 @@ void Game::RenderFirstLevel()
 			document.position.x,
 			document.position.y,
 			0.0f,
-			8,
+			1,
 			document.position.x + document.position.y,
 			[this, document, animationOffset](const ActorTransform& transform)
 			{
@@ -3943,7 +4061,7 @@ void Game::RenderFirstLevel()
 			survivor.position.x,
 			survivor.position.y,
 			0.0f,
-			3,
+			1,
 			survivor.position.x + survivor.position.y,
 			[this, survivor, index](const ActorTransform& transform)
 			{
@@ -3970,7 +4088,7 @@ void Game::RenderFirstLevel()
 			position.x,
 			position.y,
 			0.0f,
-			3,
+			1,
 			position.x + position.y,
 			[this, enemyState](const ActorTransform& transform)
 			{
@@ -3993,7 +4111,7 @@ void Game::RenderFirstLevel()
 		m_Player.x,
 		m_Player.y,
 		0.0f,
-		3,
+		1,
 		m_Player.x + m_Player.y,
 		[this](const ActorTransform& transform)
 		{
@@ -4081,7 +4199,12 @@ void Game::RenderDestination()
 				transform.y,
 				30.0f * transform.scaleX,
 				0.0f,
-				transform.rotation - std::atan2(0.5f, 1.0f));
+				transform.rotation - std::atan2(0.5f, 1.0f),
+				1.0f,
+				0.0f,
+				0.0f,
+				0.0f,
+				true);
 		});
 	ship->LocalTransform().rotation = Pi * 0.5f;
 	m_SceneGraph.Render();
